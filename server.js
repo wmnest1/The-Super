@@ -1,28 +1,46 @@
-const express = require('express');
-const cors = require('cors');
-const Anthropic = require('@anthropic-ai/sdk');
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const cors = require("cors");
+const Anthropic = require("@anthropic-ai/sdk");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static("public"));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const DATA_FILE = path.join(__dirname, 'data.json');
+const DATA_FILE = path.join(__dirname, "data.json");
 
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      const empty = { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [], nextInvoiceNumber: 1001 };
+      const empty = {
+        clients: [],
+        projects: [],
+        crew: [],
+        subs: [],
+        unitPrices: [],
+        entries: [],
+        nextInvoiceNumber: 1001,
+      };
       fs.writeFileSync(DATA_FILE, JSON.stringify(empty, null, 2));
       return empty;
     }
-    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
     if (!data.nextInvoiceNumber) data.nextInvoiceNumber = 1001;
     return data;
-  } catch { return { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [], nextInvoiceNumber: 1001 }; }
+  } catch {
+    return {
+      clients: [],
+      projects: [],
+      crew: [],
+      subs: [],
+      unitPrices: [],
+      entries: [],
+      nextInvoiceNumber: 1001,
+    };
+  }
 }
 
 function saveData(data) {
@@ -31,16 +49,39 @@ function saveData(data) {
 
 function getPSTDateTime() {
   const now = new Date();
-  const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
-  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const pstDate = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }),
+  );
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   const dayName = days[pstDate.getDay()];
   const month = months[pstDate.getMonth()];
   const day = pstDate.getDate();
   const year = pstDate.getFullYear();
   let hours = pstDate.getHours();
-  const minutes = String(pstDate.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const minutes = String(pstDate.getMinutes()).padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12 || 12;
   const dateOnly = `${month} ${day}, ${year}`;
   const dateTime = `${dayName}, ${month} ${day}, ${year} at ${hours}:${minutes} ${ampm} PST`;
@@ -79,11 +120,47 @@ Always use this number on the next document you generate. It goes in the top-rig
 DOCUMENT DATE: Default to ${dateOnly} on all invoices and proposals. If Walt specifies a different date, use that instead. Show date only — never show a time on invoices or proposals.
 
 CURRENT DATA:
-Clients: ${JSON.stringify(data.clients)}
-Projects: ${JSON.stringify(data.projects)}
-Crew: ${JSON.stringify(data.crew)}
-Subs: ${JSON.stringify(data.subs)}
-Unit Prices: ${JSON.stringify(data.unitPrices)}
+
+CLIENTS:
+${(data.clients || []).map((c) => `- ${c.name}${c.phone ? " | " + c.phone : ""}${c.email ? " | " + c.email : ""}${c.address ? " | " + c.address : ""}${c.notes ? " | Notes: " + c.notes : ""}`).join("\n") || "None on file"}
+
+PROJECTS:
+${(data.projects || []).map((p) => `- ${p.name} [${p.status || "Active"}]${p.client ? " | Client: " + p.client : ""}${p.address ? " | " + p.address : ""}${p.startDate ? " | Start: " + p.startDate : ""}${p.rate ? " | Billing: $" + p.rate + "/hr" : ""}${p.contractAmount ? " | Contract: $" + p.contractAmount : ""}${p.notes ? " | Scope: " + p.notes : ""}`).join("\n") || "None on file"}
+
+CREW:
+${(data.crew || []).map((c) => `- ${c.name}${c.nickname ? " (" + c.nickname + ")" : ""}${c.role ? " | " + c.role : ""}${c.hourlyRate ? " | Pay: $" + c.hourlyRate + "/hr" : ""}${c.phone ? " | " + c.phone : ""}${c.notes ? " | " + c.notes : ""}`).join("\n") || "None on file"}
+
+SUBCONTRACTORS:
+${(data.subs || []).map((s) => `- ${s.company || s.name}${s.trade ? " | " + s.trade : ""}${s.contact ? " | Contact: " + s.contact : ""}${s.phone ? " | " + s.phone : ""}${s.rate ? " | Rate: " + s.rate : ""}${s.cslbNumber ? " | CSLB #" + s.cslbNumber + (s.cslbExpiration ? " exp " + s.cslbExpiration : "") : ""}${s.glCarrier ? " | GL: " + s.glCarrier + (s.glExpiration ? " exp " + s.glExpiration : "") : ""}${s.wcCarrier ? " | WC: " + s.wcCarrier + (s.wcExpiration ? " exp " + s.wcExpiration : "") : ""}${s.notes ? " | Notes: " + s.notes : ""}`).join("\n") || "None on file"}
+
+UNIT PRICES:
+${(data.unitPrices || []).map((u) => `- ${u.description}${u.category ? " [" + u.category + "]" : ""}${u.price ? " | $" + u.price + " per " + (u.unit || "ea") : ""}${u.notes ? " | " + u.notes : ""}`).join("\n") || "None on file"}
+
+DAILY ENTRIES LOG (hours worked & materials purchased, newest first):
+${
+  (data.entries || []).length === 0
+    ? "No entries logged yet"
+    : [...(data.entries || [])]
+        .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+        .map((e) => {
+          const crew = (e.crew || [])
+            .map((c) => `${c.name} ${c.hours}hr`)
+            .join(", ");
+          const mats = (e.materials || [])
+            .map((m) => `${m.description} $${m.cost}`)
+            .join(", ");
+          const totalHrs = (e.crew || []).reduce(
+            (s, c) => s + parseFloat(c.hours || 0),
+            0,
+          );
+          const totalMat = (e.materials || []).reduce(
+            (s, m) => s + parseFloat(m.cost || 0),
+            0,
+          );
+          return `- [${e.date}] ${e.project}${crew ? " | Crew: " + crew + " (" + totalHrs + "hr total)" : ""}${mats ? " | Materials: " + mats + " ($" + totalMat.toFixed(2) + " total)" : ""}${e.notes ? " | " + e.notes : ""}`;
+        })
+        .join("\n")
+}
 
 HOW YOU RESPOND:
 - Plain English, direct, no fluff
@@ -134,45 +211,48 @@ Invoices include: property address, client name, date, scope of work performed, 
 Proposals include: property address, client name, scope, exclusions, total or unit pricing, signature block with date line.`;
 }
 
-app.post('/api/chat', async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   try {
     const { message, history } = req.body;
     const data = loadData();
     const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
-    
+
     const messages = [];
     if (history && history.length > 0) messages.push(...history.slice(-20));
-    messages.push({ role: 'user', content: message });
+    messages.push({ role: "user", content: message });
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: "claude-sonnet-4-6",
       max_tokens: 2000,
       system: buildSystemPrompt(data),
-      messages
+      messages,
     });
 
     const reply = response.content[0].text;
 
-    if (/<div[^>]*MULLINS CONSTRUCTION/i.test(reply) || /MULLINS CONSTRUCTION INC/i.test(reply) && /<table/i.test(reply)) {
+    if (
+      /<div[^>]*MULLINS CONSTRUCTION/i.test(reply) ||
+      (/MULLINS CONSTRUCTION INC/i.test(reply) && /<table/i.test(reply))
+    ) {
       data.nextInvoiceNumber = (data.nextInvoiceNumber || 1001) + 1;
       saveData(data);
     }
 
     res.json({ reply });
   } catch (err) {
-    console.error('Chat error:', err);
+    console.error("Chat error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/data', (req, res) => res.json(loadData()));
+app.get("/api/data", (req, res) => res.json(loadData()));
 
-app.post('/api/data', (req, res) => {
+app.post("/api/data", (req, res) => {
   saveData(req.body);
   res.json({ ok: true });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
