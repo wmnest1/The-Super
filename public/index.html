@@ -156,6 +156,137 @@
   .copy-btn:hover { background: #e8a020; color: #fff; }
   .copy-btn.copied { background: #1a3a2a; border-color: #88cc88; color: #88cc88; }
   .doc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* Data Panel Modal */
+  #data-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 1000;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  #data-modal.open { display: flex; }
+  #data-panel {
+    background: #16213e;
+    border: 1px solid #e8a020;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 780px;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+  }
+  #data-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 2px solid #e8a020;
+  }
+  #data-panel-header h2 { color: #e8a020; font-size: 18px; margin: 0; }
+  #close-data { background: none; border: none; color: #aaa; font-size: 24px; cursor: pointer; line-height: 1; }
+  #close-data:hover { color: #fff; }
+  .data-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid #333;
+    background: #0f1a2e;
+    border-radius: 0;
+    overflow-x: auto;
+  }
+  .data-tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    color: #aaa;
+    cursor: pointer;
+    border: none;
+    background: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+  }
+  .data-tab.active { color: #e8a020; border-bottom-color: #e8a020; }
+  .data-tab:hover { color: #fff; }
+  #data-content { flex: 1; padding: 20px; }
+  .data-add-btn {
+    background: #e8a020;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 16px;
+  }
+  .data-add-btn:hover { background: #c8881a; }
+  .data-item {
+    background: #0f1a2e;
+    border: 1px solid #1a3a6e;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .data-item-info { flex: 1; font-size: 13px; line-height: 1.6; }
+  .data-item-info strong { color: #e8a020; font-size: 14px; }
+  .data-item-info span { color: #aaa; }
+  .data-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .data-icon-btn {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #aaa;
+    padding: 4px 8px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .data-icon-btn:hover { border-color: #e8a020; color: #e8a020; }
+  .data-icon-btn.del:hover { border-color: #cc4444; color: #cc4444; }
+  .data-form {
+    background: #0a1020;
+    border: 1px solid #e8a020;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .data-form input, .data-form select {
+    background: #0f3460;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #eee;
+    padding: 8px 12px;
+    font-size: 13px;
+    width: 100%;
+    outline: none;
+  }
+  .data-form input:focus, .data-form select:focus { border-color: #e8a020; }
+  .data-form input::placeholder { color: #666; }
+  .data-form-row { display: flex; gap: 8px; }
+  .data-form-row input, .data-form-row select { flex: 1; }
+  .data-form-btns { display: flex; gap: 8px; }
+  .data-save-btn {
+    background: #e8a020; border: none; border-radius: 6px;
+    color: #fff; padding: 8px 16px; font-size: 13px; cursor: pointer;
+  }
+  .data-save-btn:hover { background: #c8881a; }
+  .data-cancel-btn {
+    background: #1a3a6e; border: none; border-radius: 6px;
+    color: #aaa; padding: 8px 16px; font-size: 13px; cursor: pointer;
+  }
+  .data-cancel-btn:hover { color: #fff; }
+  .empty-state { color: #555; font-size: 14px; text-align: center; padding: 30px 0; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -175,6 +306,7 @@
   <button class="quick-btn" onclick="quickSend('What jobs are currently active?')">🏠 Active Jobs</button>
   <button class="quick-btn" onclick="quickSend('Log hours for today')">⏱️ Log Hours</button>
   <button class="quick-btn" onclick="quickSend('Give me a project summary')">📊 Summary</button>
+  <button class="quick-btn" onclick="openDataPanel()" style="margin-left:auto;border-color:#e8a020;color:#e8a020;">📂 Data</button>
 </div>
 
 <div id="chat-box">
@@ -204,11 +336,151 @@ Type below or hit the mic and talk to me.</div>
   <button class="btn" id="send-btn" onclick="sendMessage()">➤</button>
 </div>
 
+<!-- Data Panel Modal -->
+<div id="data-modal">
+  <div id="data-panel">
+    <div id="data-panel-header">
+      <h2>📂 Business Data</h2>
+      <button id="close-data" onclick="closeDataPanel()">✕</button>
+    </div>
+    <div class="data-tabs">
+      <button class="data-tab active" onclick="switchTab('clients')">Clients</button>
+      <button class="data-tab" onclick="switchTab('projects')">Projects</button>
+      <button class="data-tab" onclick="switchTab('crew')">Crew</button>
+      <button class="data-tab" onclick="switchTab('subs')">Subs</button>
+      <button class="data-tab" onclick="switchTab('unitPrices')">Unit Prices</button>
+    </div>
+    <div id="data-content"></div>
+  </div>
+</div>
+
 <script>
   let history = [];
   let recognition = null;
   let isListening = false;
   let silenceTimer = null;
+  let appData = null;
+  let currentTab = 'clients';
+
+  const tabFields = {
+    clients:    [['name','Name'],['phone','Phone'],['email','Email'],['address','Address']],
+    projects:   [['name','Job Name'],['client','Client'],['address','Property Address'],['status','Status'],['rate','Rate ($/hr)']],
+    crew:       [['name','Full Name'],['nickname','Nickname']],
+    subs:       [['name','Company Name'],['trade','Trade'],['phone','Phone']],
+    unitPrices: [['description','Description'],['unit','Unit'],['price','Price']]
+  };
+
+  function itemLabel(tab, item) {
+    if (tab === 'clients')    return { title: item.name || '(no name)', sub: [item.phone, item.email, item.address].filter(Boolean).join(' · ') };
+    if (tab === 'projects')   return { title: item.name || '(no name)', sub: [item.client, item.address, item.status, item.rate ? '$'+item.rate+'/hr' : ''].filter(Boolean).join(' · ') };
+    if (tab === 'crew')       return { title: item.name || '(no name)', sub: item.nickname ? '"' + item.nickname + '"' : '' };
+    if (tab === 'subs')       return { title: item.name || '(no name)', sub: [item.trade, item.phone].filter(Boolean).join(' · ') };
+    if (tab === 'unitPrices') return { title: item.description || '(no description)', sub: [item.unit, item.price ? '$'+item.price : ''].filter(Boolean).join(' · ') };
+  }
+
+  async function openDataPanel() {
+    const res = await fetch('/api/data');
+    appData = await res.json();
+    document.getElementById('data-modal').classList.add('open');
+    renderTab(currentTab);
+  }
+
+  function closeDataPanel() {
+    document.getElementById('data-modal').classList.remove('open');
+  }
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.data-tab').forEach((btn, i) => {
+      btn.classList.toggle('active', Object.keys(tabFields)[i] === tab);
+    });
+    renderTab(tab);
+  }
+
+  function renderTab(tab, editIndex = -1, showAddForm = false) {
+    const items = appData[tab] || [];
+    const fields = tabFields[tab];
+    const content = document.getElementById('data-content');
+    let html = '';
+
+    if (showAddForm || editIndex === -2) {
+      html += buildForm(fields, {}, -2);
+    } else {
+      html += `<button class="data-add-btn" onclick="renderTab('${tab}', -1, true)">+ Add New</button>`;
+    }
+
+    if (items.length === 0 && !showAddForm) {
+      html += `<div class="empty-state">No ${tab} yet — click "+ Add New" to get started.</div>`;
+    }
+
+    items.forEach((item, i) => {
+      if (i === editIndex) {
+        html += buildForm(fields, item, i);
+      } else {
+        const lbl = itemLabel(tab, item);
+        html += `<div class="data-item">
+          <div class="data-item-info"><strong>${lbl.title}</strong>${lbl.sub ? '<br><span>' + lbl.sub + '</span>' : ''}</div>
+          <div class="data-item-actions">
+            <button class="data-icon-btn" onclick="renderTab('${tab}', ${i})">✏️ Edit</button>
+            <button class="data-icon-btn del" onclick="deleteItem('${tab}', ${i})">🗑️</button>
+          </div>
+        </div>`;
+      }
+    });
+
+    content.innerHTML = html;
+  }
+
+  function buildForm(fields, item, index) {
+    const isNew = index === -2;
+    let rows = '';
+    const pairs = [];
+    fields.forEach(([key, label]) => {
+      pairs.push(`<input id="f_${key}" placeholder="${label}" value="${(item[key] || '').replace(/"/g,'&quot;')}">`);
+    });
+    for (let i = 0; i < pairs.length; i += 2) {
+      if (pairs[i+1]) {
+        rows += `<div class="data-form-row">${pairs[i]}${pairs[i+1]}</div>`;
+      } else {
+        rows += pairs[i];
+      }
+    }
+    return `<div class="data-form">
+      ${rows}
+      <div class="data-form-btns">
+        <button class="data-save-btn" onclick="saveItem('${currentTab}', ${index})">💾 Save</button>
+        <button class="data-cancel-btn" onclick="renderTab('${currentTab}')">Cancel</button>
+      </div>
+    </div>`;
+  }
+
+  async function saveItem(tab, index) {
+    const fields = tabFields[tab];
+    const obj = {};
+    fields.forEach(([key]) => {
+      const el = document.getElementById('f_' + key);
+      if (el) obj[key] = el.value.trim();
+    });
+    if (!appData[tab]) appData[tab] = [];
+    if (index === -2) {
+      appData[tab].push(obj);
+    } else {
+      appData[tab][index] = obj;
+    }
+    await fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appData) });
+    renderTab(tab);
+  }
+
+  async function deleteItem(tab, index) {
+    if (!confirm('Delete this entry?')) return;
+    appData[tab].splice(index, 1);
+    await fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appData) });
+    renderTab(tab);
+  }
+
+  document.getElementById('data-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDataPanel();
+  });
 
   const textarea = document.getElementById('message-input');
   textarea.addEventListener('input', () => {
@@ -240,6 +512,8 @@ Type below or hit the mic and talk to me.</div>
       div.style.background = 'transparent';
       div.style.borderLeft = 'none';
       div.style.padding = '4px 0';
+      div.style.maxWidth = '100%';
+      div.style.width = '100%';
       div.innerHTML = text;
       const actions = document.createElement('div');
       actions.className = 'doc-actions';
@@ -282,7 +556,7 @@ Type below or hit the mic and talk to me.</div>
         pdfBtn.disabled = true;
 
         const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;left:-9999px;top:0;width:720px;background:#fff;padding:40px;font-family:Arial,sans-serif;color:#111;';
+        container.style.cssText = 'position:fixed;left:-9999px;top:0;width:816px;background:#fff;font-family:Arial,sans-serif;color:#111;box-sizing:border-box;';
         container.innerHTML = div.innerHTML;
         container.querySelectorAll('button').forEach(b => b.remove());
         document.body.appendChild(container);

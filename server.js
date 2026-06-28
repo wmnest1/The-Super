@@ -15,19 +15,41 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      const empty = { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [] };
+      const empty = { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [], nextInvoiceNumber: 1001 };
       fs.writeFileSync(DATA_FILE, JSON.stringify(empty, null, 2));
       return empty;
     }
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch { return { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [] }; }
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!data.nextInvoiceNumber) data.nextInvoiceNumber = 1001;
+    return data;
+  } catch { return { clients: [], projects: [], crew: [], subs: [], unitPrices: [], entries: [], nextInvoiceNumber: 1001 }; }
 }
 
 function saveData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
 
+function getPSTDateTime() {
+  const now = new Date();
+  const pstDate = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dayName = days[pstDate.getDay()];
+  const month = months[pstDate.getMonth()];
+  const day = pstDate.getDate();
+  const year = pstDate.getFullYear();
+  let hours = pstDate.getHours();
+  const minutes = String(pstDate.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const dateOnly = `${month} ${day}, ${year}`;
+  const dateTime = `${dayName}, ${month} ${day}, ${year} at ${hours}:${minutes} ${ampm} PST`;
+  return { dateOnly, dateTime };
+}
+
 function buildSystemPrompt(data) {
+  const invoiceNum = data.nextInvoiceNumber || 1001;
+  const { dateOnly, dateTime } = getPSTDateTime();
   return `You are The Super — the private business management AI for Walt Mullins of Mullins Construction Inc.
 
 COMPANY INFO:
@@ -48,6 +70,14 @@ BILLING RATES VARY BY PROJECT — always confirm rate before calculating.
 Common rates: $110/hr, $120/hr, $125/hr
 Materials markup: 15% on some jobs, none on others — confirm per job.
 
+CURRENT DATE & TIME: ${dateTime}
+Use this for notes, logs, hour entries, and any time-sensitive responses.
+
+NEXT INVOICE/PROPOSAL NUMBER: ${invoiceNum}
+Always use this number on the next document you generate. It goes in the top-right header area alongside INVOICE or PROPOSAL.
+
+DOCUMENT DATE: Default to ${dateOnly} on all invoices and proposals. If Walt specifies a different date, use that instead. Show date only — never show a time on invoices or proposals.
+
 CURRENT DATA:
 Clients: ${JSON.stringify(data.clients)}
 Projects: ${JSON.stringify(data.projects)}
@@ -66,21 +96,37 @@ HOW YOU RESPOND:
 DOCUMENT HTML FORMAT:
 When generating invoices or proposals, return clean HTML like this structure (use inline styles):
 
-<div style="font-family:Arial,sans-serif;max-width:680px;background:#fff;color:#111;padding:32px;border-radius:8px;">
-  <div style="border-bottom:3px solid #e8a020;padding-bottom:16px;margin-bottom:24px;">
-    <h1 style="color:#e8a020;margin:0;font-size:24px;">MULLINS CONSTRUCTION INC.</h1>
-    <p style="margin:4px 0;font-size:13px;color:#555;">License #855578 | 1702-L Meridian Ave #164, San Jose, CA 95125</p>
-    <p style="margin:4px 0;font-size:13px;color:#555;">Phone: 408-569-3434 | Fax: 408-448-2440 | mullinsconstruction@yahoo.com</p>
+<div style="font-family:Arial,sans-serif;width:100%;max-width:816px;background:#fff;color:#111;padding:72px 80px;box-sizing:border-box;margin:0 auto;">
+  <div style="border-bottom:3px solid #e8a020;padding-bottom:16px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;">
+    <div>
+      <h1 style="color:#e8a020;margin:0 0 4px;font-size:26px;letter-spacing:1px;">MULLINS CONSTRUCTION INC.</h1>
+      <p style="margin:2px 0;font-size:12px;color:#555;">License #855578</p>
+      <p style="margin:2px 0;font-size:12px;color:#555;">1702-L Meridian Ave #164, San Jose, CA 95125</p>
+      <p style="margin:2px 0;font-size:12px;color:#555;">Phone: 408-569-3434 | Fax: 408-448-2440</p>
+      <p style="margin:2px 0;font-size:12px;color:#555;">mullinsconstruction@yahoo.com</p>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:22px;font-weight:bold;color:#333;">INVOICE</div>
+      <!-- or PROPOSAL -->
+    </div>
   </div>
-  <h2 style="color:#333;font-size:18px;margin:0 0 16px;">INVOICE / PROPOSAL</h2>
-  <!-- document body -->
-  <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-    <tr style="background:#f5f5f5;"><th style="text-align:left;padding:8px;border:1px solid #ddd;">Description</th><th style="text-align:right;padding:8px;border:1px solid #ddd;">Amount</th></tr>
-    <!-- rows -->
+  <!-- client info: name, property address, date -->
+  <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
+    <thead><tr style="background:#f0f0f0;">
+      <th style="text-align:left;padding:10px 12px;border:1px solid #ccc;">Description</th>
+      <th style="text-align:center;padding:10px 12px;border:1px solid #ccc;width:80px;">Qty/Hrs</th>
+      <th style="text-align:right;padding:10px 12px;border:1px solid #ccc;width:100px;">Rate</th>
+      <th style="text-align:right;padding:10px 12px;border:1px solid #ccc;width:110px;">Amount</th>
+    </tr></thead>
+    <tbody>
+      <!-- line item rows -->
+    </tbody>
   </table>
-  <div style="text-align:right;font-size:18px;font-weight:bold;margin-top:16px;color:#e8a020;">TOTAL: $X,XXX.00</div>
-  <div style="margin-top:24px;font-size:13px;color:#555;border-top:1px solid #ddd;padding-top:12px;">
-    Payment: Check payable to Mullins Construction, mail to 1702 Meridian Ave L164, San Jose CA 95125 — or Zelle
+  <div style="text-align:right;margin-top:8px;">
+    <span style="font-size:20px;font-weight:bold;color:#111;">TOTAL: $X,XXX.00</span>
+  </div>
+  <div style="margin-top:40px;font-size:13px;color:#555;border-top:1px solid #ddd;padding-top:16px;">
+    <strong>Payment:</strong> Check payable to Mullins Construction — mail to 1702 Meridian Ave L164, San Jose CA 95125, or Zelle.
   </div>
 </div>
 
@@ -105,7 +151,14 @@ app.post('/api/chat', async (req, res) => {
       messages
     });
 
-    res.json({ reply: response.content[0].text });
+    const reply = response.content[0].text;
+
+    if (/<div[^>]*MULLINS CONSTRUCTION/i.test(reply) || /MULLINS CONSTRUCTION INC/i.test(reply) && /<table/i.test(reply)) {
+      data.nextInvoiceNumber = (data.nextInvoiceNumber || 1001) + 1;
+      saveData(data);
+    }
+
+    res.json({ reply });
   } catch (err) {
     console.error('Chat error:', err);
     res.status(500).json({ error: err.message });
