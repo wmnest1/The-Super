@@ -18,6 +18,7 @@ const EMPTY_DATA = () => ({
   subs: [],
   unitPrices: [],
   entries: [],
+  payments: {},
   nextInvoiceNumber: 1001,
 });
 
@@ -476,6 +477,24 @@ app.post("/api/data", async (req, res) => {
   try {
     await saveData(req.body);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/dashboard/flags", async (req, res) => {
+  try {
+    const { summary } = req.body;
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 800,
+      messages: [{
+        role: "user",
+        content: `You are the AI business manager for Mullins Construction Inc., run by Walt Mullins. Review this monthly work summary and flag any issues, missing data, risks, or opportunities. Be specific, concise, and actionable. Use bullet points. Keep it under 200 words.\n\n${summary}`
+      }]
+    });
+    res.json({ flags: response.content[0].text });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
