@@ -399,13 +399,23 @@ function executeTool(toolName, input, data) {
 // ── Routes ──
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, imageData, imageType } = req.body;
     let data = await loadData();
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     const messages = [];
     if (history && history.length > 0) messages.push(...history.slice(-20));
-    messages.push({ role: "user", content: message });
+
+    let userContent;
+    if (imageData && imageType) {
+      userContent = [
+        { type: "image", source: { type: "base64", media_type: imageType, data: imageData } },
+        { type: "text", text: message || "Please analyze this image." }
+      ];
+    } else {
+      userContent = message;
+    }
+    messages.push({ role: "user", content: userContent });
 
     let response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
