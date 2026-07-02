@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Mullins Construction</title>
+<script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
+<style>
+:root{--accent:#e8a020;--bg:#1a1a2e;--panel:#16213e;--text:#eeeeee}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:inherit;text-decoration:none}
+
+/* ── Header ── */
+#dash-header{background:var(--panel);border-bottom:2px solid var(--accent);padding:12px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+#dash-header h1{font-size:18px;color:var(--accent);white-space:nowrap}
+.month-nav{display:flex;align-items:center;gap:10px}
+.month-nav button{background:#0f3460;border:1px solid #2a3a5e;border-radius:8px;color:#eee;padding:6px 14px;font-size:16px;cursor:pointer}
+.month-nav button:hover{background:#1a4a8a}
+#month-title{font-size:17px;font-weight:bold;min-width:130px;text-align:center}
+.header-btns{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.hbtn{background:#0f3460;border:1px solid #2a3a5e;border-radius:8px;color:#aac;padding:7px 14px;font-size:13px;cursor:pointer;white-space:nowrap}
+.hbtn:hover{background:#1a4a8a;color:#fff}
+.hbtn.gold{background:var(--accent);border-color:var(--accent);color:#1a1a2e;font-weight:bold}
+.hbtn.gold:hover{background:#c8881a}
+
+/* ── Calendar ── */
+#cal-wrap{padding:16px 20px 0;overflow-x:auto}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(90px,1fr)) minmax(110px,130px);gap:2px;min-width:760px}
+.cal-hdr{background:#0f1a2e;text-align:center;font-size:11px;font-weight:bold;color:#aaa;padding:6px 0;letter-spacing:.05em}
+.cal-hdr.wktot{color:var(--accent)}
+.cal-cell{background:var(--panel);border:1px solid #1e2e4e;padding:4px 5px;min-height:76px;position:relative;font-size:11px;cursor:pointer;transition:background .12s}
+.cal-cell:hover{background:#1e2e4e;border-color:var(--accent)}
+.cal-cell.other-month{background:#111827;opacity:0.4;cursor:default}
+.cal-cell.cal-dimmed{opacity:0.15;pointer-events:none}
+.cal-cell.other-month:hover{background:#111827;border-color:#1e2e4e}
+.cal-cell.weekend{background:#131c30}
+.cal-cell.today{border-color:var(--accent);border-width:2px}
+.cal-date{font-size:11px;color:#666;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center}
+.cal-date>span:first-child{font-size:13px;font-weight:bold;color:var(--accent);line-height:1.3}
+.cal-cell.today .cal-date>span:first-child{background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;line-height:1}
+.cal-date-add{font-size:14px;color:#334;opacity:0;transition:opacity .12s}
+.cal-cell:hover .cal-date-add{opacity:1;color:var(--accent)}
+.crew-pill{font-size:10px;font-weight:bold;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.no-work{font-size:9px;color:#cc4444;font-weight:bold;text-transform:uppercase;margin-top:2px;letter-spacing:.04em}
+.cal-wk-total{background:#0f1a2e;border:1px solid #1e2e4e;padding:6px 8px;min-height:76px;font-size:11px}
+.wkt-hrs{font-size:14px;font-weight:bold;color:var(--accent);margin-bottom:4px}
+.wkt-proj{margin-bottom:2px;display:flex;justify-content:space-between;gap:4px}
+.wkt-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px}
+
+/* ── Flags ── */
+#flags-wrap{padding:12px 20px}
+.flags-panel{background:var(--panel);border:1px solid #2a3a5e;border-radius:10px;overflow:hidden}
+.flags-header{background:#0f1a2e;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.flags-header h3{font-size:13px;color:var(--accent)}
+.flags-body{padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap}
+.flag-item{background:#1a1a2e;border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:8px;align-items:flex-start;max-width:320px}
+.flag-icon{font-size:16px;flex-shrink:0}
+.flag-text{line-height:1.5}
+.flag-warn{border-left:3px solid var(--accent)}
+.flag-good{border-left:3px solid #4a8a4a}
+.flag-alert{border-left:3px solid #cc4444}
+
+/* ── Job Panels ── */
+#panels-wrap{padding:16px 20px 30px}
+.panels-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.job-panel{background:var(--panel);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.jp-header{padding:12px 16px;font-size:15px;font-weight:bold;color:#fff;display:flex;justify-content:space-between;align-items:center}
+.jp-body{flex:1;overflow:hidden}
+
+/* Worker table */
+.wk-table-wrap{overflow-x:auto;padding:12px 16px 0}
+.wk-table{width:100%;border-collapse:collapse;font-size:12px;min-width:280px}
+.wk-table th{background:#0f1a2e;color:#aaa;padding:5px 8px;font-size:10px;text-align:right;white-space:nowrap;border:1px solid #2a3a5e}
+.wk-table th:first-child{text-align:left}
+.wk-table td{padding:5px 8px;text-align:right;border:1px solid #1e2e4e;color:#eee}
+.wk-table td:first-child{text-align:left;color:#aac}
+.wk-table tr.wk-labor{background:#0f1a2e;font-weight:bold}
+.wk-table tr.wk-labor td{color:var(--accent)}
+.wk-table td.zero{color:#444}
+.wk-table td.hrs-cell{cursor:pointer;position:relative}
+.wk-table td.hrs-cell:hover{background:#1a2a4a;color:var(--accent)}
+.wk-table td.hrs-cell::after{content:'✎';position:absolute;top:2px;right:2px;font-size:8px;color:var(--accent);opacity:0}
+.wk-table td.hrs-cell:hover::after{opacity:1}
+.wk-table tr.wk-oos td{color:#ffe066;font-size:11px;font-style:italic}
+.wk-table tr.wk-oos-labor td{color:#ffe066;font-size:11px;font-style:italic;background:rgba(255,224,0,0.04)}
+
+/* Materials */
+.mat-label{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.mat-section{padding:10px 16px;border-top:1px solid #1e2e4e}
+.mat-row-wrap{display:flex;align-items:center;gap:4px;padding:2px 0;border-bottom:1px solid #1a2a3a}
+.mat-row-wrap:last-of-type{border-bottom:none}
+.mat-row-desc{flex:1;font-size:12px;color:#aac;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat-row-amt{font-size:12px;white-space:nowrap;color:#eee}
+.mat-icon-btn{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:13px;line-height:1;border-radius:4px;flex-shrink:0}
+.mat-icon-btn.edit{color:#666} .mat-icon-btn.edit:hover{color:var(--accent);background:#1a2a4a}
+.mat-icon-btn.del{color:#664444} .mat-icon-btn.del:hover{color:#ee4444;background:#2a1a1a}
+.mat-add-btn{margin-top:6px;background:none;border:1px dashed #2a3a5e;border-radius:6px;color:#666;padding:5px;font-size:11px;cursor:pointer;width:100%}
+.mat-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+.mat-total-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0 2px;border-top:1px solid #2a3a5e;margin-top:4px}
+.mat-total-row .lbl{color:#aaa} .mat-total-row .amt{color:#eee;font-weight:bold}
+
+/* Project totals */
+.proj-totals{padding:10px 16px;border-top:2px solid #2a3a5e;background:#0f1a2e}
+.tot-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#ccc}
+.tot-row .lbl{color:#888}
+.tot-row.grand{font-size:14px;font-weight:bold;color:#fff;margin-top:4px;padding-top:6px;border-top:1px solid #2a3a5e}
+
+/* Payments */
+.pay-section{padding:10px 16px;border-top:2px solid #2a3a5e}
+.pay-label{font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.pay-row{display:grid;grid-template-columns:80px 70px 80px 1fr;gap:6px;font-size:12px;padding:3px 0;color:#ccc;border-bottom:1px solid #1e2e4e}
+.pay-row.hdr{color:#666;font-size:10px;text-transform:uppercase}
+.pay-total-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0 2px;color:#aaa}
+.balance-due{display:flex;justify-content:space-between;align-items:center;background:#2a1a00;border:1px solid var(--accent);border-radius:6px;padding:8px 12px;margin-top:8px}
+.balance-due .lbl{font-size:13px;font-weight:bold;color:var(--accent)}
+.balance-due .amt{font-size:16px;font-weight:bold;color:var(--accent)}
+.balance-due .amt.paid{color:#4a8a4a}
+.add-pay-form{margin-top:10px;background:#0f1a2e;border-radius:8px;padding:10px}
+.add-pay-form input{background:#1a2a4a;border:1px solid #2a3a5e;border-radius:6px;color:#eee;padding:6px 10px;font-size:12px;outline:none;width:100%}
+.add-pay-form input:focus{border-color:var(--accent)}
+.add-pay-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.add-pay-btn{background:var(--accent);border:none;border-radius:6px;color:#1a1a2e;padding:7px 14px;font-size:12px;font-weight:bold;cursor:pointer;width:100%}
+.add-pay-btn:hover{background:#c8881a}
+.add-pay-toggle{background:none;border:1px dashed #2a3a5e;border-radius:6px;color:#666;padding:6px;font-size:11px;cursor:pointer;width:100%;margin-top:6px}
+.add-pay-toggle:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Modals ── */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:200;padding:16px}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--panel);border:1px solid #2a3a5e;border-radius:14px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column}
+.modal-box.wide{max-width:420px}
+.modal-hdr{padding:14px 18px;border-bottom:1px solid #2a3a5e;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--panel);z-index:10}
+.modal-hdr h3{font-size:15px;color:var(--accent)}
+.modal-close{background:none;border:none;color:#666;font-size:22px;cursor:pointer;line-height:1;padding:0 4px}
+.modal-close:hover{color:#eee}
+.modal-body{padding:16px 18px;flex:1}
+.modal-footer{padding:12px 18px;border-top:1px solid #2a3a5e;display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--panel)}
+.mi{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:8px;color:#eee;padding:7px 10px;font-size:13px;outline:none;width:100%}
+.mi:focus{border-color:var(--accent)}
+.mi.sm{width:90px}
+.mi.xs{width:60px}
+.flabel{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.frow{margin-bottom:12px}
+.fgrid{display:grid;gap:10px}
+.fgrid.c2{grid-template-columns:1fr 1fr}
+.mbtn{border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:bold;cursor:pointer}
+.mbtn.primary{background:var(--accent);color:#1a1a2e}
+.mbtn.primary:hover{background:#c8881a}
+.mbtn.secondary{background:#1a3060;color:#aac;border:1px solid #2a3a5e}
+.mbtn.secondary:hover{background:#263a70}
+.mbtn.danger{background:#aa2222;color:#fff}
+.mbtn.danger:hover{background:#cc3333}
+.sdiv{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 8px;padding-bottom:4px;border-bottom:1px solid #2a3a5e}
+.dm-proj-section{border:1px solid rgba(255,255,255,0.08);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.dm-proj-hdr{padding:7px 12px;font-weight:bold;font-size:13px;color:#fff;display:flex;justify-content:space-between;align-items:center}
+.dm-proj-section-body{padding:10px 12px 4px}
+.crew-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.crew-lbl{width:68px;font-size:13px;color:#aac;flex-shrink:0}
+.mat-form-row{display:grid;grid-template-columns:1fr 80px 26px;gap:6px;margin-bottom:6px;align-items:center}
+.mat-del{background:none;border:none;color:#664;cursor:pointer;font-size:16px;padding:0}
+.mat-del:hover{color:#ee4444}
+.day-proj-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.proj-chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:bold;border:2px solid transparent;cursor:pointer;color:#fff}
+.proj-chip.active{border-color:#fff}
+.proj-chip:hover{opacity:.85}
+.wk-day-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px;border-radius:8px;background:#0f1a2e}
+.wk-day-lbl{flex:1;font-size:13px;color:#ccc}
+.save-toast{position:fixed;bottom:20px;right:20px;background:#1a8a1a;color:#fff;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:bold;z-index:999;display:none;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.loading{text-align:center;padding:60px;color:#666;font-size:15px}
+.empty-dash{text-align:center;padding:40px;color:#555;font-size:14px}
+
+/* ── Materials Panel ── */
+#mat-panel{position:fixed;top:66px;left:0;right:0;bottom:0;z-index:90;background:var(--bg);display:none;flex-direction:column;overflow:hidden;border-top:2px solid var(--accent)}
+#mat-panel.open{display:flex}
+.mat-fbar{background:var(--panel);border-bottom:1px solid #2a3a5e;padding:10px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mat-fbar input,.mat-fbar select{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px}
+.mat-fbar label{font-size:11px;color:#778;white-space:nowrap}
+.mat-body{flex:1;overflow-y:auto;padding:8px 20px 20px}
+.mat-date-hdr{padding:6px 10px;margin:8px 0 3px;background:#0f1a2e;border-radius:5px;display:flex;justify-content:space-between;font-size:11px;color:#aaa;font-weight:bold;text-transform:uppercase;letter-spacing:.05em}
+.mat-row{display:flex;align-items:center;gap:8px;padding:5px 4px;border-bottom:1px solid #1a2a3a;font-size:12px}
+.mat-row:hover{background:#0a1525}
+.mat-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:bold;white-space:nowrap;flex-shrink:0;color:#fff}
+.mat-store{color:#778;min-width:60px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.mat-desc{flex:1;color:#ccd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mat-amt{font-weight:bold;color:var(--accent);white-space:nowrap;min-width:64px;text-align:right}
+.mat-footer{background:var(--panel);border-top:2px solid #1e2e4e;padding:10px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.mat-mo-hdr{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:7px 12px;background:#0e1a2e;border-radius:6px;margin-top:10px;font-size:12px;color:#aaa}
+.mat-mo-hdr:hover{background:#1a2a3a}
+html.light #mat-panel{background:#f0f4f8}
+html.light .mat-fbar{background:#fff;border-color:#dde}
+html.light .mat-fbar input,html.light .mat-fbar select{background:#f8f8f8;border-color:#ccc;color:#111}
+html.light .mat-date-hdr{background:#e8ecf0;color:#555}
+html.light .mat-row:hover{background:#e8ecf0}
+html.light .mat-store{color:#667}
+html.light .mat-desc{color:#333}
+html.light .mat-footer{background:#fff;border-color:#dde}
+html.light .mat-mo-hdr{background:#e8ecf0;color:#555}
+html.light .mat-mo-hdr:hover{background:#dde4ee}
+.mat-date-badge{background:#0f1a2e;color:var(--accent);font-size:10px;padding:2px 7px;border-radius:4px;font-weight:bold;white-space:nowrap;flex-shrink:0;border:1px solid #2a3a5e}
+.mat-store-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:bold;white-space:nowrap;flex-shrink:0;color:#fff}
+.mat-edit-btn,.mat-del-btn{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;border-radius:4px;opacity:.4;flex-shrink:0;line-height:1;transition:opacity .1s,background .1s}
+.mat-edit-btn:hover{opacity:1;background:#1a2a4a}
+.mat-del-btn:hover{opacity:1;background:#2a1a1a}
+.mat-inline-edit{background:#0b1525;border:1px solid #2a3a5e;border-radius:6px;padding:10px 12px;margin:2px 0 6px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.mie-field{display:flex;flex-direction:column;gap:2px}
+.mie-field label{font-size:10px;color:#778}
+.mie-field input,.mie-field select{background:#1a2a3a;border:1px solid #2a3a5e;border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px}
+html.light .mat-date-badge{background:#e8ecf0;color:var(--accent);border-color:#ccd}
+html.light .mat-inline-edit{background:#f0f4f8;border-color:#ccd}
+html.light .mie-field input,html.light .mie-field select{background:#fff;border-color:#bbc;color:#111}
+
+@media(max-width:700px){
+  #dash-header h1{font-size:15px}
+  #month-title{font-size:14px;min-width:110px}
+  .cal-grid{min-width:360px}
+  .cal-cell{min-height:54px;padding:3px}
+  .panels-grid{grid-template-columns:1fr}
+  .hbtn{font-size:12px;padding:6px 10px}
+}
+
+/* ── Light mode ── */
+html.light body{background:#f0f2f5;color:#1a1a2e}
+html.light #dash-header{background:#fff}
+html.light .month-nav button{background:#eee;border-color:#ccc;color:#333}
+html.light .month-nav button:hover{background:#ddd}
+html.light .hbtn{background:#eee;border-color:#ccc;color:#444}
+html.light .hbtn:hover{background:#ddd;color:#111}
+html.light .hbtn.gold{background:var(--accent);color:#fff;border-color:var(--accent)}
+html.light .cal-hdr{background:#e4e6ea;color:#555}
+html.light .cal-cell{background:#fff;border-color:#ddd}
+html.light .cal-cell:hover{background:#fff8ee;border-color:var(--accent)}
+html.light .cal-cell.other-month{background:#e8e8e8}
+html.light .cal-cell.weekend{background:#f5f0e8}
+html.light .cal-date{color:#999}
+html.light .cal-date>span:first-child{color:var(--accent)}
+html.light .cal-cell.today .cal-date>span:first-child{background:var(--accent);color:#fff}
+html.light .cal-date-add{color:#ccc}
+html.light .cal-cell:hover .cal-date-add{color:var(--accent)}
+html.light .no-work{color:#e05555}
+html.light .cal-wk-total{background:#fff8ee;border-color:#ddd}
+html.light .wkt-hrs{color:var(--accent)}
+html.light .flags-panel{background:#fff;border-color:#ddd}
+html.light .flags-header{background:#f5f5f5}
+html.light .flag-item{background:#f5f5f5}
+html.light .job-panel{background:#fff}
+html.light .wk-table th{background:#f0f0f0;color:#666;border-color:#ddd}
+html.light .wk-table td{border-color:#eee;color:#222}
+html.light .wk-table td:first-child{color:#555}
+html.light .wk-table td.zero{color:#ccc}
+html.light .wk-table td.hrs-cell:hover{background:#fff8ee;color:var(--accent)}
+html.light .wk-table tr.wk-labor{background:#f5f5f5}
+html.light .wk-table tr.wk-labor td{color:#c8780a}
+html.light .mat-section{border-color:#eee}
+html.light .mat-label{color:#c8780a}
+html.light .mat-row-desc{color:#444}
+html.light .mat-row-amt{color:#222}
+html.light .mat-icon-btn.edit{color:#bbb}
+html.light .mat-icon-btn.edit:hover{color:var(--accent);background:#fff8ee}
+html.light .mat-icon-btn.del:hover{background:#fff0f0}
+html.light .mat-add-btn{border-color:#ddd;color:#888}
+html.light .mat-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+html.light .mat-total-row .lbl{color:#777}
+html.light .mat-total-row .amt{color:#333}
+html.light .proj-totals{background:#f5f5f5;border-color:#ddd}
+html.light .tot-row{color:#333}
+html.light .tot-row .lbl{color:#777}
+html.light .pay-section{border-color:#ddd}
+html.light .pay-label{color:#c8780a}
+html.light .pay-row{color:#333;border-color:#eee}
+html.light .pay-row.hdr{color:#999}
+html.light .pay-total-row{color:#555}
+html.light .balance-due{background:#fff3e0;border-color:var(--accent)}
+html.light .add-pay-form{background:#f5f5f5}
+html.light .add-pay-form input{background:#fff;border-color:#ddd;color:#222}
+html.light .add-pay-toggle{border-color:#ddd;color:#888}
+html.light .add-pay-toggle:hover{border-color:var(--accent);color:var(--accent)}
+html.light .section-title{color:#c8780a}
+html.light .empty-dash{color:#888}
+html.light .modal-box{background:#fff}
+html.light .modal-hdr{background:#fff;border-color:#ddd}
+html.light .modal-hdr h3{color:#c8780a}
+html.light .modal-footer{background:#fff;border-color:#ddd}
+html.light .modal-close{color:#aaa}
+html.light .modal-close:hover{color:#333}
+html.light .mi{background:#f5f5f5;border-color:#ddd;color:#222}
+html.light .mi:focus{border-color:var(--accent)}
+html.light .flabel{color:#999}
+html.light .sdiv{color:#c8780a;border-color:#ddd}
+html.light .dm-proj-section{border-color:rgba(0,0,0,0.12)}
+html.light .dm-proj-section-body{background:#fafafa}
+html.light .crew-lbl{color:#555}
+html.light .wk-day-row{background:#f5f5f5}
+html.light .wk-day-lbl{color:#444}
+html.light .mat-del{color:#cc8888}
+html.light .mbtn.secondary{background:#eee;color:#555;border-color:#ddd}
+html.light .mbtn.secondary:hover{background:#ddd}
+html.light .proj-chip:hover{opacity:.8}
+html.light .save-toast{background:#1a7a1a}
+</style>
+</head>
+<body>
+
+<div id="dash-header">
+  <div style="font-size:26px">🏗️</div>
+  <h1>📊 Dashboard</h1>
+  <div class="month-nav">
+    <button onclick="prevMonth()">‹</button>
+    <span id="month-title">Loading…</span>
+    <button onclick="nextMonth()">›</button>
+  </div>
+  <div class="header-btns">
+    <button class="hbtn" onclick="getAIFlags()">🤖 AI Flags</button>
+    <button class="hbtn" onclick="openMaterials()">📦 Materials</button>
+    <a href="/" class="hbtn">💬 Chat</a>
+    <button class="hbtn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+    <button class="hbtn gold" onclick="refreshAll()">↺ Refresh</button>
+  </div>
+</div>
+
+<!-- Materials Panel -->
+<div id="mat-panel">
+  <div class="mat-fbar">
+    <strong style="color:var(--accent);font-size:14px;white-space:nowrap">📦 Materials Log</strong>
+    <label>Project</label>
+    <select id="mat-f-proj" onchange="renderMatList()">
+      <option value="">All Projects</option>
+    </select>
+    <label>From</label>
+    <input type="date" id="mat-f-from" onchange="renderMatList()">
+    <label>To</label>
+    <input type="date" id="mat-f-to" onchange="renderMatList()">
+    <input type="text" id="mat-f-search" placeholder="🔍 Store / description / invoice#" oninput="renderMatList()" style="min-width:140px">
+    <select id="mat-f-sort" onchange="renderMatList()">
+      <option value="newest">Newest first</option>
+      <option value="oldest">Oldest first</option>
+      <option value="amount-hi">Amount (high→low)</option>
+      <option value="amount-lo">Amount (low→high)</option>
+      <option value="project">By project</option>
+      <option value="store">By store</option>
+    </select>
+    <div style="display:flex;gap:6px;margin-left:auto">
+      <button class="hbtn" onclick="exportMatCSV()">📊 CSV</button>
+      <button class="hbtn" onclick="exportMatPDF()">📄 PDF</button>
+      <button class="hbtn" onclick="clearMatFilters()">✕ Clear filters</button>
+      <button class="hbtn gold" onclick="closeMaterials()">✕ Close</button>
+    </div>
+  </div>
+  <div class="mat-body" id="mat-list"><div class="loading">Loading…</div></div>
+  <div class="mat-footer" id="mat-footer">
+    <span id="mat-f-total" style="font-size:13px;font-weight:bold">Total: $0.00</span>
+  </div>
+</div>
+
+<div id="cal-wrap"><div class="loading">Loading…</div></div>
+<div id="flags-wrap"></div>
+<div id="panels-wrap"><div class="loading">Loading job panels…</div></div>
+
+<!-- Day Entry Modal -->
+<div class="modal-overlay" id="day-modal" onclick="if(event.target===this)closeDayModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <h3 id="dm-title">📅 Day</h3>
+      <button class="modal-close" onclick="closeDayModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="frow">
+        <div class="flabel">Project</div>
+        <div class="day-proj-bar" id="dm-proj-bar"></div>
+      </div>
+      <div class="sdiv">Hours Worked</div>
+      <div id="dm-crew-section"></div>
+      <div class="sdiv">Materials &amp; Subs</div>
+      <div id="dm-mats-section"></div>
+      <div class="frow" style="margin-top:12px">
+        <div class="flabel">Notes</div>
+        <textarea id="dm-notes" class="mi" rows="2" placeholder="Optional notes…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="mbtn danger" onclick="deleteDayEntry()" id="dm-delete-btn">🗑 Delete</button>
+      <button class="mbtn secondary" onclick="closeDayModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveDayModal()">💾 Save All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Week Breakdown Modal -->
+<div class="modal-overlay" id="week-modal" onclick="if(event.target===this)closeWeekModal()">
+  <div class="modal-box wide">
+    <div class="modal-hdr">
+      <h3 id="wm-title">Week Hours</h3>
+      <button class="modal-close" onclick="closeWeekModal()">✕</button>
+    </div>
+    <div class="modal-body" id="wm-body"></div>
+    <div class="modal-footer">
+      <button class="mbtn secondary" onclick="closeWeekModal()">Cancel</button>
+      <button class="mbtn primary" onclick="saveWeekModal()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="save-toast" id="save-toast">✓ Saved</div>
+
+<script>
+// ── Constants ──
+const CREW_ORDER = ['Moi','Abner','Chemo','Chepey','Isreal'];
+const JOB_COLORS = {barbara:'#e8720c',viraj:'#1a8a1e',cronce:'#6b2fbe',farve:'#8b6914'};
+const DEFAULT_COLORS = ['#1a5fa8','#a8501a','#1a8a8a','#8a1a1a','#8a1a8a','#1a6a4a'];
+
+// ── Palette ──
+let appPalette=['#cc4444','#e8720c','#e8c020','#2a9a2a','#1a8a8a','#1a5fa8','#6b2fbe','#b02080','#8b6914','#666666','#111111','#ffffff'];
+function palStrip(inputId){
+  return appPalette.map(c=>`<span onclick="(function(el,sw,c){el.value=c;el.dispatchEvent(new Event('input'));[...sw.parentElement.children].forEach(function(s){s.style.outline='none';});sw.style.outline='2px solid #fff';sw.style.outlineOffset='1px';})(document.getElementById('${inputId}'),this,'${c}')" title="${c}" style="display:inline-block;width:15px;height:15px;border-radius:2px;background:${c};cursor:pointer;border:1px solid rgba(255,255,255,0.2);margin:1px;vertical-align:middle;flex-shrink:0"></span>`).join('');
+}
+function noWorkCrew(worker){
+  const hEl=document.getElementById('dm-crew-'+worker);
+  const oEl=document.getElementById('dm-oos-'+worker);
+  const nEl=document.getElementById('dm-note-'+worker);
+  const cEl=document.getElementById('dm-color-'+worker);
+  const btn=document.getElementById('dm-nw-'+worker);
+  if(hEl)hEl.value='0';
+  if(oEl)oEl.value='0';
+  if(nEl){nEl.value='NO WORK';nEl.style.color='#cc3333';nEl.style.fontWeight='bold';}
+  if(cEl)cEl.value='#cc3333';
+  if(btn){btn.style.background='#5a1515';btn.style.borderColor='#ff4444';btn.style.color='#ff6666';}
+  const strip=btn?.nextElementSibling;
+  if(strip)[...strip.children].forEach(function(s){s.style.outline='none';});
+}
+
+// ── State ──
+let data = {clients:[],projects:[],crew:[],subs:[],unitPrices:[],entries:[],payments:{}};
+let displayYear, displayMonth;
+const _tn = new Date();
+const today = `${_tn.getFullYear()}-${String(_tn.getMonth()+1).padStart(2,'0')}-${String(_tn.getDate()).padStart(2,'0')}`;
+
+// Modal state
+let dayModalState = {date:'',project:'',projects:[],crewData:{},mats:[]};
+let weekModalState = {proj:'',worker:'',days:[]};
+
+// Calendar filter state
+let calendarFilter = {type:null, value:null};
+function setCalFilter(type, value) {
+  if(calendarFilter.type===type && calendarFilter.value===value) calendarFilter={type:null,value:null};
+  else calendarFilter={type, value};
+  renderCalendar();
+}
+function clearCalFilter() { calendarFilter={type:null,value:null}; renderCalendar(); }
+
+// ── Utils ──
+function jobColor(name){
+  const p=(data.projects||[]).find(p=>(p.name||'').toLowerCase()===(name||'').toLowerCase());
+  if(p&&p.color) return p.color;
+  const n=(name||'').toLowerCase();
+  for(const [k,c] of Object.entries(JOB_COLORS)) if(n.includes(k)) return c;
+  return DEFAULT_COLORS[(name.charCodeAt(0)||0)%DEFAULT_COLORS.length];
+}
+function billingRate(name){
+  const p=(data.projects||[]).find(p=>p.name.toLowerCase()===(name||'').toLowerCase());
+  if(p&&p.rate) return parseFloat(p.rate);
+  const n=(name||'').toLowerCase();
+  if(n.includes('barbara')) return 110;
+  if(n.includes('viraj')) return 120;
+  if(n.includes('cronce')) return 125;
+  if(n.includes('farve')) return 150;
+  return 110;
+}
+function oosRateFor(name){
+  const p=(data.projects||[]).find(p=>p.name.toLowerCase()===(name||'').toLowerCase());
+  if(p&&p.oosRate&&String(p.oosRate).trim()!=='')return parseFloat(p.oosRate);
+  return billingRate(name);
+}
+function normName(n){
+  const s=(n||'').toLowerCase().trim();
+  if(s==='moi'||s.includes('mois')) return 'Moi';
+  if(s==='ab'||s.includes('abner')) return 'Abner';
+  if(s.includes('chemo')&&!s.includes('chep')) return 'Chemo';
+  if(s.includes('chepey')||s==='ch') return 'Chepey';
+  if(s.includes('isreal')||s.includes('israel')||s==='is') return 'Isreal';
+  return n.charAt(0).toUpperCase()+n.slice(1);
+}
+function initial(n){const nm=normName(n);if(nm==='Isreal')return 'Is';if(nm==='Chepey')return 'Ch';return nm.charAt(0);}
+function d2s(date){return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
+function fmt$(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+// ── Data ──
+async function loadData(){
+  const res=await fetch('/api/data');
+  data=await res.json();
+  if(!data.payments)data.payments={};
+  if(!data.entries)data.entries=[];
+}
+async function saveAll(){
+  await fetch('/api/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  showToast();
+}
+function showToast(){
+  const t=document.getElementById('save-toast');
+  t.style.display='block';
+  clearTimeout(t._tid);
+  t._tid=setTimeout(()=>t.style.display='none',2000);
+}
+
+// ── Entry helpers ──
+function findEntry(date,project){
+  return (data.entries||[]).find(e=>e.date===date&&(e.project||'').toLowerCase()===(project||'').toLowerCase());
+}
+function findOrCreateEntry(date,project){
+  let e=findEntry(date,project);
+  if(!e){e={date,project,crew:[],materials:[],notes:''};data.entries.push(e);}
+  return e;
+}
+function removeEntry(date,project){
+  data.entries=(data.entries||[]).filter(e=>!(e.date===date&&(e.project||'').toLowerCase()===(project||'').toLowerCase()));
+}
+
+// ── Calendar math ──
+function monthWeeks(year,month){
+  const first=new Date(year,month,1),last=new Date(year,month+1,0);
+  const weeks=[];let ws=new Date(first);ws.setDate(first.getDate()-first.getDay());let n=1;
+  while(ws<=last){const we=new Date(ws);we.setDate(ws.getDate()+6);weeks.push({n:n++,start:new Date(ws),end:new Date(we)});ws.setDate(ws.getDate()+7);}
+  return weeks;
+}
+function entriesForDate(iso){return(data.entries||[]).filter(e=>e.date===iso);}
+function entriesForProject(name){return(data.entries||[]).filter(e=>(e.project||'').toLowerCase()===(name||'').toLowerCase());}
+function entriesForProjectMonth(name,year,month){
+  const s=`${year}-${String(month+1).padStart(2,'0')}-01`,e=`${year}-${String(month+1).padStart(2,'0')}-31`;
+  return entriesForProject(name).filter(en=>en.date>=s&&en.date<=e);
+}
+function entriesInWeek(entries,ws,we){const s=d2s(ws),e=d2s(we);return entries.filter(en=>en.date>=s&&en.date<=e);}
+function workerHours(entries,worker){
+  let t=0;
+  for(const en of entries) for(const c of(en.crew||[])) if(normName(c.name)===normName(worker)){
+    if(c.outOfScope) continue; // old format: hours were all OOS, regular=0
+    t+=parseFloat(c.hours||0);
+  }
+  return t;
+}
+function workerOOSHours(entries,worker){
+  let t=0;
+  for(const en of entries) for(const c of(en.crew||[])) if(normName(c.name)===normName(worker)){
+    if(c.outOfScope) t+=parseFloat(c.hours||0); // old format migration
+    else t+=parseFloat(c.oosHours||0);
+  }
+  return t;
+}
+function matsTotal(entries){let t=0;for(const en of entries)for(const m of(en.materials||[]))t+=parseFloat(m.cost||0);return t;}
+function allProjectsInMonth(year,month){
+  const s=`${year}-${String(month+1).padStart(2,'0')}-01`,e=`${year}-${String(month+1).padStart(2,'0')}-31`;
+  const seen=new Set();
+  for(const en of(data.entries||[])) if(en.date>=s&&en.date<=e&&en.project) seen.add(en.project);
+  return [...seen];
+}
+
+// ── Render Calendar ──
+function renderCalendar(){
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const mName=new Date(displayYear,displayMonth,1).toLocaleString('en-US',{month:'long',year:'numeric'});
+  document.getElementById('month-title').textContent=mName;
+  let html='<div class="cal-grid">';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat','Week Total'].forEach((d,i)=>{
+    html+=`<div class="cal-hdr${i===7?' wktot':''}">${d}</div>`;
+  });
+  for(const wk of weeks){
+    const wkProj={};const wkCrew={};let wkTotalHrs=0;
+    for(let i=0;i<7;i++){
+      const dt=new Date(wk.start);dt.setDate(wk.start.getDate()+i);
+      const iso=d2s(dt);
+      if(dt.getMonth()===displayMonth){
+        for(const en of entriesForDate(iso)){
+          if(!wkProj[en.project])wkProj[en.project]=0;
+          for(const c of(en.crew||[])){
+            const h=parseFloat(c.hours||0);
+            wkProj[en.project]+=h;wkTotalHrs+=h;
+            const nm=normName(c.name);
+            wkCrew[nm]=(wkCrew[nm]||0)+h;
+          }
+        }
+      }
+    }
+    for(let i=0;i<7;i++){
+      const dt=new Date(wk.start);dt.setDate(wk.start.getDate()+i);
+      const iso=d2s(dt);
+      const isCurMo=dt.getMonth()===displayMonth;
+      const isWknd=dt.getDay()===0||dt.getDay()===6;
+      const isToday=iso===today;
+      const isPast=iso<today;
+      const entries=isCurMo?entriesForDate(iso):[];
+      let cls='cal-cell';
+      if(!isCurMo)cls+=' other-month';
+      else if(isWknd)cls+=' weekend';
+      if(isToday)cls+=' today';
+      // Apply calendar filter
+      if(calendarFilter.type&&isCurMo){
+        let match=false;
+        if(calendarFilter.type==='project') match=entries.some(e=>e.project===calendarFilter.value);
+        else if(calendarFilter.type==='crew') match=entries.some(e=>(e.crew||[]).some(c=>normName(c.name)===calendarFilter.value&&(parseFloat(c.hours||0)>0||parseFloat(c.oosHours||0)>0)));
+        if(!match) cls+=' cal-dimmed';
+      }
+      const clickAttr=isCurMo?`onclick="openDayModal('${iso}')"`:'' ;
+      let inner=`<div class="cal-date"><span>${dt.getDate()}</span><span class="cal-date-add">+</span></div>`;
+      if(isCurMo){
+        // Build per-employee map including notes/colors from all entries for this day
+        const byEmp={};
+        for(const en of entries){
+          const col=jobColor(en.project);
+          const abbr=(en.project||'').substring(0,3);
+          for(const c of(en.crew||[])){
+            const regHrs=c.outOfScope?0:parseFloat(c.hours||0);
+            const oosHrs=c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0);
+            const nm=normName(c.name);
+            if(!byEmp[nm]){byEmp[nm]={init:initial(c.name),segs:[],note:'',noteColor:''};}
+            if(c.note&&!byEmp[nm].note){byEmp[nm].note=c.note;byEmp[nm].noteColor=c.color||'#884444';}
+            if(regHrs>0||oosHrs>0){byEmp[nm].segs.push({abbr,regHrs,oosHrs,col});}
+          }
+        }
+        // Always show ALL crew in CREW_ORDER — dimmed initial if no data, colored note if set
+        for(const worker of CREW_ORDER){
+          const nm=normName(worker);
+          const emp=byEmp[nm];
+          if(emp&&emp.segs.length>0){
+            const segHtml=emp.segs.map(s=>{
+              if(s.regHrs>0&&s.oosHrs>0)return `<span style="color:${s.col}">${s.abbr}&nbsp;${s.regHrs}+${s.oosHrs}h<sup style="color:#ffe066;font-size:7px">OOS</sup></span>`;
+              if(s.oosHrs>0)return `<span style="color:${s.col}">${s.abbr}&nbsp;${s.oosHrs}h<sup style="color:#ffe066;font-size:7px">OOS</sup></span>`;
+              return `<span style="color:${s.col}">${s.abbr}&nbsp;${s.regHrs}h</span>`;
+            }).join('<span style="color:#556">,&nbsp;</span>');
+            inner+=`<div class="crew-pill">${emp.init}:&nbsp;${segHtml}</div>`;
+          } else if(emp&&emp.note){
+            inner+=`<div class="crew-pill" style="color:${emp.noteColor}">${emp.init}:&nbsp;${esc(emp.note)}</div>`;
+          } else {
+            inner+=`<div class="crew-pill" style="color:#444">${initial(worker)}</div>`;
+          }
+        }
+      }
+      html+=`<div class="${cls}" ${clickAttr}>${inner}</div>`;
+    }
+    let wtInner=`<div class="wkt-hrs">${wkTotalHrs}hr</div>`;
+    for(const [proj,hrs] of Object.entries(wkProj)){
+      const col=jobColor(proj);const abbr=proj.length>4?proj.substring(0,4):proj;
+      const isActProj=calendarFilter.type==='project'&&calendarFilter.value===proj;
+      wtInner+=`<div class="wkt-proj" style="cursor:pointer;border-radius:3px;padding:1px 2px;${isActProj?'background:#1a1a00;outline:1px solid '+col+';':''}" onclick="setCalFilter('project','${proj.replace(/'/g,"\\'")}')" title="Filter: ${esc(proj)}"><span><span class="wkt-dot" style="background:${col}"></span> ${esc(abbr)}</span><span>${hrs}h</span></div>`;
+    }
+    // Crew initials row — clickable to filter
+    const crewRow=CREW_ORDER.filter(nm=>wkCrew[normName(nm)]).map(nm=>{
+      const isActCrew=calendarFilter.type==='crew'&&calendarFilter.value===normName(nm);
+      return `<span style="cursor:pointer;color:${isActCrew?'var(--accent)':'#556'};font-weight:${isActCrew?'bold':'normal'};text-decoration:${isActCrew?'underline':'none'};margin-right:2px" onclick="setCalFilter('crew','${normName(nm)}')" title="${nm}: ${wkCrew[normName(nm)]}h">${initial(nm)}</span>`;
+    }).join('');
+    if(crewRow) wtInner+=`<div style="margin-top:5px;font-size:10px;letter-spacing:0.05em">${crewRow}</div>`;
+    html+=`<div class="cal-wk-total">${wtInner}</div>`;
+  }
+  html+='</div>';
+  // Build Clear Filter pill if active
+  const filterPill=calendarFilter.type?`<div style="padding:5px 0 0"><span style="background:#1a0a0a;border:1px solid #884444;border-radius:20px;padding:3px 12px;font-size:11px;color:#cc8888;cursor:pointer" onclick="clearCalFilter()">🔍 ${calendarFilter.type==='project'?'Project':'Crew'}: ${calendarFilter.value} &nbsp;✕ Clear</span></div>`:'';
+  document.getElementById('cal-wrap').innerHTML=filterPill+html;
+}
+
+// ── Day Modal ──
+// ── Helpers: flush current UI inputs into crewData for the active project ──
+function flushCrewToState(){
+  const proj=dayModalState.project;
+  if(!proj)return;
+  const crew=[];
+  for(const worker of CREW_ORDER){
+    crew.push({
+      name:worker,
+      reg:document.getElementById('dm-crew-'+worker)?.value??'',
+      oos:document.getElementById('dm-oos-'+worker)?.value??'',
+      note:(document.getElementById('dm-note-'+worker)?.value??'').trim(),
+      color:document.getElementById('dm-color-'+worker)?.value??'#884444'
+    });
+  }
+  dayModalState.crewData[proj]=crew;
+}
+
+function isZeroEntry(proj){
+  return (dayModalState.crewData[proj]||[]).every(c=>
+    parseFloat(c.reg||0)===0&&parseFloat(c.oos||0)===0&&!(c.note||'').trim()
+  );
+}
+
+function openDayModal(iso){
+  // Auto-clean all-zero entries from in-memory data on open
+  const allEntries=entriesForDate(iso);
+  const zeroEntries=allEntries.filter(e=>{
+    const crew=e.crew||[];
+    return crew.length===0||crew.every(c=>
+      parseFloat(c.hours||0)===0&&parseFloat(c.oosHours||0)===0&&!(c.note||'').trim()
+    );
+  });
+  for(const ze of zeroEntries)removeEntry(ze.date,ze.project);
+  if(zeroEntries.length>0)saveAll(); // fire-and-forget cleanup
+
+  const existingEntries=entriesForDate(iso);
+  const monthProjects=allProjectsInMonth(displayYear,displayMonth);
+  const dpSet=new Set([...existingEntries.map(e=>e.project),...monthProjects]);
+  (data.projects||[]).forEach(p=>dpSet.add(p.name));
+  const projects=[...dpSet].filter(Boolean);
+  const dt=new Date(iso+'T12:00:00');
+  const dateLabel=dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+  // Load each project's crew into crewData from existing DB entries
+  const crewData={};
+  for(const proj of projects){
+    const entry=findEntry(iso,proj)||{crew:[]};
+    crewData[proj]=(entry.crew||[]).map(c=>({
+      name:normName(c.name),
+      reg:c.outOfScope?'0':(c.hours||''),
+      oos:c.outOfScope?(c.hours||''):(c.oosHours||''),
+      note:c.note||'',
+      color:c.color||'#884444'
+    }));
+  }
+
+  const firstEntry=existingEntries[0];
+  const mats=(firstEntry?.materials||[]).map(m=>({description:m.description||'',cost:parseFloat(m.cost||0)}));
+  dayModalState={
+    date:iso,
+    project:existingEntries[0]?.project||projects[0]||'',
+    projects,
+    crewData,
+    mats
+  };
+  document.getElementById('dm-title').textContent='📅 '+dateLabel;
+  document.getElementById('dm-notes').value=firstEntry?.notes||'';
+  populateDayModal();
+  document.getElementById('day-modal').classList.add('open');
+}
+function closeDayModal(){document.getElementById('day-modal').classList.remove('open');}
+
+function populateDayModal(){
+  const{date,project,projects,crewData}=dayModalState;
+
+  // Project chips
+  let chipsHtml=projects.map(p=>{
+    const col=jobColor(p);
+    const isActive=p===project;
+    const hasDraft=!isActive&&(crewData[p]||[]).some(c=>
+      parseFloat(c.reg||0)>0||parseFloat(c.oos||0)>0||(c.note||'').trim()
+    );
+    return `<span class="proj-chip ${isActive?'active':''}" style="background:${col}" onclick="switchDayProject('${esc(p)}')">${esc(p)}${hasDraft?' ●':''}</span>`;
+  }).join('');
+  chipsHtml+=`<span style="font-size:12px;color:#666;cursor:pointer;padding:5px" onclick="addNewProjectToDay()">+ New</span>`;
+  document.getElementById('dm-proj-bar').innerHTML=chipsHtml;
+
+  // Crew rows for the active project — read from crewData (in-memory), not DB
+  const projCrew=crewData[project]||[];
+  let crewHtml='';
+  for(const worker of CREW_ORDER){
+    const cd=projCrew.find(c=>normName(c.name)===normName(worker));
+    const regHrs=cd?.reg??'';
+    const oosHrs=cd?.oos??'';
+    const noteVal=cd?.note??'';
+    const colorVal=cd?.color??'#884444';
+    const isNoWork=noteVal==='NO WORK';
+    crewHtml+=`<div style="margin-bottom:7px">
+      <div class="crew-row" style="flex-wrap:nowrap">
+        <span class="crew-lbl">${worker}</span>
+        <input type="number" class="mi xs" id="dm-crew-${worker}" value="${regHrs}" placeholder="0" min="0" max="24" step="0.5" title="Regular hours">
+        <span style="font-size:11px;color:#666">reg</span>
+        <input type="number" class="mi xs" id="dm-oos-${worker}" value="${oosHrs}" placeholder="0" min="0" max="24" step="0.5" style="border-color:#5a5a20" title="Out-of-scope hours">
+        <span style="font-size:11px;color:#ffe066">OOS</span>
+        <input type="text" class="mi" id="dm-note-${worker}" value="${esc(noteVal)}" placeholder="Sick, vacation…" style="flex:1;min-width:80px;font-size:12px${isNoWork?';color:#cc3333;font-weight:bold':''}" title="Status note">
+        <input type="color" id="dm-color-${worker}" value="${colorVal}" style="width:26px;height:26px;border:none;border-radius:4px;cursor:pointer;padding:1px;background:transparent;flex-shrink:0" title="Note color">
+        <button id="dm-nw-${worker}" onclick="noWorkCrew('${worker}')" title="No Work" style="font-size:11px;padding:2px 6px;background:${isNoWork?'#5a1515':'#2a1515'};border:1px solid ${isNoWork?'#ff4444':'#cc3333'};color:${isNoWork?'#ff6666':'#cc8888'};border-radius:4px;cursor:pointer;flex-shrink:0;white-space:nowrap;line-height:1.5">🚫</button>
+      </div>
+      <div style="margin-left:76px;line-height:1">${palStrip('dm-color-'+worker)}</div>
+    </div>`;
+  }
+  document.getElementById('dm-crew-section').innerHTML=crewHtml;
+  renderDayModalMats();
+
+  // Show delete button only if the active project has a real saved entry
+  const hasEntry=!!findEntry(date,project);
+  document.getElementById('dm-delete-btn').style.display=hasEntry?'':'none';
+}
+
+function switchDayProject(proj){
+  flushCrewToState();
+  dayModalState.project=proj;
+  populateDayModal();
+}
+
+function addNewProjectToDay(){
+  const name=prompt('Project name:');
+  if(!name||!name.trim())return;
+  const n=name.trim();
+  if(!dayModalState.projects.includes(n)){
+    dayModalState.projects.push(n);
+    if(!dayModalState.crewData[n])dayModalState.crewData[n]=[];
+  }
+  flushCrewToState();
+  dayModalState.project=n;
+  populateDayModal();
+}
+
+function renderDayModalMats(){
+  let html=dayModalState.mats.map((m,i)=>`
+    <div class="mat-form-row">
+      <input type="text" class="mi" value="${esc(m.description)}" oninput="dayModalState.mats[${i}].description=this.value" placeholder="Vendor / Description">
+      <input type="number" class="mi" value="${m.cost||''}" oninput="dayModalState.mats[${i}].cost=parseFloat(this.value)||0" placeholder="$0" min="0" step="0.01">
+      <button class="mat-del" onclick="removeDayModalMat(${i})">✕</button>
+    </div>`).join('');
+  html+=`<button class="mat-add-btn" onclick="addDayModalMat()">+ Add Material / Sub</button>`;
+  document.getElementById('dm-mats-section').innerHTML=html;
+}
+function addDayModalMat(){dayModalState.mats.push({description:'',cost:0});renderDayModalMats();}
+function removeDayModalMat(i){dayModalState.mats.splice(i,1);renderDayModalMats();}
+
+async function saveDayModal(){
+  flushCrewToState(); // capture current UI before saving
+  const{date,projects,crewData}=dayModalState;
+  if(!projects.length){closeDayModal();return;}
+  let firstProjWithData=null;
+
+  for(const proj of projects){
+    const rawCrew=crewData[proj]||[];
+    const crew=[];
+    for(const cd of rawCrew){
+      const hrs=parseFloat(cd.reg||0);
+      const oosHrs=parseFloat(cd.oos||0);
+      const note=(cd.note||'').trim();
+      const color=cd.color||'';
+      if(hrs>0||oosHrs>0||note){
+        const item={name:cd.name,hours:hrs,oosHours:oosHrs};
+        if(note){item.note=note;if(color)item.color=color;}
+        crew.push(item);
+      }
+    }
+    if(crew.length>0){
+      if(!firstProjWithData)firstProjWithData=proj;
+      const entry=findOrCreateEntry(date,proj);
+      entry.crew=crew;
+      entry.materials=[];
+      entry.notes='';
+    }else{
+      // Zero/empty — delete any existing entry so it vanishes from calendar
+      removeEntry(date,proj);
+    }
+  }
+
+  // Attach shared materials + notes to first project that has crew data
+  const mats=dayModalState.mats.filter(m=>m.description||m.cost>0);
+  const notes=document.getElementById('dm-notes').value.trim();
+  const matProj=firstProjWithData||projects[0];
+  if(matProj&&(mats.length>0||notes)){
+    const entry=findOrCreateEntry(date,matProj);
+    entry.materials=mats;
+    entry.notes=notes;
+  }
+
+  await saveAll();closeDayModal();render();
+}
+
+async function deleteDayEntry(){
+  const{date,project}=dayModalState;
+  if(!confirm(`Delete ${project} entry for ${date}?`))return;
+  removeEntry(date,project);
+  await saveAll();closeDayModal();render();
+}
+
+// ── Week Modal ──
+function openWeekModal(proj,worker,weekIdx){
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const wk=weeks[weekIdx];
+  const projEnt=entriesForProjectMonth(proj,displayYear,displayMonth);
+  const days=[];
+  for(let i=0;i<7;i++){
+    const dt=new Date(wk.start);dt.setDate(wk.start.getDate()+i);
+    const iso=d2s(dt);
+    const entry=findEntry(iso,proj);
+    let hrs=0;
+    if(entry){const cm=(entry.crew||[]).find(c=>normName(c.name)===normName(worker));if(cm)hrs=parseFloat(cm.hours||0);}
+    const dayLabel=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    days.push({date:iso,label:dayLabel,hrs,inMonth:dt.getMonth()===displayMonth});
+  }
+  weekModalState={proj,worker,weekIdx,days};
+  const col=jobColor(proj);
+  document.getElementById('wm-title').innerHTML=`<span style="color:${col}">${esc(worker)}</span> on <span style="color:${col}">${esc(proj)}</span> — Wk ${weekIdx+1}`;
+  renderWeekModal();
+  document.getElementById('week-modal').classList.add('open');
+}
+function closeWeekModal(){document.getElementById('week-modal').classList.remove('open');}
+
+function renderWeekModal(){
+  const{days,proj}=weekModalState;
+  let html=`<div style="font-size:12px;color:#888;margin-bottom:12px">Click a day to edit hours. 0 = not worked.</div>`;
+  days.forEach((d,i)=>{
+    const col=d.inMonth?'#eee':'#555';
+    html+=`<div class="wk-day-row">
+      <span class="wk-day-lbl" style="color:${col}">${d.label}</span>
+      <input type="number" class="mi xs" id="wm-day-${d.date}" value="${d.hrs||''}" placeholder="0" min="0" max="24" step="0.5" ${!d.inMonth?'disabled':''}>
+      <span style="font-size:12px;color:#666">hrs</span>
+    </div>`;
+  });
+  document.getElementById('wm-body').innerHTML=html;
+}
+
+async function saveWeekModal(){
+  const{proj,worker,days}=weekModalState;
+  for(const d of days){
+    if(!d.inMonth)continue;
+    const el=document.getElementById('wm-day-'+d.date);
+    const hrs=parseFloat(el?.value||0);
+    if(hrs>0){
+      const entry=findOrCreateEntry(d.date,proj);
+      const existing=(entry.crew||[]).find(c=>normName(c.name)===normName(worker));
+      if(existing)existing.hours=hrs;
+      else entry.crew.push({name:worker,hours:hrs});
+    }else{
+      // Remove worker from entry if hrs=0
+      const entry=findEntry(d.date,proj);
+      if(entry)entry.crew=(entry.crew||[]).filter(c=>normName(c.name)!==normName(worker));
+    }
+  }
+  await saveAll();closeWeekModal();render();
+}
+
+// ── Flags ──
+function computeAutoFlags(){
+  const flags=[];
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const noWorkDays=[];
+  for(const wk of weeks){
+    for(let i=1;i<6;i++){
+      const dt=new Date(wk.start);dt.setDate(wk.start.getDate()+i);
+      const iso=d2s(dt);
+      if(dt.getMonth()!==displayMonth||iso>=today)continue;
+      if(!entriesForDate(iso).length)noWorkDays.push(iso);
+    }
+  }
+  if(noWorkDays.length>0)flags.push({icon:'📅',text:`${noWorkDays.length} weekday${noWorkDays.length>1?'s':''} with no work logged`,cls:'flag-warn'});
+  const projects=allProjectsInMonth(displayYear,displayMonth);
+  for(const proj of projects){
+    const allEnt=entriesForProject(proj);
+    let billed=0;for(const en of allEnt)for(const c of(en.crew||[])){if(c.outOfScope)billed+=parseFloat(c.hours||0)*oosRateFor(proj);else billed+=parseFloat(c.hours||0)*billingRate(proj)+parseFloat(c.oosHours||0)*oosRateFor(proj);}
+    const paid=((data.payments||{})[proj]||[]).reduce((s,p)=>s+parseFloat(p.amount||0),0);
+    if(billed-paid>1000)flags.push({icon:'💰',text:`${proj}: ${fmt$(billed-paid)} balance due`,cls:'flag-alert'});
+  }
+  for(const proj of projects){
+    const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+    let hrs=0;for(const en of ent)for(const c of(en.crew||[]))hrs+=parseFloat(c.hours||0);
+    if(hrs>=40&&matsTotal(ent)===0)flags.push({icon:'🧱',text:`${proj}: ${hrs}hrs but no materials logged`,cls:'flag-warn'});
+  }
+  if(flags.length===0)flags.push({icon:'✅',text:'All clear — no issues this month',cls:'flag-good'});
+  return flags;
+}
+
+function renderFlags(){
+  const flags=computeAutoFlags();
+  document.getElementById('flags-wrap').innerHTML=`<div class="flags-panel">
+    <div class="flags-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+      <h3>⚑ Flags &amp; Alerts</h3><span style="color:#666;font-size:12px">▼</span>
+    </div>
+    <div class="flags-body" id="flags-body">
+      ${flags.map(f=>`<div class="flag-item ${f.cls}"><span class="flag-icon">${f.icon}</span><div class="flag-text">${f.text}</div></div>`).join('')}
+      <div class="flag-item" id="ai-flag-item" style="display:none;max-width:100%;flex:1"></div>
+    </div>
+  </div>`;
+}
+
+async function getAIFlags(){
+  const projects=allProjectsInMonth(displayYear,displayMonth);
+  const monthName=new Date(displayYear,displayMonth,1).toLocaleString('en-US',{month:'long',year:'numeric'});
+  let summary=`Mullins Construction — ${monthName}\n\n`;
+  for(const proj of projects){
+    const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+    const rate=billingRate(proj);let hrs=0;
+    for(const en of ent)for(const c of(en.crew||[]))hrs+=parseFloat(c.hours||0);
+    const mats=matsTotal(ent);const billed=hrs*rate;
+    const paid=((data.payments||{})[proj]||[]).reduce((s,p)=>s+parseFloat(p.amount||0),0);
+    summary+=`${proj} @ $${rate}/hr: ${hrs}hrs | Billed ${fmt$(billed)} | Materials ${fmt$(mats)} | Paid ${fmt$(paid)} | Balance ${fmt$(billed+mats*1.15-paid)}\n`;
+  }
+  const el=document.getElementById('ai-flag-item');
+  if(el){el.style.display='flex';el.innerHTML='<span class="flag-icon">🤖</span><div class="flag-text" style="color:#888">Asking Claude…</div>';}
+  try{
+    const res=await fetch('/api/dashboard/flags',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary})});
+    const d=await res.json();
+    if(el)el.innerHTML=`<span class="flag-icon">🤖</span><div class="flag-text">${(d.flags||'').replace(/\n/g,'<br>')}</div>`;
+  }catch(e){if(el)el.innerHTML='<span class="flag-icon">⚠️</span><div class="flag-text">AI unavailable</div>';}
+}
+
+// ── Materials panel actions ──
+function openEditMat(proj,date){
+  openDayModal(date);
+}
+async function deleteMatInPanel(proj,date,matIdx){
+  if(!confirm('Delete this material?'))return;
+  const entry=findEntry(date,proj);
+  if(!entry)return;
+  entry.materials=(entry.materials||[]).filter((_,i)=>i!==matIdx);
+  await saveAll();renderJobPanels();
+}
+
+// ── Job Panels ──
+function renderJobPanel(proj){
+  const color=jobColor(proj);
+  const rate=billingRate(proj);
+  const oosR=oosRateFor(proj);
+  const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+  const allEnt=entriesForProject(proj);
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const payments=((data.payments||{})[proj]||[]);
+  const projId=proj.replace(/[^a-z0-9]/gi,'_');
+
+  // Crew set
+  const crewSet=new Set();
+  for(const en of ent)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
+  const crew=[...CREW_ORDER.filter(c=>crewSet.has(c)),...[...crewSet].filter(c=>!CREW_ORDER.includes(c))];
+
+  // Weekly hours table
+  let wkCols=weeks.map((wk,wi)=>`<th style="cursor:default">Wk ${wk.n}</th>`).join('')+'<th>Total</th><th>Billed</th>';
+  let wkRows='';const wkLabor=weeks.map(()=>0);let grandLaborHrs=0;
+  const wkOOSHrs=weeks.map(()=>0);
+  for(const worker of crew){
+    const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(ent,wk.start,wk.end),worker));
+    const total=wkHrs.reduce((a,b)=>a+b,0);grandLaborHrs+=total;
+    wkHrs.forEach((h,i)=>wkLabor[i]+=h);
+    const billed=total*rate;
+    wkRows+=`<tr>
+      <td>${esc(worker)}</td>
+      ${wkHrs.map((h,wi)=>`<td class="hrs-cell${h===0?' zero':''}" onclick="openWeekModal('${esc(proj)}','${esc(worker)}',${wi})" title="Click to edit ${worker} Week ${wi+1}">${h===0?'—':h}</td>`).join('')}
+      <td><strong>${total}</strong></td>
+      <td>${billed>0?fmt$(billed):'—'}</td>
+    </tr>`;
+  }
+  // Tally OOS hours per week
+  weeks.forEach((wk,wi)=>{
+    const wkEnt=entriesInWeek(ent,wk.start,wk.end);
+    for(const en of wkEnt)for(const c of(en.crew||[])){if(c.outOfScope)wkOOSHrs[wi]+=parseFloat(c.hours||0);else wkOOSHrs[wi]+=parseFloat(c.oosHours||0);}
+  });
+  const grandOOSHrs=wkOOSHrs.reduce((a,b)=>a+b,0);
+  const wkLaborTotals=wkLabor.map(h=>fmt$(h*rate)).join('</td><td>');
+  const totalLabor=grandLaborHrs*rate;
+  wkRows+=`<tr class="wk-labor"><td>Wk Labor $</td><td>${wkLaborTotals}</td><td></td><td>${fmt$(totalLabor)}</td></tr>`;
+  if(grandOOSHrs>0){
+    const oosHrCells=wkOOSHrs.map(h=>h>0?h:'—').join('</td><td>');
+    const oosLabCells=wkOOSHrs.map(h=>h>0?fmt$(h*oosR):'—').join('</td><td>');
+    wkRows+=`<tr class="wk-oos"><td>↳ OOS Hrs</td><td>${oosHrCells}</td><td>${grandOOSHrs}</td><td>—</td></tr>`;
+    wkRows+=`<tr class="wk-oos-labor"><td>↳ OOS Labor $</td><td>${oosLabCells}</td><td></td><td>${fmt$(grandOOSHrs*oosR)}</td></tr>`;
+  }
+
+  // Materials (from all entries in month, with edit/delete)
+  const matItems=[];
+  for(const en of ent)for(let mi=0;mi<(en.materials||[]).length;mi++){
+    const m=en.materials[mi];if(m.description||m.cost)matItems.push({date:en.date,m,mi});
+  }
+  const matsSub=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0),0);
+  const matsMarkup=matsSub*0.15;
+  const matsTotal2=matsSub+matsMarkup;
+
+  let matsRows=matItems.length===0
+    ?`<div style="font-size:12px;color:#444;padding:4px 0">No materials logged — <a style="color:var(--accent);cursor:pointer" onclick="openDayModal('${today}')">add one</a></div>`
+    :matItems.map(({date,m,mi})=>`
+      <div class="mat-row-wrap">
+        <span class="mat-row-desc" title="${esc(m.description)}">${esc(date.slice(5))} ${esc(m.description)}</span>
+        <span class="mat-row-amt">${fmt$(m.cost)}</span>
+        <button class="mat-icon-btn edit" onclick="openEditMat('${esc(proj)}','${esc(date)}')" title="Edit">✎</button>
+        <button class="mat-icon-btn del" onclick="deleteMatInPanel('${esc(proj)}','${esc(date)}',${mi})" title="Delete">✕</button>
+      </div>`).join('');
+
+  let matsHtml='';
+  if(matItems.length>0){
+    matsHtml=`<div class="mat-total-row"><span class="lbl">Subtotal</span><span class="amt">${fmt$(matsSub)}</span></div>
+    <div class="mat-total-row"><span class="lbl">15% Markup</span><span class="amt">${fmt$(matsMarkup)}</span></div>
+    <div class="mat-total-row" style="border-top:2px solid #2a3a5e"><span class="lbl" style="color:#fff;font-weight:bold">Total Materials</span><span class="amt" style="color:var(--accent);font-weight:bold">${fmt$(matsTotal2)}</span></div>`;
+  }
+
+  // All-time totals
+  const allLaborBilled=(()=>{let t=0;for(const en of allEnt)for(const c of(en.crew||[])){if(c.outOfScope)t+=parseFloat(c.hours||0)*oosR;else t+=parseFloat(c.hours||0)*rate+parseFloat(c.oosHours||0)*oosR;}return t;})();
+  const allOOSHrs=allEnt.reduce((t,e)=>t+(e.crew||[]).reduce((s,c)=>s+(c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0)),0),0);
+  const allOOSLabor=allOOSHrs*oosR;
+  const allMatsSub=matsTotal(allEnt);
+  const allMatsTotal=allMatsSub*1.15;
+  const grandTotal=allLaborBilled+allMatsTotal;
+  const totalPaid=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+  const balanceDue=grandTotal-totalPaid;
+
+  // Payments
+  const payRows=payments.length===0
+    ?'<div style="font-size:12px;color:#444;padding:4px 0">No payments recorded</div>'
+    :`<div class="pay-row hdr"><span>Date</span><span>Check</span><span>Amount</span><span>Notes</span></div>`
+    +payments.map(p=>`<div class="pay-row"><span>${p.date||''}</span><span>${p.check||''}</span><span>${fmt$(p.amount||0)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes||'')}</span></div>`).join('');
+
+  const balColor=balanceDue<=0?'paid':'';
+
+  return `<div class="job-panel">
+    <div class="jp-header" style="background:${color}">
+      <span>${esc(proj)} • $${rate}/hr${oosR!==rate?' · OOS: $'+oosR+'/hr':''}</span>
+      <span style="font-size:12px;opacity:.85">${grandLaborHrs}hr this month</span>
+    </div>
+    <div class="jp-body">
+      <div class="wk-table-wrap">
+        <div class="mat-label">Weekly Hours <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— click any cell to edit</span></div>
+        <table class="wk-table"><thead><tr><th>Worker</th>${wkCols}</tr></thead><tbody>${wkRows}</tbody></table>
+      </div>
+      <div class="mat-section">
+        <div class="mat-label">Materials &amp; Subs</div>
+        ${matsRows}
+        ${matsHtml}
+        <button class="mat-add-btn" onclick="openDayModal('${today}')">+ Add Material (log to today)</button>
+      </div>
+      <div class="proj-totals">
+        <div class="tot-row"><span class="lbl">Total Labor (billed, all time)</span><span>${fmt$(allLaborBilled)}</span></div>
+        ${allOOSLabor>0?`<div class="tot-row" style="color:#ffe066;font-size:12px"><span class="lbl">↳ incl. Out-of-Scope Labor (${allOOSHrs}hr)</span><span>${fmt$(allOOSLabor)}</span></div>`:''}
+        <div class="tot-row"><span class="lbl">Total Materials (with markup)</span><span>${fmt$(allMatsTotal)}</span></div>
+        <div class="tot-row grand"><span class="lbl">GRAND TOTAL</span><span>${fmt$(grandTotal)}</span></div>
+      </div>
+      <div class="pay-section">
+        <div class="pay-label">Payments Received</div>
+        ${payRows}
+        <div class="pay-total-row"><span>Total Paid</span><span>${fmt$(totalPaid)}</span></div>
+        <div class="balance-due">
+          <span class="lbl">BALANCE DUE</span>
+          <span class="amt ${balColor}">${fmt$(Math.abs(balanceDue))}${balanceDue<=0?' ✓':''}</span>
+        </div>
+        <button class="add-pay-toggle" onclick="togglePayForm('${projId}')">+ Log Payment</button>
+        <div id="payform-${projId}" style="display:none">
+          <div class="add-pay-form" style="margin-top:8px">
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Date</div><input type="date" id="pf-date-${projId}" value="${today}"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Check #</div><input type="text" id="pf-check-${projId}" placeholder="Optional"></div>
+            </div>
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Amount ($)</div><input type="number" id="pf-amt-${projId}" placeholder="0.00"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Notes</div><input type="text" id="pf-notes-${projId}" placeholder="Optional"></div>
+            </div>
+            <button class="add-pay-btn" onclick="savePayment('${esc(proj)}','${projId}')">💾 Save Payment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function togglePayForm(projId){const el=document.getElementById('payform-'+projId);if(el)el.style.display=el.style.display==='none'?'block':'none';}
+
+async function savePayment(proj,projId){
+  const date=document.getElementById('pf-date-'+projId)?.value||today;
+  const check=document.getElementById('pf-check-'+projId)?.value||'';
+  const amount=parseFloat(document.getElementById('pf-amt-'+projId)?.value||0);
+  const notes=document.getElementById('pf-notes-'+projId)?.value||'';
+  if(!amount){alert('Enter an amount');return;}
+  if(!data.payments)data.payments={};
+  if(!data.payments[proj])data.payments[proj]=[];
+  data.payments[proj].push({date,check,amount,notes});
+  await saveAll();renderJobPanels();
+}
+
+function renderJobPanels(){
+  const projects=allProjectsInMonth(displayYear,displayMonth);
+  if(!projects.length){
+    document.getElementById('panels-wrap').innerHTML=`<div class="empty-dash">No entries this month.<br>Click any calendar day to log work, or go to <a href="/" style="color:var(--accent)">Chat</a>.</div>`;
+    return;
+  }
+  let html=`<div class="section-title" style="padding:0 20px 12px">Job Panels — ${new Date(displayYear,displayMonth,1).toLocaleString('en-US',{month:'long',year:'numeric'})}</div>`;
+  html+='<div class="panels-grid">';
+  for(const proj of projects)html+=renderJobPanel(proj);
+  html+='</div>';
+  document.getElementById('panels-wrap').innerHTML=html;
+}
+
+// ── Navigation ──
+function prevMonth(){if(displayMonth===0){displayMonth=11;displayYear--;}else displayMonth--;render();}
+function nextMonth(){if(displayMonth===11){displayMonth=0;displayYear++;}else displayMonth++;render();}
+
+function render(){renderCalendar();renderFlags();renderJobPanels();}
+
+async function refreshAll(){
+  document.getElementById('panels-wrap').innerHTML='<div class="loading">Refreshing…</div>';
+  await loadData();render();
+}
+
+// ── Materials Panel ──
+const MAT_PROJ_COLORS = ['#1a5fa8','#e8720c','#2a9a2a','#6b2fbe','#1a8a8a','#b03030','#8b6914','#b02080'];
+let matData = [];
+let matProjects = [];
+
+async function openMaterials() {
+  document.getElementById('mat-panel').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  await loadMaterials();
+}
+
+function closeMaterials() {
+  document.getElementById('mat-panel').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function clearMatFilters() {
+  document.getElementById('mat-f-from').value = '';
+  document.getElementById('mat-f-to').value = '';
+  document.getElementById('mat-f-search').value = '';
+  document.getElementById('mat-f-proj').value = '';
+  document.getElementById('mat-f-sort').value = 'newest';
+  renderMatList();
+}
+
+function detectStore(description, store) {
+  const desc = description || '';
+  const st = store || '';
+  const combined = (desc + ' ' + st).toLowerCase();
+  if (/^materials\s*[—\-]/i.test(desc) || /home\s*depot/i.test(combined) || /#[016]\d{3}\b/.test(desc)) return { name:'Home Depot', color:'#f96302' };
+  if (/\bace\b/i.test(combined)) return { name:'Ace Hardware', color:'#cc2222' };
+  if (/\bpace\b/i.test(combined)) return { name:'Pace Supply', color:'#1a6fa8' };
+  if (/lowe'?s/i.test(combined)) return { name:"Lowe's", color:'#3b3b9e' };
+  if (/amazon/i.test(combined)) return { name:'Amazon', color:'#232f3e' };
+  if (st) return { name: st, color:'#445566' };
+  return null;
+}
+
+function cleanMatDesc(description) {
+  return (description || '').replace(/^materials\s*[—\-]\s*/i, '').trim();
+}
+
+function fmtDateBadge(d) {
+  if (!d) return '';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const parts = d.split('-');
+  return `${months[parseInt(parts[1],10)-1]} ${parseInt(parts[2],10)}`;
+}
+
+async function loadMaterials() {
+  document.getElementById('mat-list').innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const res = await fetch('/api/materials');
+    const data = await res.json();
+    matData = data.materials || [];
+    matData.forEach((m, i) => { m._mid = i; });
+    matProjects = data.projects || [];
+    const sel = document.getElementById('mat-f-proj');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All Projects</option>' +
+      matProjects.map(p => `<option value="${esc(p)}"${p===cur?' selected':''}>${esc(p)}</option>`).join('') +
+      '<option value="__general__"' + (cur==='__general__'?' selected':'') + '>⬛ General Expenses</option>';
+    renderMatList();
+  } catch(e) {
+    document.getElementById('mat-list').innerHTML = '<div class="loading" style="color:#cc4444">Error loading materials.</div>';
+  }
+}
+
+function getMatColor(proj, colorMap) {
+  if (proj === '__general__') return '#445566';
+  if (!colorMap[proj]) {
+    const usedCount = Object.keys(colorMap).length;
+    colorMap[proj] = MAT_PROJ_COLORS[usedCount % MAT_PROJ_COLORS.length];
+  }
+  return colorMap[proj];
+}
+
+function applyMatFilters() {
+  const q = (document.getElementById('mat-f-search')?.value || '').toLowerCase().trim();
+  const proj = document.getElementById('mat-f-proj')?.value || '';
+  const from = document.getElementById('mat-f-from')?.value || '';
+  const to = document.getElementById('mat-f-to')?.value || '';
+  const sort = document.getElementById('mat-f-sort')?.value || 'newest';
+  let items = [...matData];
+  if (q) items = items.filter(m => [m.store||'', m.description||'', m.invoiceNum||''].join(' ').toLowerCase().includes(q));
+  if (proj) items = items.filter(m => m.project === proj);
+  if (from) items = items.filter(m => (m.date||'') >= from);
+  if (to) items = items.filter(m => (m.date||'') <= to);
+  if (sort === 'oldest') items.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  else if (sort === 'amount-hi') items.sort((a,b) => b.amount - a.amount);
+  else if (sort === 'amount-lo') items.sort((a,b) => a.amount - b.amount);
+  else if (sort === 'project') items.sort((a,b) => (a.project||'').localeCompare(b.project||''));
+  else if (sort === 'store') items.sort((a,b) => (a.store||'').localeCompare(b.store||''));
+  else items.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  return { items, sort, from, to };
+}
+
+function renderMatList() {
+  const { items, sort, from, to } = applyMatFilters();
+  const total = items.reduce((s,m) => s + parseFloat(m.amount||0), 0);
+  document.getElementById('mat-f-total').innerHTML =
+    `<strong>Filtered Total:</strong> <span style="color:var(--accent)">$${total.toFixed(2)}</span>` +
+    `<span style="color:#778;font-size:11px;margin-left:10px">${items.length} item${items.length!==1?'s':''}</span>`;
+
+  if (!items.length) {
+    document.getElementById('mat-list').innerHTML = '<div class="loading" style="margin-top:30px;color:#778">No materials match the current filters.</div>';
+    return;
+  }
+
+  const colorMap = {};
+  const byDate = sort === 'newest' || sort === 'oldest';
+  const hasDateFilter = from || to;
+  let html = '';
+
+  if (byDate && !hasDateFilter) {
+    // Group by month → collapsible sections
+    const months = {};
+    for (const m of items) {
+      const mo = (m.date||'').slice(0,7);
+      if (!months[mo]) months[mo] = [];
+      months[mo].push(m);
+    }
+    const sortedMonths = Object.keys(months).sort((a,b) => sort==='oldest' ? a.localeCompare(b) : b.localeCompare(a));
+    for (const mo of sortedMonths) {
+      const moItems = months[mo];
+      const moTotal = moItems.reduce((s,m) => s + parseFloat(m.amount||0), 0);
+      const [y,mn] = mo.split('-');
+      const moLabel = new Date(+y, +mn-1, 1).toLocaleString('default', {month:'long', year:'numeric'});
+      const moId = 'matmo-' + mo.replace('-','');
+      html += `<div class="mat-mo-hdr" onclick="toggleMatMonth('${moId}')">`;
+      html += `<span>📅 ${moLabel}</span>`;
+      html += `<span><span style="color:var(--accent)">$${moTotal.toFixed(2)}</span> <span style="color:#778;font-size:11px">${moItems.length} item${moItems.length!==1?'s':''}</span> <span id="${moId}-tog">▾</span></span>`;
+      html += `</div><div id="${moId}">`;
+      html += buildMatRows(moItems, colorMap, sort);
+      html += `</div>`;
+    }
+  } else {
+    html = buildMatRows(items, colorMap, sort);
+  }
+
+  document.getElementById('mat-list').innerHTML = html;
+}
+
+function buildMatRows(items, colorMap, sort) {
+  const byDate = sort === 'newest' || sort === 'oldest';
+  const EXP_CATS = ['Tools','Fuel','Truck/Vehicle','Safety/PPE','General Supplies','Permits/Fees','Other'];
+  let html = '';
+  let lastDate = '';
+  for (const m of items) {
+    if (byDate && m.date !== lastDate) {
+      const dateItems = items.filter(x => x.date === m.date);
+      const dateTotal = dateItems.reduce((s,x) => s + parseFloat(x.amount||0), 0);
+      html += `<div class="mat-date-hdr"><span>${m.date}</span><span>$${dateTotal.toFixed(2)}</span></div>`;
+      lastDate = m.date;
+    }
+    const mid = m._mid;
+    const col = getMatColor(m.project, colorMap);
+    const projLabel = m.project === '__general__' ? (m.projectLabel || m.category || 'General') : m.project;
+    const storeInfo = detectStore(m.description, m.store);
+    const cleanDesc = cleanMatDesc(m.description);
+    const dateBadge = fmtDateBadge(m.date);
+
+    // ── Row ──
+    html += `<div class="mat-row" id="matrow-${mid}">`;
+    html += `<span class="mat-badge" style="background:${col};max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${esc(projLabel)}">${esc(projLabel)}</span>`;
+    if (!byDate) html += `<span class="mat-date-badge">${dateBadge}</span>`;
+    if (storeInfo) html += `<span class="mat-store-badge" style="background:${storeInfo.color}">${esc(storeInfo.name)}</span>`;
+    html += `<span class="mat-desc">${esc(cleanDesc)}`;
+    if (m.invoiceNum) html += `<span style="color:#556;font-size:10px;margin-left:5px">#${esc(m.invoiceNum)}</span>`;
+    html += `</span>`;
+    html += `<span class="mat-amt">$${parseFloat(m.amount||0).toFixed(2)}</span>`;
+    html += `<button class="mat-edit-btn" onclick="toggleMatEdit(${mid})" title="Edit">✏️</button>`;
+    html += `<button class="mat-del-btn" onclick="deleteMat(${mid})" title="Delete">🗑️</button>`;
+    html += `</div>`;
+
+    // ── Inline edit form (hidden until toggled) ──
+    const editStore = storeInfo ? storeInfo.name : (m.store || '');
+    html += `<div class="mat-inline-edit" id="matedit-${mid}" style="display:none">`;
+    if (m.isGeneral) {
+      html += `<div class="mie-field"><label>Date</label><input type="date" id="mie-date-${mid}" value="${esc(m.date)}"></div>`;
+      html += `<div class="mie-field"><label>Category</label><select id="mie-cat-${mid}">${EXP_CATS.map(c=>`<option value="${esc(c)}"${(m.category||'Other')===c?' selected':''}>${esc(c)}</option>`).join('')}</select></div>`;
+    } else {
+      html += `<div class="mie-field"><label>Date</label><input type="date" id="mie-date-${mid}" value="${esc(m.date)}"></div>`;
+      html += `<div class="mie-field"><label>Project</label><select id="mie-proj-${mid}">${matProjects.map(p=>`<option value="${esc(p)}"${m.project===p?' selected':''}>${esc(p)}</option>`).join('')}</select></div>`;
+    }
+    html += `<div class="mie-field"><label>Store</label><input type="text" id="mie-store-${mid}" value="${esc(editStore)}" style="width:120px"></div>`;
+    html += `<div class="mie-field" style="flex:1"><label>Description</label><input type="text" id="mie-desc-${mid}" value="${esc(cleanDesc)}" style="width:100%;min-width:180px"></div>`;
+    html += `<div class="mie-field"><label>Amount ($)</label><input type="number" id="mie-amt-${mid}" value="${parseFloat(m.amount||0).toFixed(2)}" step="0.01" style="width:90px"></div>`;
+    html += `<div class="mie-field"><label>Invoice#</label><input type="text" id="mie-inv-${mid}" value="${esc(m.invoiceNum||'')}" style="width:100px"></div>`;
+    html += `<div style="display:flex;gap:6px;align-items:flex-end">`;
+    html += `<button class="hbtn gold" onclick="saveMatEdit(${mid})" style="padding:5px 14px;font-size:12px">💾 Save</button>`;
+    html += `<button class="hbtn" onclick="toggleMatEdit(${mid})" style="padding:5px 14px;font-size:12px">✕ Cancel</button>`;
+    html += `</div></div>`;
+  }
+  return html;
+}
+
+function toggleMatEdit(mid) {
+  const el = document.getElementById('matedit-' + mid);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+async function saveMatEdit(mid) {
+  const m = matData[mid];
+  if (!m) return;
+  const btn = document.querySelector(`#matedit-${mid} .hbtn.gold`);
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  const updated = {
+    store: (document.getElementById('mie-store-' + mid)?.value || '').trim(),
+    description: (document.getElementById('mie-desc-' + mid)?.value || '').trim(),
+    amount: parseFloat(document.getElementById('mie-amt-' + mid)?.value || 0),
+    invoiceNum: (document.getElementById('mie-inv-' + mid)?.value || '').trim(),
+  };
+  if (m.isGeneral) {
+    updated.date = document.getElementById('mie-date-' + mid)?.value || m.date;
+    updated.category = document.getElementById('mie-cat-' + mid)?.value || m.category;
+  } else {
+    updated.date = document.getElementById('mie-date-' + mid)?.value || m.date;
+    updated.project = document.getElementById('mie-proj-' + mid)?.value || m.project;
+  }
+
+  try {
+    const res = await fetch('/api/material-edit', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        isGeneral: m.isGeneral,
+        expIndex: m.expIndex,
+        entryDate: m.entryDate,
+        entryProject: m.entryProject,
+        matIndex: m.matIndex,
+        updated
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Save failed');
+    await loadMaterials();
+  } catch(e) {
+    alert('Save failed: ' + e.message);
+    if (btn) { btn.textContent = '💾 Save'; btn.disabled = false; }
+  }
+}
+
+async function deleteMat(mid) {
+  const m = matData[mid];
+  if (!m) return;
+  const label = m.isGeneral ? (m.description || 'this expense') : (m.description || 'this material');
+  if (!confirm(`Delete "${label}" ($${parseFloat(m.amount||0).toFixed(2)})?`)) return;
+  try {
+    const res = await fetch('/api/material-delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        isGeneral: m.isGeneral,
+        expIndex: m.expIndex,
+        entryDate: m.entryDate,
+        entryProject: m.entryProject,
+        matIndex: m.matIndex
+      })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Delete failed');
+    await loadMaterials();
+  } catch(e) {
+    alert('Delete failed: ' + e.message);
+  }
+}
+
+function toggleMatMonth(id) {
+  const el = document.getElementById(id);
+  const tog = document.getElementById(id + '-tog');
+  if (!el) return;
+  const hidden = el.style.display === 'none';
+  el.style.display = hidden ? '' : 'none';
+  if (tog) tog.textContent = hidden ? '▾' : '▸';
+}
+
+function getFilteredMat() {
+  return applyMatFilters().items;
+}
+
+function exportMatCSV() {
+  const items = getFilteredMat();
+  const rows = [['Date','Project','Store','Description','Amount','Invoice#']];
+  for (const m of items) {
+    const projLabel = m.project === '__general__' ? (m.projectLabel||m.category||'General') : m.project;
+    rows.push([m.date||'', projLabel, m.store||'', m.description||'', parseFloat(m.amount||0).toFixed(2), m.invoiceNum||'']);
+  }
+  const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'materials_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+function exportMatPDF() {
+  const items = getFilteredMat();
+  const total = items.reduce((s,m) => s + parseFloat(m.amount||0), 0);
+  const from = document.getElementById('mat-f-from')?.value || '';
+  const to = document.getElementById('mat-f-to')?.value || '';
+  const dateRange = from||to ? `${from||'start'} → ${to||'today'}` : 'All Dates';
+  const rows = items.map(m => {
+    const projLabel = m.project === '__general__' ? (m.projectLabel||m.category||'General') : m.project;
+    return `<tr><td>${esc(m.date||'')}</td><td>${esc(projLabel)}</td><td>${esc(m.store||'')}</td><td>${esc(m.description||'')}</td><td style="text-align:right">$${parseFloat(m.amount||0).toFixed(2)}</td></tr>`;
+  }).join('');
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Materials Report</title><style>
+    body{font-family:Arial,sans-serif;margin:0;padding:40px;color:#111}
+    h1{font-size:20px;color:#e8a020;border-bottom:3px solid #e8a020;padding-bottom:8px;margin-bottom:4px}
+    .sub{font-size:12px;color:#555;margin-bottom:18px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{background:#f0f0f0;padding:7px 10px;text-align:left;border:1px solid #ccc;font-size:11px}
+    th:last-child{text-align:right}
+    td{padding:5px 10px;border:1px solid #ddd;vertical-align:top}
+    tr:nth-child(even){background:#f9f9f9}
+    .total-row{font-size:15px;font-weight:bold;text-align:right;margin-top:14px;border-top:2px solid #ccc;padding-top:8px}
+    @media print{@page{margin:20mm}}
+  </style></head><body>
+    <h1>MULLINS CONSTRUCTION INC.</h1>
+    <div class="sub">Materials Report &nbsp;|&nbsp; ${esc(dateRange)} &nbsp;|&nbsp; Generated ${new Date().toLocaleDateString()}</div>
+    <table><thead><tr><th>Date</th><th>Project</th><th>Store</th><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="total-row">Grand Total: $${total.toFixed(2)}</div>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+// ── Theme ──
+function toggleTheme(){
+  const light=document.documentElement.classList.toggle('light');
+  localStorage.setItem('theme',light?'light':'dark');
+  document.getElementById('theme-toggle').textContent=light?'☀️':'🌙';
+}
+function initTheme(){
+  const btn=document.getElementById('theme-toggle');
+  if(btn)btn.textContent=document.documentElement.classList.contains('light')?'☀️':'🌙';
+}
+
+async function loadAppTheme() {
+  try {
+    const res = await fetch('/api/theme');
+    const t = await res.json();
+    const r = document.documentElement;
+    r.style.setProperty('--accent', t.accentColor  || '#e8a020');
+    r.style.setProperty('--bg',     t.bgColor       || '#1a1a2e');
+    r.style.setProperty('--panel',  t.panelColor    || '#16213e');
+    r.style.setProperty('--text',   t.textColor     || '#eeeeee');
+    if(t.colorPalette && t.colorPalette.length===12) appPalette=t.colorPalette;
+  } catch(e) {}
+}
+
+// ── Init ──
+(async function init(){
+  const now=new Date();
+  displayYear=now.getFullYear();displayMonth=now.getMonth();
+  document.getElementById('month-title').textContent='Loading…';
+  initTheme();
+  await loadAppTheme();
+  await loadData();render();
+})();
+</script>
+</body>
+</html>
