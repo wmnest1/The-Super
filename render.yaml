@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: The-Super
-    env: node
-    buildCommand: npm install && npx puppeteer browsers install chrome
-    startCommand: node server.js
