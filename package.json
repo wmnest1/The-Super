@@ -4,7 +4,6 @@
   "description": "Mullins Construction Business Manager",
   "main": "server.js",
   "scripts": {
-    "build": "npm install",
     "start": "node server.js"
   },
   "dependencies": {
