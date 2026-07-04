@@ -2208,6 +2208,81 @@ function cwInitListeners(){
 })();
 </script>
 
+<!-- ══ KEYBOARD NAV — arrow keys move between day/week modal fields ══ -->
+<script>
+(function(){
+  var COLS = ['dm-crew-','dm-oos-','dm-note-'];
+
+  function crewList(){ return (typeof CREW_ORDER!=='undefined') ? CREW_ORDER : []; }
+
+  function parseDayField(id){
+    for (var c=0;c<COLS.length;c++){
+      if (id.indexOf(COLS[c])===0){
+        var worker = id.slice(COLS[c].length);
+        var r = crewList().indexOf(worker);
+        if (r>=0) return {row:r, col:c};
+      }
+    }
+    return null;
+  }
+
+  function focusDayField(row, col){
+    var crew = crewList();
+    if (row<0) row = crew.length-1;
+    if (row>=crew.length) row = 0;
+    if (col<0){ col = COLS.length-1; row = row-1<0?crew.length-1:row-1; }
+    if (col>=COLS.length){ col = 0; row = row+1>=crew.length?0:row+1; }
+    var el = document.getElementById(COLS[col]+crew[row]);
+    if (el){ el.focus(); if (el.select) try{ el.select(); }catch(e){} }
+  }
+
+  function weekInputs(){
+    return Array.prototype.slice.call(document.querySelectorAll('#week-modal input[id^="wm-day-"]:not([disabled])'));
+  }
+
+  document.addEventListener('keydown', function(e){
+    if (e.key!=='ArrowDown' && e.key!=='ArrowUp' && e.key!=='Enter') return;
+    var t = e.target;
+    if (!t || !t.id) return;
+
+    // ── Day modal ──
+    var dm = document.getElementById('day-modal');
+    if (dm && dm.classList.contains('open')){
+      var pos = parseDayField(t.id);
+      if (pos){
+        e.preventDefault();
+        if (e.key==='ArrowDown') focusDayField(pos.row+1, pos.col);
+        else if (e.key==='ArrowUp') focusDayField(pos.row-1, pos.col);
+        else if (e.key==='Enter') focusDayField(pos.row, pos.col+1);
+        return;
+      }
+    }
+
+    // ── Week modal ──
+    var wm = document.getElementById('week-modal');
+    if (wm && wm.classList.contains('open') && t.id.indexOf('wm-day-')===0){
+      var ins = weekInputs();
+      var i = ins.indexOf(t);
+      if (i<0) return;
+      e.preventDefault();
+      var next = (e.key==='ArrowUp') ? i-1 : i+1; // Enter and ↓ both go down
+      if (next<0) next = ins.length-1;
+      if (next>=ins.length) next = 0;
+      ins[next].focus();
+      if (ins[next].select) try{ ins[next].select(); }catch(e2){}
+    }
+  }, true);
+
+  // Select-all on focus for quick overwrite in both modals
+  document.addEventListener('focusin', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    var inDay = t.id.indexOf('dm-crew-')===0 || t.id.indexOf('dm-oos-')===0;
+    var inWeek = t.id.indexOf('wm-day-')===0;
+    if ((inDay||inWeek) && t.select) try{ t.select(); }catch(err){}
+  });
+})();
+</script>
 </body>
 </html>
 
