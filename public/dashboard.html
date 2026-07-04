@@ -3230,6 +3230,217 @@ function cwInitListeners(){
   applyMkDefault();
 })();
 </script>
+<!-- ══ MATERIALS FIX v2.1 — clean job-panel math + sub-aware payee box ══ -->
+<script>
+(function(){
+  // markup priority: item % → project markup field → 15%
+  window.__itemPct = function(m, projName){
+    if (m && m.markupPct!=null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    if (typeof data!=='undefined'){
+      var p=(data.projects||[]).find(function(x){return (x.name||'')===projName;});
+      if (p && p.markup!==undefined && p.markup!=='' && !isNaN(parseFloat(p.markup))) return parseFloat(p.markup);
+    }
+    return 15;
+  };
+
+  // ── Clean rebuild of the job panel renderer (replaces the buggy patched version) ──
+  window.renderJobPanel = function(proj){
+  const color=jobColor(proj);
+  const rate=billingRate(proj);
+  const oosR=oosRateFor(proj);
+  const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+  const allEnt=entriesForProject(proj);
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const payments=((data.payments||{})[proj]||[]);
+  const projId=proj.replace(/[^a-z0-9]/gi,'_');
+
+  // Crew set
+  const crewSet=new Set();
+  for(const en of ent)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
+  const crew=[...CREW_ORDER.filter(c=>crewSet.has(c)),...[...crewSet].filter(c=>!CREW_ORDER.includes(c))];
+
+  // Weekly hours table
+  let wkCols=weeks.map((wk,wi)=>`<th style="cursor:default">Wk ${wk.n}</th>`).join('')+'<th>Total</th><th>Billed</th>';
+  let wkRows='';const wkLabor=weeks.map(()=>0);let grandLaborHrs=0;
+  const wkOOSHrs=weeks.map(()=>0);
+  for(const worker of crew){
+    const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(ent,wk.start,wk.end),worker));
+    const total=wkHrs.reduce((a,b)=>a+b,0);grandLaborHrs+=total;
+    wkHrs.forEach((h,i)=>wkLabor[i]+=h);
+    const billed=total*rate;
+    wkRows+=`<tr>
+      <td>${esc(worker)}</td>
+      ${wkHrs.map((h,wi)=>`<td class="hrs-cell${h===0?' zero':''}" onclick="openWeekModal('${esc(proj)}','${esc(worker)}',${wi})" title="Click to edit ${worker} Week ${wi+1}">${h===0?'—':h}</td>`).join('')}
+      <td><strong>${total}</strong></td>
+      <td>${billed>0?fmt$(billed):'—'}</td>
+    </tr>`;
+  }
+  // Tally OOS hours per week
+  weeks.forEach((wk,wi)=>{
+    const wkEnt=entriesInWeek(ent,wk.start,wk.end);
+    for(const en of wkEnt)for(const c of(en.crew||[])){if(c.outOfScope)wkOOSHrs[wi]+=parseFloat(c.hours||0);else wkOOSHrs[wi]+=parseFloat(c.oosHours||0);}
+  });
+  const grandOOSHrs=wkOOSHrs.reduce((a,b)=>a+b,0);
+  const wkLaborTotals=wkLabor.map(h=>fmt$(h*rate)).join('</td><td>');
+  const totalLabor=grandLaborHrs*rate;
+  wkRows+=`<tr class="wk-labor"><td>Wk Labor $</td><td>${wkLaborTotals}</td><td></td><td>${fmt$(totalLabor)}</td></tr>`;
+  if(grandOOSHrs>0){
+    const oosHrCells=wkOOSHrs.map(h=>h>0?h:'—').join('</td><td>');
+    const oosLabCells=wkOOSHrs.map(h=>h>0?fmt$(h*oosR):'—').join('</td><td>');
+    wkRows+=`<tr class="wk-oos"><td>↳ OOS Hrs</td><td>${oosHrCells}</td><td>${grandOOSHrs}</td><td>—</td></tr>`;
+    wkRows+=`<tr class="wk-oos-labor"><td>↳ OOS Labor $</td><td>${oosLabCells}</td><td></td><td>${fmt$(grandOOSHrs*oosR)}</td></tr>`;
+  }
+
+  // Materials (from all entries in month, with edit/delete)
+  const matItems=[];
+  for(const en of ent)for(let mi=0;mi<(en.materials||[]).length;mi++){
+    const m=en.materials[mi];if(m.description||m.cost)matItems.push({date:en.date,m,mi});
+  }
+  const matsSub=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0),0);
+  const matsMarkup=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0)*(window.__itemPct(m,proj)/100),0);
+  const matsTotal2=matsSub+matsMarkup;
+  const monthSubPay=matItems.reduce((s,{m})=>s+(m.kind==='sub'?parseFloat(m.cost||0):0),0);
+
+  let matsRows=matItems.length===0
+    ?`<div style="font-size:12px;color:#444;padding:4px 0">No materials logged — <a style="color:var(--accent);cursor:pointer" onclick="openDayModal('${today}')">add one</a></div>`
+    :matItems.map(({date,m,mi})=>`
+      <div class="mat-row-wrap">
+        <span class="mat-row-desc" title="${esc(m.description)}">${esc(date.slice(5))} ${esc(m.description)}</span>
+        <span class="mat-row-amt">${fmt$(m.cost)}</span>
+        <button class="mat-icon-btn edit" onclick="openEditMat('${esc(proj)}','${esc(date)}')" title="Edit">✎</button>
+        <button class="mat-icon-btn del" onclick="deleteMatInPanel('${esc(proj)}','${esc(date)}',${mi})" title="Delete">✕</button>
+      </div>`).join('');
+
+  let matsHtml='';
+  if(matItems.length>0){
+    matsHtml=`<div class="mat-total-row"><span class="lbl">Subtotal</span><span class="amt">${fmt$(matsSub)}</span></div>
+    <div class="mat-total-row"><span class="lbl">Markup (per item)</span><span class="amt">${fmt$(matsMarkup)}</span></div>
+    ${monthSubPay>0?`<div class="mat-total-row"><span class="lbl" style="color:#ffce7a">↳ incl. Sub payments (cost)</span><span class="amt" style="color:#ffce7a">${fmt$(monthSubPay)}</span></div>`:''}
+    <div class="mat-total-row" style="border-top:2px solid #2a3a5e"><span class="lbl" style="color:#fff;font-weight:bold">Total Materials</span><span class="amt" style="color:var(--accent);font-weight:bold">${fmt$(matsTotal2)}</span></div>`;
+  }
+
+  // All-time totals
+  const allLaborBilled=(()=>{let t=0;for(const en of allEnt)for(const c of(en.crew||[])){if(c.outOfScope)t+=parseFloat(c.hours||0)*oosR;else t+=parseFloat(c.hours||0)*rate+parseFloat(c.oosHours||0)*oosR;}return t;})();
+  const allOOSHrs=allEnt.reduce((t,e)=>t+(e.crew||[]).reduce((s,c)=>s+(c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0)),0),0);
+  const allOOSLabor=allOOSHrs*oosR;
+  const allMatsSub=matsTotal(allEnt);
+  let allMatsTotal=0, allSubPay=0;
+  for(const en of allEnt)for(const m of(en.materials||[])){
+    const c=parseFloat(m.cost||0);
+    allMatsTotal+=c*(1+window.__itemPct(m,proj)/100);
+    if(m.kind==='sub')allSubPay+=c;
+  }
+  const grandTotal=allLaborBilled+allMatsTotal;
+  const totalPaid=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+  const balanceDue=grandTotal-totalPaid;
+
+  // Payments
+  const payRows=payments.length===0
+    ?'<div style="font-size:12px;color:#444;padding:4px 0">No payments recorded</div>'
+    :`<div class="pay-row hdr"><span>Date</span><span>Check</span><span>Amount</span><span>Notes</span></div>`
+    +payments.map(p=>`<div class="pay-row"><span>${p.date||''}</span><span>${p.check||''}</span><span>${fmt$(p.amount||0)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes||'')}</span></div>`).join('');
+
+  const balColor=balanceDue<=0?'paid':'';
+
+  return `<div class="job-panel">
+    <div class="jp-header" style="background:${color}">
+      <span>${esc(proj)} • $${rate}/hr${oosR!==rate?' · OOS: $'+oosR+'/hr':''}</span>
+      <span style="font-size:12px;opacity:.85">${grandLaborHrs}hr this month</span>
+    </div>
+    <div class="jp-body">
+      <div class="wk-table-wrap">
+        <div class="mat-label">Weekly Hours <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— click any cell to edit</span></div>
+        <table class="wk-table"><thead><tr><th>Worker</th>${wkCols}</tr></thead><tbody>${wkRows}</tbody></table>
+      </div>
+      <div class="mat-section">
+        <div class="mat-label">Materials &amp; Subs</div>
+        ${matsRows}
+        ${matsHtml}
+        <button class="mat-add-btn" onclick="openDayModal('${today}')">+ Add Material (log to today)</button>
+      </div>
+      <div class="proj-totals">
+        <div class="tot-row"><span class="lbl">Total Labor (billed, all time)</span><span>${fmt$(allLaborBilled)}</span></div>
+        ${allOOSLabor>0?`<div class="tot-row" style="color:#ffe066;font-size:12px"><span class="lbl">↳ incl. Out-of-Scope Labor (${allOOSHrs}hr)</span><span>${fmt$(allOOSLabor)}</span></div>`:''}
+        <div class="tot-row"><span class="lbl">Total Materials & Subs (billed)</span><span>${fmt$(allMatsTotal)}</span></div>
+        ${allSubPay>0?`<div class="tot-row" style="color:#ffce7a;font-size:12px"><span class="lbl">↳ incl. Sub payments (cost)</span><span>${fmt$(allSubPay)}</span></div>`:''}
+        <div class="tot-row grand"><span class="lbl">GRAND TOTAL</span><span>${fmt$(grandTotal)}</span></div>
+      </div>
+      <div class="pay-section">
+        <div class="pay-label">Payments Received</div>
+        ${payRows}
+        <div class="pay-total-row"><span>Total Paid</span><span>${fmt$(totalPaid)}</span></div>
+        <div class="balance-due">
+          <span class="lbl">BALANCE DUE</span>
+          <span class="amt ${balColor}">${fmt$(Math.abs(balanceDue))}${balanceDue<=0?' ✓':''}</span>
+        </div>
+        <button class="add-pay-toggle" onclick="togglePayForm('${projId}')">+ Log Payment</button>
+        <div id="payform-${projId}" style="display:none">
+          <div class="add-pay-form" style="margin-top:8px">
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Date</div><input type="date" id="pf-date-${projId}" value="${today}"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Check #</div><input type="text" id="pf-check-${projId}" placeholder="Optional"></div>
+            </div>
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Amount ($)</div><input type="number" id="pf-amt-${projId}" placeholder="0.00"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Notes</div><input type="text" id="pf-notes-${projId}" placeholder="Optional"></div>
+            </div>
+            <button class="add-pay-btn" onclick="savePayment('${esc(proj)}','${projId}')">💾 Save Payment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+};
+
+  // ── Sub-aware payee box ──
+  var kind = document.getElementById('qa-kind');
+  var storeEl = document.getElementById('qa-store');
+  var descEl = document.getElementById('qa-desc');
+  if (kind && storeEl){
+    var dl = document.getElementById('qa-stores');
+    function subNames(){
+      var fromData = (typeof data!=='undefined') ? (data.subs||[]).map(function(s){return s.name||s.company||'';}) : [];
+      var used = [];
+      try { used = JSON.parse(localStorage.getItem('matSubPayees')||'[]'); } catch(e){}
+      var seen={};
+      return fromData.concat(used).filter(function(s){ if(!s)return false; var k=s.toLowerCase(); if(seen[k])return false; seen[k]=true; return true; });
+    }
+    function paintKindMode(){
+      if (kind.value==='sub'){
+        storeEl.placeholder = 'Sub name / payee ▾';
+        if (storeEl.value==='Home Depot') storeEl.value = localStorage.getItem('matLastSub') || '';
+        if (dl) dl.innerHTML = subNames().map(function(s){return '<option value="'+s.replace(/"/g,'&quot;')+'">';}).join('');
+        if (descEl) descEl.placeholder = 'Work performed / scope';
+      } else {
+        storeEl.placeholder = 'Store ▾';
+        if (!storeEl.value) storeEl.value = localStorage.getItem('matLastStore') || 'Home Depot';
+        if (typeof refreshStoreList==='function') refreshStoreList();
+        else if (dl){ /* fallback: leave list as-is */ }
+        if (descEl) descEl.placeholder = 'Description / location / Txn#';
+      }
+    }
+    kind.addEventListener('change', paintKindMode);
+    // remember sub payees on add
+    var _qadd2 = window.matQuickAdd;
+    window.matQuickAdd = async function(){
+      var wasSub = kind.value==='sub';
+      var payee = storeEl.value.trim();
+      await _qadd2();
+      if (wasSub && payee){
+        localStorage.setItem('matLastSub', payee);
+        try {
+          var list = JSON.parse(localStorage.getItem('matSubPayees')||'[]');
+          if (list.map(function(x){return x.toLowerCase();}).indexOf(payee.toLowerCase())===-1){
+            list.push(payee); localStorage.setItem('matSubPayees', JSON.stringify(list.slice(-40)));
+          }
+        } catch(e){}
+        storeEl.value = payee; // keep payee for the next sub entry
+      }
+    };
+    paintKindMode();
+  }
+})();
+</script>
 </body>
 </html>
 
