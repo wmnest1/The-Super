@@ -1914,5 +1914,129 @@ function cwInitListeners(){
 
 <div id="dash-refresh-toast" style="position:fixed;bottom:20px;left:20px;background:#1a4a1a;color:#8d8;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:bold;z-index:9998;display:none;animation:fadeIn .2s">🔄 Dashboard refreshed</div>
 
-</body>
+<!-- ══ TODAY'S APPOINTMENTS CARD — paste this whole block just above </body></html> in public/dashboard.html ══ -->
+<script>
+(function(){
+  var css = ''
+  +'#appt-card-wrap{padding:12px 20px 0}'
+  +'.appt-card{background:var(--panel);border:1px solid var(--accent);border-radius:10px;overflow:hidden}'
+  +'.appt-card-hdr{background:#0f1a2e;padding:10px 16px;display:flex;justify-content:space-between;align-items:center}'
+  +'.appt-card-hdr h3{font-size:13px;color:var(--accent);margin:0}'
+  +'.appt-card-body{padding:6px 16px 12px}'
+  +'.appt-item{display:flex;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #1e2e4e;font-size:13px;flex-wrap:wrap}'
+  +'.appt-item:last-child{border-bottom:none}'
+  +'.appt-item.past{opacity:.5}'
+  +'.appt-t{color:var(--accent);font-weight:bold;min-width:68px}'
+  +'.appt-a{color:#88a;font-size:12px;text-decoration:underline}'
+  +'.appt-x{margin-left:auto;background:none;border:1px solid #2a3a5e;border-radius:5px;color:#886;padding:2px 8px;font-size:11px;cursor:pointer}'
+  +'.appt-x:hover{border-color:#cc4444;color:#ff8888}'
+  +'.appt-addbtn{background:none;border:1px dashed #2a3a5e;border-radius:6px;color:#667;padding:5px 12px;font-size:11px;cursor:pointer;margin-top:8px}'
+  +'.appt-addbtn:hover{border-color:var(--accent);color:var(--accent)}'
+  +'#appt-form{display:none;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:flex-end}'
+  +'#appt-form input{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px}'
+  +'#appt-form label{font-size:10px;color:#778;display:block;margin-bottom:2px}'
+  +'.appt-savebtn{background:var(--accent);border:none;border-radius:6px;color:#1a1a2e;padding:7px 14px;font-size:12px;font-weight:bold;cursor:pointer}'
+  +'html.light .appt-card-hdr{background:#f5f5f5}'
+  +'html.light .appt-item{border-color:#eee}'
+  +'html.light #appt-form input{background:#fff;border-color:#ccc;color:#111}';
+  var st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  var flagsWrap = document.getElementById('flags-wrap');
+  if (!flagsWrap) return;
+  var wrap = document.createElement('div');
+  wrap.id = 'appt-card-wrap';
+  wrap.innerHTML = '<div class="appt-card">'
+    + '<div class="appt-card-hdr"><h3>📍 Today\'s Appointments</h3><span id="appt-count" style="color:#667;font-size:12px"></span></div>'
+    + '<div class="appt-card-body">'
+    + '<div id="appt-list"><div style="color:#667;font-size:12px;padding:4px 0">Loading…</div></div>'
+    + '<button class="appt-addbtn" onclick="apptToggleForm()">+ Add Appointment</button>'
+    + '<div id="appt-form">'
+    + '<div><label>Time</label><input type="time" id="appt-f-time"></div>'
+    + '<div><label>Person</label><input type="text" id="appt-f-person" placeholder="Gary"></div>'
+    + '<div style="flex:1;min-width:160px"><label>Address</label><input type="text" id="appt-f-addr" placeholder="111 Main St, San Jose" style="width:100%"></div>'
+    + '<div style="flex:1;min-width:120px"><label>Notes</label><input type="text" id="appt-f-notes" placeholder="Optional" style="width:100%"></div>'
+    + '<button class="appt-savebtn" onclick="apptSave()">💾 Save</button>'
+    + '</div>'
+    + '</div></div>';
+  flagsWrap.parentNode.insertBefore(wrap, flagsWrap);
+
+  function nowHM(){ var d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+  function escA(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function mapsLink(a){ return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a); }
+  function toDisplay(t){
+    var p = t.split(':');
+    var h = parseInt(p[0], 10);
+    var ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return h + ':' + p[1] + ' ' + ampm;
+  }
+  function localISO(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  window.apptToggleForm = function(){
+    var f = document.getElementById('appt-form');
+    f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+  };
+
+  window.apptSave = async function(){
+    var time = document.getElementById('appt-f-time').value;
+    if (!time){ alert('Pick a time'); return; }
+    var body = {
+      date: localISO(),
+      time: time,
+      time_display: toDisplay(time),
+      person: document.getElementById('appt-f-person').value.trim(),
+      address: document.getElementById('appt-f-addr').value.trim(),
+      notes: document.getElementById('appt-f-notes').value.trim()
+    };
+    try {
+      await fetch('/api/appointments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      document.getElementById('appt-f-time').value='';
+      document.getElementById('appt-f-person').value='';
+      document.getElementById('appt-f-addr').value='';
+      document.getElementById('appt-f-notes').value='';
+      document.getElementById('appt-form').style.display='none';
+      apptLoad();
+    } catch(e){ alert('Save failed'); }
+  };
+
+  window.apptDel = async function(id){
+    if (!confirm('Cancel this appointment?')) return;
+    try { await fetch('/api/appointments/' + id, { method:'DELETE' }); } catch(e) {}
+    apptLoad();
+  };
+
+  async function apptLoad(){
+    try {
+      var r = await fetch('/api/appointments/today');
+      var d = await r.json();
+      var appts = d.appointments || [];
+      var now = nowHM();
+      document.getElementById('appt-count').textContent = appts.length ? (appts.length + ' today') : '';
+      document.getElementById('appt-list').innerHTML = appts.length
+        ? appts.map(function(a){
+            var past = a.time < now;
+            return '<div class="appt-item' + (past ? ' past' : '') + '">'
+              + '<span class="appt-t">' + escA(a.time_display) + '</span>'
+              + '<span style="font-weight:bold">' + escA(a.person || '') + '</span>'
+              + (a.address ? '<a class="appt-a" target="_blank" href="' + mapsLink(a.address) + '">' + escA(a.address) + '</a>' : '')
+              + (a.notes ? '<span style="color:#667;font-size:12px;font-style:italic">' + escA(a.notes) + '</span>' : '')
+              + '<button class="appt-x" onclick="apptDel(\'' + a.id + '\')">✕</button>'
+              + '</div>';
+          }).join('')
+        : '<div style="color:#667;font-size:12px;padding:4px 0">No appointments today — add one below or tell The Super in chat.</div>';
+    } catch(e) {
+      document.getElementById('appt-list').innerHTML = '<div style="color:#886;font-size:12px">Could not load appointments.</div>';
+    }
+  }
+
+  apptLoad();
+  setInterval(apptLoad, 60000);
+  window.addEventListener('focus', apptLoad);
+})();
+</script></body>
 </html>
