@@ -2821,6 +2821,164 @@ function cwInitListeners(){
   fillQaProjects();
 })();
 </script>
+<!-- ══ MATERIALS WINDOW MODE — draggable, resizable panel over the dashboard ══ -->
+<script>
+(function(){
+  var panel = document.getElementById('mat-panel');
+  if (!panel) return;
+
+  // Fix the positioning bug from the upgrade snippet and convert to a floating window
+  var st = document.createElement('style');
+  st.textContent = ''
+  +'#mat-panel{position:fixed!important;top:auto;left:auto;right:auto;bottom:auto;'
+  +'border:2px solid var(--accent);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.6);'
+  +'min-width:700px;min-height:400px;overflow:hidden}'
+  +'#mat-panel .mat-fbar{cursor:grab;user-select:none}'
+  +'#mat-panel .mat-fbar.dragging{cursor:grabbing}'
+  +'.mat-rs{position:absolute;z-index:60}'
+  +'#mat-rs-se{bottom:0;right:0;width:20px;height:20px;cursor:se-resize}'
+  +'#mat-rs-se::after{content:"";position:absolute;bottom:4px;right:4px;width:9px;height:9px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);border-radius:1px;opacity:.7}'
+  +'#mat-rs-e{top:40px;right:0;bottom:24px;width:6px;cursor:e-resize}'
+  +'#mat-rs-s{bottom:0;left:24px;right:24px;height:6px;cursor:s-resize}'
+  +'#mat-rs-w{top:40px;left:0;bottom:24px;width:6px;cursor:w-resize}'
+  +'@media(max-width:900px){#mat-panel{min-width:0}}';
+  document.head.appendChild(st);
+
+  // Resize handles
+  ['se','e','s','w'].forEach(function(d){
+    var h = document.createElement('div');
+    h.className = 'mat-rs'; h.id = 'mat-rs-'+d;
+    panel.appendChild(h);
+  });
+
+  var DEFAULT = function(){
+    var w = Math.min(Math.max(Math.round(window.innerWidth*0.86), 700), window.innerWidth-24);
+    var h = Math.min(Math.max(Math.round(window.innerHeight*0.78), 400), window.innerHeight-90);
+    return { left: Math.round((window.innerWidth-w)/2), top: 76, width: w, height: h };
+  };
+  function loadRect(){
+    try { var s = JSON.parse(localStorage.getItem('matWinRect')||'null'); if (s && s.width) return s; } catch(e){}
+    return DEFAULT();
+  }
+  function saveRect(){
+    localStorage.setItem('matWinRect', JSON.stringify({
+      left: panel.offsetLeft, top: panel.offsetTop, width: panel.offsetWidth, height: panel.offsetHeight
+    }));
+  }
+  function applyRect(r){
+    // clamp on-screen
+    r.width = Math.min(Math.max(r.width, 700), window.innerWidth);
+    r.height = Math.min(Math.max(r.height, 400), window.innerHeight-10);
+    r.left = Math.min(Math.max(r.left, 0), Math.max(0, window.innerWidth - r.width));
+    r.top  = Math.min(Math.max(r.top, 0), Math.max(0, window.innerHeight - 60));
+    panel.style.left = r.left+'px';
+    panel.style.top = r.top+'px';
+    panel.style.width = r.width+'px';
+    panel.style.height = r.height+'px';
+  }
+
+  // openMaterials: window placement + DON'T lock the page behind
+  var _open = window.openMaterials;
+  window.openMaterials = async function(){
+    await _open();
+    document.body.style.overflow = '';   // dashboard stays scrollable behind
+    applyRect(loadRect());
+  };
+
+  // ── Drag by the filter bar ──
+  var fbar = panel.querySelector('.mat-fbar');
+  var drag = null;
+  function dStart(cx, cy, target){
+    if (target.closest('input,select,button,a,label')) return false;
+    drag = { ox: cx - panel.offsetLeft, oy: cy - panel.offsetTop };
+    fbar.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    return true;
+  }
+  function dMove(cx, cy){
+    if (!drag) return;
+    applyRect({ left: cx - drag.ox, top: cy - drag.oy, width: panel.offsetWidth, height: panel.offsetHeight });
+  }
+  function dEnd(){
+    if (!drag) return;
+    drag = null;
+    fbar.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    saveRect();
+  }
+  if (fbar){
+    fbar.addEventListener('mousedown', function(e){ if (dStart(e.clientX, e.clientY, e.target)) e.preventDefault(); });
+    document.addEventListener('mousemove', function(e){ dMove(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', dEnd);
+    fbar.addEventListener('touchstart', function(e){ var t=e.touches[0]; if (dStart(t.clientX, t.clientY, e.target)) e.preventDefault(); }, {passive:false});
+    document.addEventListener('touchmove', function(e){ if (drag){ var t=e.touches[0]; dMove(t.clientX, t.clientY); e.preventDefault(); } }, {passive:false});
+    document.addEventListener('touchend', dEnd);
+  }
+
+  // ── Resize from edges/corner ──
+  var rs = null;
+  function rsStart(e, dir){
+    e.preventDefault(); e.stopPropagation();
+    rs = { dir: dir, x: e.clientX, y: e.clientY,
+      w: panel.offsetWidth, h: panel.offsetHeight, l: panel.offsetLeft, t: panel.offsetTop };
+    document.body.style.userSelect = 'none';
+  }
+  document.addEventListener('mousemove', function(e){
+    if (!rs) return;
+    var dx = e.clientX - rs.x, dy = e.clientY - rs.y;
+    var r = { left: rs.l, top: rs.t, width: rs.w, height: rs.h };
+    if (rs.dir.indexOf('e')>-1) r.width = rs.w + dx;
+    if (rs.dir.indexOf('s')>-1) r.height = rs.h + dy;
+    if (rs.dir.indexOf('w')>-1){ r.width = rs.w - dx; r.left = rs.l + dx; }
+    applyRect(r);
+  });
+  document.addEventListener('mouseup', function(){
+    if (!rs) return;
+    rs = null;
+    document.body.style.userSelect = '';
+    saveRect();
+  });
+  document.getElementById('mat-rs-se').addEventListener('mousedown', function(e){ rsStart(e,'se'); });
+  document.getElementById('mat-rs-e').addEventListener('mousedown', function(e){ rsStart(e,'e'); });
+  document.getElementById('mat-rs-s').addEventListener('mousedown', function(e){ rsStart(e,'s'); });
+  document.getElementById('mat-rs-w').addEventListener('mousedown', function(e){ rsStart(e,'w'); });
+
+  // ── Maximize / restore toggle in the filter bar ──
+  var maxed = false, preMax = null;
+  var mx = document.createElement('button');
+  mx.className = 'hbtn';
+  mx.textContent = '⛶';
+  mx.title = 'Maximize / restore';
+  mx.style.cssText = 'padding:5px 10px;font-size:13px';
+  mx.addEventListener('click', function(){
+    if (!maxed){
+      preMax = { left: panel.offsetLeft, top: panel.offsetTop, width: panel.offsetWidth, height: panel.offsetHeight };
+      applyRect({ left: 6, top: 70, width: window.innerWidth-12, height: window.innerHeight-80 });
+      maxed = true; mx.textContent = '🗗';
+    } else {
+      applyRect(preMax || DEFAULT());
+      maxed = false; mx.textContent = '⛶';
+      saveRect();
+    }
+  });
+  var btnGroup = fbar ? fbar.querySelector('div[style*="margin-left:auto"]') : null;
+  if (btnGroup) btnGroup.insertBefore(mx, btnGroup.firstChild);
+  else if (fbar) fbar.appendChild(mx);
+
+  // Double-click header = maximize toggle
+  if (fbar) fbar.addEventListener('dblclick', function(e){
+    if (e.target.closest('input,select,button,a,label')) return;
+    mx.click();
+  });
+
+  // Keep the window on-screen if the browser resizes
+  window.addEventListener('resize', function(){
+    if (panel.classList.contains('open')) applyRect({
+      left: panel.offsetLeft, top: panel.offsetTop, width: panel.offsetWidth, height: panel.offsetHeight
+    });
+  });
+})();
+</script>
 </body>
 </html>
 
