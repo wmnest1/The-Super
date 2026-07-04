@@ -196,7 +196,7 @@ Moises (Moi), Abner (Ab), Chemo, Chepey, Isreal
 
 BILLING RATES VARY BY PROJECT — always confirm rate before calculating.
 Common rates: $110/hr, $120/hr, $125/hr
-Materials markup: Each project has its own markup % stored in the project record. Use the per-project "markup" field when calculating material costs on invoices and proposals. If no markup is set for a project, do not apply one unless Walt specifies.
+Materials & subs markup: Logged material/sub items may carry their own "markupPct" (a percent number) and a "kind" ("material" or "sub"). PRIORITY: (1) if an item has markupPct, bill that line at cost x (1 + markupPct/100); (2) otherwise use the project's "markup" field; (3) otherwise no markup unless Walt specifies. Subcontractor payments (kind "sub") are billed the same way using their own markupPct — never assume subs get the materials markup. Show marked-up amounts on client documents; never reveal the raw cost or the markup % to the client.
 Out-of-scope rate: Each project may have an "oosRate" field ($/hr billed to client for OOS/extra work). Use it for OOS line items on invoices. If not set, fall back to the project's regular "rate".
 
 APPOINTMENTS: Use save_appointment when Walt mentions a meeting/appointment/scheduled event. Use cancel_appointment (with the id from the lists above) when he cancels one. When he asks "what's my day look like" or "what's my schedule", summarize TODAY'S APPOINTMENTS conversationally. If a requested appointment time is vague ("this afternoon"), ask for a specific time before saving.
@@ -1074,12 +1074,15 @@ app.post("/api/materials/add-batch", async (req, res) => {
         let entry = data.entries.find(e => e.date === date && (e.project || "") === projName);
         if (!entry) { entry = { date, project: projName, crew: [], materials: [], notes: "" }; data.entries.push(entry); }
         if (!entry.materials) entry.materials = [];
-        entry.materials.push({
+        const matObj = {
           store: (it.store || "").trim(),
           description: (it.description || "").trim(),
           cost: String(amount),
           invoiceNum: (it.invoiceNum || "").trim()
-        });
+        };
+        if (it.kind === "sub") matObj.kind = "sub";
+        if (it.markupPct != null && it.markupPct !== "" && !isNaN(parseFloat(it.markupPct))) matObj.markupPct = parseFloat(it.markupPct);
+        entry.materials.push(matObj);
         added++;
       }
     }
@@ -1260,6 +1263,8 @@ app.get("/api/materials", async (req, res) => {
             description: mat.description || '',
             amount: parseFloat(mat.cost || 0),
             invoiceNum: mat.invoiceNum || '',
+            kind: mat.kind === 'sub' ? 'sub' : 'material',
+            markupPct: (mat.markupPct != null && !isNaN(parseFloat(mat.markupPct))) ? parseFloat(mat.markupPct) : null,
             matIndex: mi,
             entryDate: entry.date || '',
             entryProject: entry.project || '',
@@ -1319,9 +1324,9 @@ app.put("/api/material-edit", async (req, res) => {
         let targetIdx = entries.findIndex(e => e.date === newDate && e.project === newProject);
         if (targetIdx === -1) { entries.push({ date: newDate, project: newProject, materials: [] }); targetIdx = entries.length - 1; }
         if (!entries[targetIdx].materials) entries[targetIdx].materials = [];
-        entries[targetIdx].materials.push({ store: updated.store || '', description: updated.description || '', cost: String(updated.amount || 0), invoiceNum: updated.invoiceNum || '' });
+        entries[targetIdx].materials.push({ store: updated.store || '', description: updated.description || '', cost: String(updated.amount || 0), invoiceNum: updated.invoiceNum || '', ...(updated.kind === 'sub' ? { kind: 'sub' } : {}), ...(updated.markupPct != null ? { markupPct: parseFloat(updated.markupPct) } : {}) });
       } else {
-        mats[matIndex] = { ...mats[matIndex], store: updated.store ?? mats[matIndex].store, description: updated.description ?? mats[matIndex].description, cost: updated.amount != null ? String(updated.amount) : mats[matIndex].cost, invoiceNum: updated.invoiceNum ?? mats[matIndex].invoiceNum };
+        mats[matIndex] = { ...mats[matIndex], store: updated.store ?? mats[matIndex].store, description: updated.description ?? mats[matIndex].description, cost: updated.amount != null ? String(updated.amount) : mats[matIndex].cost, invoiceNum: updated.invoiceNum ?? mats[matIndex].invoiceNum, ...(updated.kind !== undefined ? (updated.kind === 'sub' ? { kind: 'sub' } : { kind: undefined }) : {}), ...(updated.markupPct !== undefined ? { markupPct: updated.markupPct == null ? undefined : parseFloat(updated.markupPct) } : {}) };
         entries[entryIdx].materials = mats;
       }
       await db.collection('data').updateOne({ _id: 'main' }, { $set: { entries } });
@@ -1442,3 +1447,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
+
