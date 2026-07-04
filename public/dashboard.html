@@ -2367,6 +2367,161 @@ function cwInitListeners(){
   });
 })();
 </script>
+<!-- ══ KEYBOARD NAV v2 — calendar arrows + modal arrows + Enter to save ══ -->
+<script>
+(function(){
+  // ─────────── PART 1: Calendar day-to-day navigation ───────────
+  var st = document.createElement('style');
+  st.textContent = '.cal-cell.kb-selected{outline:3px solid var(--accent);outline-offset:-3px;background:#1e2e4e!important}'
+    + 'html.light .cal-cell.kb-selected{background:#fff8ee!important}';
+  document.head.appendChild(st);
+
+  var kbSel = null; // ISO date string of the selected day
+
+  function isoAdd(iso, days){
+    var p = iso.split('-').map(Number);
+    var d = new Date(p[0], p[1]-1, p[2] + days);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function cellFor(iso){
+    var cells = document.querySelectorAll('#cal-wrap .cal-cell[onclick]');
+    for (var i=0;i<cells.length;i++){
+      if ((cells[i].getAttribute('onclick')||'').indexOf("'"+iso+"'") !== -1) return cells[i];
+    }
+    return null;
+  }
+  function applySel(){
+    document.querySelectorAll('.cal-cell.kb-selected').forEach(function(c){ c.classList.remove('kb-selected'); });
+    if (!kbSel) return;
+    var c = cellFor(kbSel);
+    if (c){ c.classList.add('kb-selected'); c.scrollIntoView({block:'nearest'}); }
+  }
+
+  // Re-apply the ring every time the calendar re-renders
+  if (typeof renderCalendar === 'function'){
+    var _origRenderCal = renderCalendar;
+    renderCalendar = function(){ _origRenderCal(); applySel(); };
+  }
+
+  function moveSel(days){
+    if (!kbSel){
+      // Start at today if it's on screen, else the 1st of the displayed month
+      var startIso = (typeof today!=='undefined') ? today : null;
+      var dispFirst = displayYear+'-'+String(displayMonth+1).padStart(2,'0')+'-01';
+      kbSel = (startIso && cellFor(startIso)) ? startIso : dispFirst;
+      applySel();
+      return;
+    }
+    kbSel = isoAdd(kbSel, days);
+    var p = kbSel.split('-').map(Number);
+    // Rolled off the displayed month? Flip the calendar to follow.
+    if (p[0] !== displayYear || (p[1]-1) !== displayMonth){
+      if (days > 0) nextMonth(); else prevMonth();
+    }
+    applySel();
+  }
+
+  function typingSomewhere(){
+    var a = document.activeElement;
+    return a && (a.tagName==='INPUT' || a.tagName==='TEXTAREA' || a.tagName==='SELECT' || a.isContentEditable);
+  }
+  function anyModalOpen(){
+    var dm=document.getElementById('day-modal'), wm=document.getElementById('week-modal'), mp=document.getElementById('mat-panel');
+    return (dm&&dm.classList.contains('open'))||(wm&&wm.classList.contains('open'))||(mp&&mp.classList.contains('open'));
+  }
+
+  // Clicking a day also moves the selection there
+  var calWrap = document.getElementById('cal-wrap');
+  if (calWrap) calWrap.addEventListener('click', function(e){
+    var cell = e.target.closest('.cal-cell[onclick]');
+    if (!cell) return;
+    var m = (cell.getAttribute('onclick')||'').match(/'(\d{4}-\d{2}-\d{2})'/);
+    if (m){ kbSel = m[1]; }
+  });
+
+  document.addEventListener('keydown', function(e){
+    // ── Calendar navigation: only when nothing else wants the keys ──
+    if (!anyModalOpen() && !typingSomewhere()){
+      if (e.key==='ArrowLeft'){ e.preventDefault(); moveSel(-1); return; }
+      if (e.key==='ArrowRight'){ e.preventDefault(); moveSel(1); return; }
+      if (e.key==='ArrowUp'){ e.preventDefault(); moveSel(-7); return; }
+      if (e.key==='ArrowDown'){ e.preventDefault(); moveSel(7); return; }
+      if (e.key==='Enter' && kbSel && cellFor(kbSel)){ e.preventDefault(); openDayModal(kbSel); return; }
+      if (e.key==='Escape' && kbSel){ kbSel=null; applySel(); return; }
+      if (e.key==='PageUp'){ e.preventDefault(); prevMonth(); return; }
+      if (e.key==='PageDown'){ e.preventDefault(); nextMonth(); return; }
+      if (e.key==='Home'){
+        e.preventDefault();
+        var now = new Date();
+        if (displayYear!==now.getFullYear() || displayMonth!==now.getMonth()){
+          displayYear=now.getFullYear(); displayMonth=now.getMonth(); render();
+        }
+        if (typeof today!=='undefined'){ kbSel = today; applySel(); }
+        return;
+      }
+    }
+
+    // ─────────── PART 2: Inside the day/week modals ───────────
+    var t = e.target;
+    if (!t) return;
+    var dm = document.getElementById('day-modal');
+    var wm = document.getElementById('week-modal');
+    var dayOpen = dm && dm.classList.contains('open');
+    var weekOpen = wm && wm.classList.contains('open');
+    if (!dayOpen && !weekOpen) return;
+
+    // Enter = Save All (except in the notes textarea / on buttons)
+    if (e.key==='Enter'){
+      if (t.tagName==='TEXTAREA' || t.tagName==='BUTTON') return;
+      e.preventDefault();
+      if (dayOpen && typeof saveDayModal==='function') saveDayModal();
+      else if (weekOpen && typeof saveWeekModal==='function') saveWeekModal();
+      return;
+    }
+    if (e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+
+    // Day modal: ↓/↑ between workers in the same column
+    var COLS = ['dm-crew-','dm-oos-','dm-note-'];
+    if (dayOpen && t.id){
+      for (var c=0;c<COLS.length;c++){
+        if (t.id.indexOf(COLS[c])===0){
+          var worker = t.id.slice(COLS[c].length);
+          var crew = (typeof CREW_ORDER!=='undefined') ? CREW_ORDER : [];
+          var r = crew.indexOf(worker);
+          if (r<0) return;
+          e.preventDefault();
+          r += (e.key==='ArrowDown'?1:-1);
+          if (r<0) r = crew.length-1;
+          if (r>=crew.length) r = 0;
+          var el = document.getElementById(COLS[c]+crew[r]);
+          if (el){ el.focus(); if (el.select) try{ el.select(); }catch(x){} }
+          return;
+        }
+      }
+    }
+    // Week modal: ↓/↑ between day inputs
+    if (weekOpen && t.id && t.id.indexOf('wm-day-')===0){
+      var ins = Array.prototype.slice.call(document.querySelectorAll('#week-modal input[id^="wm-day-"]:not([disabled])'));
+      var i = ins.indexOf(t);
+      if (i<0) return;
+      e.preventDefault();
+      var next = i + (e.key==='ArrowDown'?1:-1);
+      if (next<0) next = ins.length-1;
+      if (next>=ins.length) next = 0;
+      ins[next].focus();
+      if (ins[next].select) try{ ins[next].select(); }catch(x2){}
+    }
+  }, true);
+
+  // Select-all on focus for quick overwrite
+  document.addEventListener('focusin', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    var quick = t.id.indexOf('dm-crew-')===0 || t.id.indexOf('dm-oos-')===0 || t.id.indexOf('wm-day-')===0;
+    if (quick && t.select) try{ t.select(); }catch(err){}
+  });
+})();
+</script>
 </body>
 </html>
 
