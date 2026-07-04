@@ -909,6 +909,141 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+// ── Text reminders (Twilio) ──
+async function sendText(to, body) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const tok = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_FROM_NUMBER;
+  if (!sid || !tok || !from) return { ok: false, error: "Twilio not configured — add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER in Render env vars" };
+  try {
+    const params = new URLSearchParams({ To: to, From: from, Body: body });
+    const resp = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: "POST",
+      headers: {
+        "Authorization": "Basic " + Buffer.from(sid + ":" + tok).toString("base64"),
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params.toString()
+    });
+    const j = await resp.json();
+    if (!resp.ok) return { ok: false, error: j.message || resp.statusText };
+    return { ok: true, sid: j.sid };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+const REMINDER_DEFAULTS = {
+  enabled: false, phone: "",
+  apptAlerts: true, apptLeadMin: 30,
+  digest: false, digestTime: "06:30",
+  nudge: false, nudgeTime: "18:00"
+};
+
+async function reminderTick() {
+  try {
+    const data = await loadData();
+    const rs = { ...REMINDER_DEFAULTS, ...(data.textReminders || {}) };
+    if (!rs.enabled || !rs.phone) return;
+    const { isoDate } = getPSTDateTime();
+    const pst = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+    const hhmm = String(pst.getHours()).padStart(2, "0") + ":" + String(pst.getMinutes()).padStart(2, "0");
+    const nowMin = pst.getHours() * 60 + pst.getMinutes();
+    let changed = false;
+
+    // 1) Appointment alerts — fire once, within lead window (allow up to 5 min late)
+    if (rs.apptAlerts) {
+      const lead = parseInt(rs.apptLeadMin || 30, 10);
+      for (const a of (data.appointments || [])) {
+        if (a.status === "cancelled" || a.reminded || a.date !== isoDate || !a.time) continue;
+        const [h, m] = a.time.split(":").map(Number);
+        const diff = (h * 60 + m) - nowMin;
+        if (diff <= lead && diff >= -5) {
+          const when = diff > 0 ? `in ${diff} min` : "now";
+          const msg = `📍 The Super: ${a.time_display}${a.person ? " with " + a.person : ""}${a.address ? " — " + a.address : ""} (${when})`;
+          const r = await sendText(rs.phone, msg);
+          if (r.ok) { a.reminded = true; changed = true; }
+          else console.error("Appt reminder text failed:", r.error);
+        }
+      }
+    }
+
+    // 2) Morning digest — first tick at/after the chosen time, once per day
+    if (rs.digest && rs.digestTime && hhmm >= rs.digestTime && data._lastDigestDate !== isoDate) {
+      const todays = (data.appointments || [])
+        .filter(a => a.date === isoDate && a.status !== "cancelled")
+        .sort((x, y) => (x.time || "").localeCompare(y.time || ""));
+      const lines = todays.length
+        ? todays.map(a => `• ${a.time_display}${a.person ? " — " + a.person : ""}${a.address ? " — " + a.address : ""}`).join("\n")
+        : "No appointments today.";
+      const r = await sendText(rs.phone, `☀️ The Super — Today:\n${lines}`);
+      if (r.ok) { data._lastDigestDate = isoDate; changed = true; }
+      else console.error("Digest text failed:", r.error);
+    }
+
+    // 3) Evening nudge — only if nothing logged today, once per day
+    if (rs.nudge && rs.nudgeTime && hhmm >= rs.nudgeTime && data._lastNudgeDate !== isoDate) {
+      const hasEntries = (data.entries || []).some(e => e.date === isoDate);
+      if (!hasEntries) {
+        const r = await sendText(rs.phone, "🔨 The Super: No hours logged today yet — log the crew before you forget?");
+        if (r.ok) { data._lastNudgeDate = isoDate; changed = true; }
+        else console.error("Nudge text failed:", r.error);
+      } else {
+        data._lastNudgeDate = isoDate; changed = true;
+      }
+    }
+
+    if (changed) await saveData(data);
+  } catch (err) {
+    console.error("reminderTick error:", err.message);
+  }
+}
+setInterval(reminderTick, 60 * 1000);
+
+// ── Reminder settings API ──
+app.get("/api/reminder-settings", async (req, res) => {
+  try {
+    const data = await loadData();
+    res.json({ ...REMINDER_DEFAULTS, ...(data.textReminders || {}), configured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_FROM_NUMBER) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/reminder-settings", async (req, res) => {
+  try {
+    const { enabled, phone, apptAlerts, apptLeadMin, digest, digestTime, nudge, nudgeTime } = req.body;
+    const data = await loadData();
+    data.textReminders = {
+      enabled: !!enabled,
+      phone: String(phone || "").trim(),
+      apptAlerts: !!apptAlerts,
+      apptLeadMin: [15, 30, 60].includes(parseInt(apptLeadMin, 10)) ? parseInt(apptLeadMin, 10) : 30,
+      digest: !!digest,
+      digestTime: /^\d{2}:\d{2}$/.test(digestTime || "") ? digestTime : "06:30",
+      nudge: !!nudge,
+      nudgeTime: /^\d{2}:\d{2}$/.test(nudgeTime || "") ? nudgeTime : "18:00"
+    };
+    await saveData(data);
+    res.json({ ok: true, settings: data.textReminders });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/test-text", async (req, res) => {
+  try {
+    const data = await loadData();
+    const phone = (req.body && req.body.phone) || (data.textReminders && data.textReminders.phone);
+    if (!phone) return res.status(400).json({ error: "No phone number saved yet" });
+    const r = await sendText(phone, "✅ The Super: test text — reminders are wired up and working.");
+    if (!r.ok) return res.status(500).json({ error: r.error });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Chat model setting (Opus / Sonnet toggle) ──
 app.get("/api/model", async (req, res) => {
   try {
