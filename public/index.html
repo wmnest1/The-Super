@@ -2110,12 +2110,13 @@ Type below or hit the mic and talk to me.</div>
     </div>
   </div>
 </div>
-<!-- ══ APPOINTMENTS BANNER — paste this whole block just above </body></html> in public/index.html ══ -->
+<!-- ══ APPOINTMENTS BANNER v2 — shows next upcoming appointment (today or future) ══ -->
 <script>
 (function(){
   var css = ''
-  +'#appt-banner{display:none;background:linear-gradient(90deg,rgba(232,160,32,0.16),rgba(232,160,32,0.04));border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);padding:8px 20px;font-size:14px;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;user-select:none}'
+  +'#appt-banner{display:none;background:linear-gradient(90deg,rgba(232,160,32,0.22),rgba(232,160,32,0.05));border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);padding:10px 20px;font-size:15px;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;user-select:none}'
   +'#appt-banner.past{opacity:.55}'
+  +'#appt-banner .ab-day{background:var(--accent);color:#1a1a2e;font-weight:bold;font-size:11px;letter-spacing:.06em;border-radius:4px;padding:3px 8px;white-space:nowrap}'
   +'#appt-banner .ab-time{color:var(--accent);font-weight:bold;white-space:nowrap}'
   +'#appt-banner .ab-person{color:var(--text);font-weight:bold}'
   +'#appt-banner .ab-addr{color:#aac;font-size:13px}'
@@ -2124,6 +2125,7 @@ Type below or hit the mic and talk to me.</div>
   +'.ad-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1e2e4e;font-size:13px;flex-wrap:wrap}'
   +'.ad-row:last-child{border-bottom:none}'
   +'.ad-row.past{opacity:.5}'
+  +'.ad-day{background:#0f3460;color:#aac;font-size:10px;font-weight:bold;border-radius:4px;padding:2px 7px;white-space:nowrap}'
   +'.ad-time{color:var(--accent);font-weight:bold;min-width:70px}'
   +'.ad-btn{background:#0f3460;border:1px solid #2a3a5e;border-radius:6px;color:#aac;padding:4px 10px;font-size:12px;cursor:pointer;text-decoration:none;line-height:1.4}'
   +'.ad-btn:hover{background:#1a4a8a;color:#fff}'
@@ -2131,7 +2133,8 @@ Type below or hit the mic and talk to me.</div>
   +'html.light #appt-banner{background:#fff3dd}'
   +'html.light #appt-banner .ab-addr{color:#666}'
   +'html.light .ad-row{border-color:#eee}'
-  +'html.light .ad-btn{background:#eee;border-color:#ccc;color:#444}';
+  +'html.light .ad-btn{background:#eee;border-color:#ccc;color:#444}'
+  +'html.light .ad-day{background:#e8ecf4;color:#556}';
   var st = document.createElement('style');
   st.textContent = css;
   document.head.appendChild(st);
@@ -2146,30 +2149,57 @@ Type below or hit the mic and talk to me.</div>
   chatBox.parentNode.insertBefore(detail, chatBox);
 
   var appts = [];
+  function localISO(offsetDays){
+    var d = new Date();
+    if (offsetDays) d.setDate(d.getDate() + offsetDays);
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
   function nowHM(){ var d = new Date(); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
   function escA(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
   function mapsLink(a){ return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(a); }
+  function dayLabel(dateStr){
+    if (dateStr === localISO(0)) return 'TODAY';
+    if (dateStr === localISO(1)) return 'TOMORROW';
+    var p = dateStr.split('-');
+    var d = new Date(+p[0], +p[1]-1, +p[2], 12);
+    return d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }).toUpperCase();
+  }
+
+  function relevantAppts(){
+    var today = localISO(0);
+    return appts.filter(function(a){ return a.date >= today; });
+  }
 
   function renderBanner(){
-    if (!appts.length){ banner.style.display='none'; detail.style.display='none'; return; }
+    var rel = relevantAppts();
+    if (!rel.length){ banner.style.display='none'; detail.style.display='none'; return; }
+    var today = localISO(0);
     var now = nowHM();
-    var upcoming = appts.filter(function(a){ return a.time >= now; });
-    var focus = upcoming[0] || appts[appts.length-1];
-    var allPast = upcoming.length === 0;
-    var remaining = upcoming.length > 1 ? upcoming.length - 1 : 0;
+    var next = null;
+    for (var i = 0; i < rel.length; i++){
+      var a = rel[i];
+      if (a.date > today || (a.date === today && a.time >= now)) { next = a; break; }
+    }
+    var allPast = !next;
+    var focus = next || rel[rel.length-1];
+    var moreCount = rel.length - 1;
     banner.className = allPast ? 'past' : '';
     banner.style.display = 'flex';
-    banner.innerHTML = '📍 <span class="ab-time">' + escA(focus.time_display) + '</span>'
+    banner.innerHTML = '<span class="ab-day">' + dayLabel(focus.date) + '</span>'
+      + '📍 <span class="ab-time">' + escA(focus.time_display) + '</span>'
       + (focus.person ? ' <span class="ab-person">— ' + escA(focus.person) + '</span>' : '')
       + (focus.address ? ' <span class="ab-addr">— ' + escA(focus.address) + '</span>' : '')
-      + (remaining ? '<span class="ab-more">+' + remaining + ' more today ▾</span>' : '<span class="ab-more">details ▾</span>');
+      + (moreCount > 0 ? '<span class="ab-more">+' + moreCount + ' more upcoming ▾</span>' : '<span class="ab-more">details ▾</span>');
   }
 
   function renderDetail(){
+    var rel = relevantAppts();
+    var today = localISO(0);
     var now = nowHM();
-    detail.innerHTML = appts.map(function(a){
-      var past = a.time < now;
+    detail.innerHTML = rel.map(function(a){
+      var past = a.date === today && a.time < now;
       return '<div class="ad-row' + (past ? ' past' : '') + '">'
+        + '<span class="ad-day">' + dayLabel(a.date) + '</span>'
         + '<span class="ad-time">' + escA(a.time_display) + '</span>'
         + '<span>' + escA(a.person || '') + '</span>'
         + (a.address ? '<span style="color:#889;font-size:12px">' + escA(a.address) + '</span>' : '')
@@ -2178,7 +2208,7 @@ Type below or hit the mic and talk to me.</div>
         + (a.address ? '<a class="ad-btn" target="_blank" href="' + mapsLink(a.address) + '">🗺 Directions</a>' : '')
         + '<button class="ad-btn danger" onclick="apptCancel(\'' + a.id + '\',event)">✕ Cancel</button>'
         + '</span></div>';
-    }).join('') || '<div style="color:#667;font-size:13px;padding:4px 0">No appointments today.</div>';
+    }).join('') || '<div style="color:#667;font-size:13px;padding:4px 0">No upcoming appointments.</div>';
   }
 
   banner.addEventListener('click', function(){
@@ -2196,9 +2226,11 @@ Type below or hit the mic and talk to me.</div>
 
   async function loadAppts(){
     try {
-      var r = await fetch('/api/appointments/today');
+      var r = await fetch('/api/appointments');
       var d = await r.json();
-      appts = d.appointments || [];
+      appts = (d.appointments || []).slice().sort(function(a,b){
+        return (a.date + a.time).localeCompare(b.date + b.time);
+      });
       renderBanner();
       if (detail.style.display === 'block') renderDetail();
     } catch(e) {}
