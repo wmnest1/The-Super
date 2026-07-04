@@ -88,6 +88,7 @@ const EMPTY_DATA = () => ({
   unitPrices: [],
   entries: [],
   generalNotes: [],
+  appointments: [],
   payments: {},
   nextInvoiceNumber: 1001,
 });
@@ -114,6 +115,7 @@ async function loadData() {
   }
   if (!doc.nextInvoiceNumber) doc.nextInvoiceNumber = 1001;
   if (!doc.entries) doc.entries = [];
+  if (!doc.appointments) doc.appointments = [];
   return doc;
 }
 
@@ -164,6 +166,17 @@ function buildSystemPrompt(data, invoiceAccentColor = '#e8a020') {
   const currentQ = Math.floor(_mo/3)+1;
   const qStarts=['01-01','04-01','07-01','10-01']; const qEnds=['03-31','06-30','09-30','12-31'];
   const qStart=`${_yr}-${qStarts[currentQ-1]}`; const qEnd=`${_yr}-${qEnds[currentQ-1]}`;
+  // Today's + upcoming appointments for context
+  const _appts = (data.appointments || []).filter(a => a.status !== "cancelled");
+  const _todayAppts = _appts.filter(a => a.date === isoDate);
+  const _futureAppts = _appts.filter(a => a.date > isoDate).slice(0, 10);
+  const _fmtAppt = a => `- [id:${a.id}] ${a.date} ${a.time_display}${a.person ? " — " + a.person : ""}${a.address ? " — " + a.address : ""}${a.notes ? " (" + a.notes + ")" : ""}`;
+  const apptContext = `
+TODAY'S APPOINTMENTS:
+${_todayAppts.length ? _todayAppts.map(_fmtAppt).join("\n") : "- none"}
+
+UPCOMING APPOINTMENTS (next 10):
+${_futureAppts.length ? _futureAppts.map(_fmtAppt).join("\n") : "- none"}`;
   return `You are The Super — the private business management AI for Walt Mullins of Mullins Construction Inc.
 
 COMPANY INFO:
@@ -188,6 +201,10 @@ Out-of-scope rate: Each project may have an "oosRate" field ($/hr billed to clie
 CURRENT DATE & TIME: ${dateTime}
 TODAY'S ISO DATE (for save_entry): ${isoDate}
 Use this for notes, logs, hour entries, and any time-sensitive responses.
+
+${apptContext}
+
+APPOINTMENTS: Use save_appointment when Walt mentions a meeting/appointment/scheduled event. Use cancel_appointment (with the id from the lists above) when he cancels one. When he asks "what's my day look like" or "what's my schedule", summarize TODAY'S APPOINTMENTS conversationally. If a requested appointment time is vague ("this afternoon"), ask for a specific time before saving.
 
 NEXT INVOICE/PROPOSAL NUMBER: ${invoiceNum}
 Always use this number on the next document you generate. It goes in the top-right header area alongside INVOICE or PROPOSAL.
@@ -483,6 +500,33 @@ const TOOLS = [
       },
       required: ["to_email", "subject", "html_body"]
     }
+  },
+  {
+    name: "save_appointment",
+    description: "Save an appointment, meeting, or scheduled event — NOT tied to job hours or materials. Use when Walt says things like 'meeting at 11:30 with Gary at 111 Main St', 'I have an appointment tomorrow at 2 with the inspector', 'remind me I'm seeing Barbara Friday at 9am'. This is for client walkthroughs, permit office visits, inspections, phone calls, and anything scheduled. If the time is ambiguous (e.g. 'this afternoon'), ask Walt for a specific time before saving.",
+    input_schema: {
+      type: "object",
+      properties: {
+        date: { type: "string", description: "Date in YYYY-MM-DD format. Default to today's ISO date if Walt doesn't specify. Resolve 'tomorrow', weekday names, etc. relative to the current date." },
+        time: { type: "string", description: "24-hour time HH:MM, e.g. '11:30' or '14:00'. Required — ask Walt if not given." },
+        time_display: { type: "string", description: "Human-readable time, e.g. '11:30 AM' or '2:00 PM'." },
+        person: { type: "string", description: "Who the meeting is with, e.g. 'Gary', 'City inspector'. Omit if not mentioned." },
+        address: { type: "string", description: "Location/address if mentioned, e.g. '111 Main St, San Jose'. Omit if not mentioned." },
+        notes: { type: "string", description: "Anything else Walt mentioned — purpose, things to bring, etc." }
+      },
+      required: ["date", "time", "time_display"]
+    }
+  },
+  {
+    name: "cancel_appointment",
+    description: "Cancel an existing appointment. Use when Walt says things like 'cancel my 11:30 with Gary', 'the meeting with the inspector is off', 'scratch Friday's appointment'. Match against the appointment list in the system prompt by person, time, and/or date. If more than one could match, ask Walt which one.",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "The appointment id from the TODAY'S APPOINTMENTS / UPCOMING APPOINTMENTS list in your context." }
+      },
+      required: ["id"]
+    }
   }
 ];
 
@@ -550,6 +594,30 @@ function checkMaterialDuplicate(date, project, description, amount, entries) {
 // ── Tool executor ──
 async function executeTool(toolName, input, data) {
   switch (toolName) {
+    case "save_appointment": {
+      if (!data.appointments) data.appointments = [];
+      const appt = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        date: input.date,
+        time: input.time,
+        time_display: input.time_display,
+        person: input.person || "",
+        address: input.address || "",
+        notes: input.notes || "",
+        status: "upcoming",
+        created_at: new Date().toISOString()
+      };
+      data.appointments.push(appt);
+      data.appointments.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      return { ok: true, action: "created", type: "appointment", data: appt };
+    }
+    case "cancel_appointment": {
+      if (!data.appointments) data.appointments = [];
+      const apptIdx = data.appointments.findIndex(a => a.id === input.id);
+      if (apptIdx < 0) return { ok: false, message: "Appointment not found — ask Walt to clarify which appointment." };
+      data.appointments[apptIdx].status = "cancelled";
+      return { ok: true, action: "cancelled", type: "appointment", data: data.appointments[apptIdx] };
+    }
     case "save_entry": {
       if (!data.entries) data.entries = [];
       // Fuzzy-match project name against existing projects
@@ -825,6 +893,65 @@ app.post("/api/chat", async (req, res) => {
     res.json({ reply, dataSaved });
   } catch (err) {
     console.error("Chat error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Appointments API ──
+app.get("/api/appointments/today", async (req, res) => {
+  try {
+    const data = await loadData();
+    const { isoDate } = getPSTDateTime();
+    const appts = (data.appointments || [])
+      .filter(a => a.date === isoDate && a.status !== "cancelled")
+      .sort((a, b) => a.time.localeCompare(b.time));
+    res.json({ date: isoDate, appointments: appts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/appointments", async (req, res) => {
+  try {
+    const data = await loadData();
+    const appts = (data.appointments || []).filter(a => a.status !== "cancelled");
+    res.json({ appointments: appts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/appointments", async (req, res) => {
+  try {
+    const { date, time, time_display, person, address, notes } = req.body;
+    if (!date || !time || !time_display) return res.status(400).json({ error: "date, time, and time_display are required" });
+    const data = await loadData();
+    if (!data.appointments) data.appointments = [];
+    const appt = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      date, time, time_display,
+      person: person || "", address: address || "", notes: notes || "",
+      status: "upcoming",
+      created_at: new Date().toISOString()
+    };
+    data.appointments.push(appt);
+    data.appointments.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+    await saveData(data);
+    res.json({ ok: true, appointment: appt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/appointments/:id", async (req, res) => {
+  try {
+    const data = await loadData();
+    const idx = (data.appointments || []).findIndex(a => a.id === req.params.id);
+    if (idx < 0) return res.status(404).json({ error: "not found" });
+    data.appointments[idx].status = "cancelled";
+    await saveData(data);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
