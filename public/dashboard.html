@@ -3441,6 +3441,58 @@ function cwInitListeners(){
   }
 })();
 </script>
+<!-- ══ SUBS MARKUP — dashboard wiring (paste above </body> in dashboard.html, after ALL other blocks) ══ -->
+<script>
+(function(){
+  function projField(name, field){
+    if (typeof data==='undefined') return null;
+    var p = (data.projects||[]).find(function(x){ return (x.name||'')===name; });
+    if (p && p[field]!==undefined && p[field]!=='' && !isNaN(parseFloat(p[field]))) return parseFloat(p[field]);
+    return null;
+  }
+
+  // markup priority, now sub-aware:
+  //   materials: item % → project "markup" → 15
+  //   subs:      item % → project "subMarkup" → 0
+  window.__itemPct = function(m, projName){
+    if (m && m.markupPct!=null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    if (m && m.kind==='sub'){
+      var s = projField(projName, 'subMarkup');
+      return (s!=null) ? s : 0;
+    }
+    var pm = projField(projName, 'markup');
+    return (pm!=null) ? pm : 15;
+  };
+
+  // quick-add stepper default, same chain (remembered % still wins)
+  var projEl = document.getElementById('qa-proj');
+  var kindEl = document.getElementById('qa-kind');
+  var mkEl   = document.getElementById('qa-mk');
+  if (projEl && kindEl && mkEl){
+    function applySmartDefault(){
+      var key = projEl.value+'|'+kindEl.value;
+      var d = {};
+      try { d = JSON.parse(localStorage.getItem('matMkDefaults')||'{}'); } catch(e){}
+      if (d[key]!=null) return; // you've used this combo before — your last % stands
+      var v;
+      if (kindEl.value==='sub'){
+        var s = projField(projEl.value, 'subMarkup');
+        v = (s!=null) ? s : 0;
+      } else {
+        var pm = projField(projEl.value, 'markup');
+        v = (pm!=null) ? pm : 15;
+      }
+      mkEl.value = v;
+      mkEl.dispatchEvent(new Event('input')); // refresh the green "bills $" box
+    }
+    // registered after the earlier block's listeners, so this runs last and wins
+    projEl.addEventListener('change', applySmartDefault);
+    kindEl.addEventListener('change', applySmartDefault);
+    var _open3 = window.openMaterials;
+    window.openMaterials = async function(){ await _open3(); applySmartDefault(); };
+  }
+})();
+</script>
 </body>
 </html>
 
