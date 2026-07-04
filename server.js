@@ -1044,6 +1044,99 @@ app.post("/api/test-text", async (req, res) => {
   }
 });
 
+// ── Materials: batch add (quick-add row + screenshot staging commit) ──
+app.post("/api/materials/add-batch", async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: "No items" });
+    if (items.length > 100) return res.status(400).json({ error: "Too many items (max 100)" });
+    const data = await loadData();
+    if (!data.entries) data.entries = [];
+    if (!data.generalExpenses) data.generalExpenses = [];
+    let added = 0;
+    for (const it of items) {
+      const amount = parseFloat(it.amount || 0);
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(it.date || "") ? it.date : getPSTDateTime().isoDate;
+      if (!amount && !(it.description || "").trim()) continue;
+      if (it.isGeneral || it.project === "__general__") {
+        data.generalExpenses.push({
+          date,
+          category: it.category || "Other",
+          store: (it.store || "").trim(),
+          description: (it.description || "").trim(),
+          amount: String(amount),
+          receiptNumber: (it.invoiceNum || "").trim()
+        });
+        added++;
+      } else {
+        const projName = (it.project || "").trim();
+        if (!projName) continue;
+        let entry = data.entries.find(e => e.date === date && (e.project || "") === projName);
+        if (!entry) { entry = { date, project: projName, crew: [], materials: [], notes: "" }; data.entries.push(entry); }
+        if (!entry.materials) entry.materials = [];
+        entry.materials.push({
+          store: (it.store || "").trim(),
+          description: (it.description || "").trim(),
+          cost: String(amount),
+          invoiceNum: (it.invoiceNum || "").trim()
+        });
+        added++;
+      }
+    }
+    await saveData(data);
+    res.json({ ok: true, added });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Materials: parse a receipt / HD Pro purchase-history screenshot with vision ──
+app.post("/api/materials/parse-image", async (req, res) => {
+  try {
+    const { imageData, imageType } = req.body;
+    if (!imageData) return res.status(400).json({ error: "No image" });
+    const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: imageType || "image/jpeg", data: imageData } },
+          { type: "text", text: `This is a screenshot of purchase history (likely Home Depot Pro) or a receipt for a construction business. Extract EVERY purchase row visible.
+
+Respond with ONLY a JSON array, no markdown fences, no commentary. Each element:
+{"date":"YYYY-MM-DD","store":"Home Depot","description":"<store # / location / job name and any transaction context>","amount":123.45,"invoiceNum":"<invoice or receipt number if visible, else empty string>"}
+
+Rules:
+- Dates: convert to YYYY-MM-DD. If the year isn't shown, assume the current year (2026).
+- amount must be a plain number (no $ or commas).
+- Include Txn numbers in the description like "(Txn 1234, Inv 5678)" when visible, matching this style: "#1009 Hillsdale (Txn 4116, Inv 5512305)".
+- One object per purchase line. If totals/subtotal rows appear, skip them.
+- If you cannot read a field, use an empty string, never guess digits.` }
+        ]
+      }]
+    });
+    const text = response.content.map(c => c.type === "text" ? c.text : "").join("");
+    const clean = text.replace(/```json|```/g, "").trim();
+    let rows;
+    try { rows = JSON.parse(clean); } catch (e) {
+      return res.status(422).json({ error: "Could not read the screenshot clearly — try a sharper or closer screenshot." });
+    }
+    if (!Array.isArray(rows)) rows = [rows];
+    rows = rows.filter(r => r && (r.amount || r.description)).slice(0, 100).map(r => ({
+      date: /^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? r.date : "",
+      store: String(r.store || "").slice(0, 60),
+      description: String(r.description || "").slice(0, 200),
+      amount: parseFloat(r.amount || 0) || 0,
+      invoiceNum: String(r.invoiceNum || "").slice(0, 40)
+    }));
+    res.json({ ok: true, rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Chat model setting (Opus / Sonnet toggle) ──
 app.get("/api/model", async (req, res) => {
   try {
