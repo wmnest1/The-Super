@@ -177,7 +177,8 @@ ${_todayAppts.length ? _todayAppts.map(_fmtAppt).join("\n") : "- none"}
 
 UPCOMING APPOINTMENTS (next 10):
 ${_futureAppts.length ? _futureAppts.map(_fmtAppt).join("\n") : "- none"}`;
-  return `You are The Super — the private business management AI for Walt Mullins of Mullins Construction Inc.
+  // ── Prompt caching: static instructions (cached) + volatile context (not cached) ──
+  const staticPart = `You are The Super — the private business management AI for Walt Mullins of Mullins Construction Inc.
 
 COMPANY INFO:
 - Mullins Construction Inc.
@@ -198,16 +199,7 @@ Common rates: $110/hr, $120/hr, $125/hr
 Materials markup: Each project has its own markup % stored in the project record. Use the per-project "markup" field when calculating material costs on invoices and proposals. If no markup is set for a project, do not apply one unless Walt specifies.
 Out-of-scope rate: Each project may have an "oosRate" field ($/hr billed to client for OOS/extra work). Use it for OOS line items on invoices. If not set, fall back to the project's regular "rate".
 
-CURRENT DATE & TIME: ${dateTime}
-TODAY'S ISO DATE (for save_entry): ${isoDate}
-Use this for notes, logs, hour entries, and any time-sensitive responses.
-
-${apptContext}
-
 APPOINTMENTS: Use save_appointment when Walt mentions a meeting/appointment/scheduled event. Use cancel_appointment (with the id from the lists above) when he cancels one. When he asks "what's my day look like" or "what's my schedule", summarize TODAY'S APPOINTMENTS conversationally. If a requested appointment time is vague ("this afternoon"), ask for a specific time before saving.
-
-NEXT INVOICE/PROPOSAL NUMBER: ${invoiceNum}
-Always use this number on the next document you generate. It goes in the top-right header area alongside INVOICE or PROPOSAL.
 
 DOCUMENT DATE: Default to ${dateOnly} on all invoices and proposals. If Walt specifies a different date, use that instead. Show date only — never show a time on invoices or proposals.
 
@@ -263,39 +255,6 @@ EMAIL CAPABILITIES:
 - PDF filename format: "Invoice-[number]-[ClientLastName].pdf" or "Proposal-[JobName]-[Date].pdf"
 - After sending confirm: "✅ Email sent to [email] with PDF attachment: [filename]"
 
-CURRENT DATA:
-
-CLIENTS:
-${(data.clients||[]).map(c => `- ${c.name}${c.phone?" | "+c.phone:""}${c.email?" | "+c.email:""}${c.address?" | "+c.address:""}${c.notes?" | Notes: "+c.notes:""}`).join("\n") || "None on file"}
-
-PROJECTS:
-${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
-
-CREW:
-${(data.crew||[]).map(c => `- ${c.name}${c.nickname?" ("+c.nickname+")":""}${c.role?" | "+c.role:""}${c.hourlyRate?" | Pay: $"+c.hourlyRate+"/hr":""}${c.phone?" | "+c.phone:""}${c.notes?" | "+c.notes:""}`).join("\n") || "None on file"}
-
-SUBCONTRACTORS:
-${(data.subs||[]).map(s => `- ${s.company||s.name}${s.trade?" | "+s.trade:""}${s.contact?" | Contact: "+s.contact:""}${s.phone?" | "+s.phone:""}${s.rate?" | Rate: "+s.rate:""}${s.cslbNumber?" | CSLB #"+s.cslbNumber+(s.cslbExpiration?" exp "+s.cslbExpiration:""):""}${s.glCarrier?" | GL: "+s.glCarrier+(s.glExpiration?" exp "+s.glExpiration:""):""}${s.wcCarrier?" | WC: "+s.wcCarrier+(s.wcExpiration?" exp "+s.wcExpiration:""):""}${s.notes?" | Notes: "+s.notes:""}`).join("\n") || "None on file"}
-
-UNIT PRICES:
-${(data.unitPrices||[]).map(u => `- ${u.description}${u.category?" ["+u.category+"]":""}${u.price?" | $"+u.price+" per "+(u.unit||"ea"):""}${u.notes?" | "+u.notes:""}`).join("\n") || "None on file"}
-
-DAILY ENTRIES LOG (hours worked & materials purchased, newest first):
-${(data.entries||[]).length === 0 ? "No entries logged yet" : [...(data.entries||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e => {
-  const crew = (e.crew||[]).map(c=>{const reg=c.outOfScope?0:parseFloat(c.hours||0);const oos=c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0);return `${c.name} ${reg}hr${oos>0?'+'+oos+'hr OOS':''}`;}).join(", ");
-  const mats = (e.materials||[]).map(m=>`${m.description} $${m.cost}`).join(", ");
-  const totalHrs = (e.crew||[]).reduce((s,c)=>s+parseFloat(c.hours||0),0);
-  const totalMat = (e.materials||[]).reduce((s,m)=>s+parseFloat(m.cost||0),0);
-  return `- [${e.date}] ${e.project}${crew?" | Crew: "+crew+" ("+totalHrs+"hr total)":""}${mats?" | Materials: "+mats+" ($"+totalMat.toFixed(2)+" total)":""}${e.notes?" | "+e.notes:""}`;
-}).join("\n")}
-
-GENERAL NOTES (reminders, ideas, supplier info, follow-ups):
-${(data.generalNotes||[]).length === 0 ? "No general notes yet" : [...(data.generalNotes||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(n=>`- [${n.date||""}] [${n.tag||"General"}] ${n.note}`).join("\n")}
-
-GENERAL EXPENSES (company overhead — tools, fuel, supplies NOT tied to any client project):
-${(data.generalExpenses||[]).length === 0 ? "None logged yet" : [...(data.generalExpenses||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e=>`- [${e.date}] [${e.category||"Other"}] ${e.store?e.store+": ":""}${e.description} $${parseFloat(e.amount||0).toFixed(2)}${e.receiptNumber?" Receipt #"+e.receiptNumber:""}${e.notes?" | "+e.notes:""}`).join("\n")}
-${(data.generalExpenses||[]).length > 0 ? "All-time totals by category: "+['Tools','Fuel','Truck/Vehicle','Safety/PPE','General Supplies','Permits/Fees','Other'].map(cat=>{const t=(data.generalExpenses||[]).filter(e=>e.category===cat).reduce((s,e)=>s+parseFloat(e.amount||0),0);return t>0?cat+" $"+t.toFixed(2):null;}).filter(Boolean).join(" | ") : ""}
-
 HOW YOU RESPOND:
 - Plain English, direct, no fluff
 - For normal conversation, reply in plain text
@@ -339,6 +298,53 @@ When generating invoices or proposals, return clean HTML like this structure (us
 
 Invoices include: property address, client name, date, scope of work performed, line items with hours/rate, materials, markup if applicable, total, payment instructions.
 Proposals include: property address, client name, scope, exclusions, total or unit pricing, signature block with date line.`;
+
+  const dynamicPart = `CURRENT DATE & TIME: ${dateTime}
+TODAY'S ISO DATE (for save_entry): ${isoDate}
+Use this for notes, logs, hour entries, and any time-sensitive responses.
+
+${apptContext}
+
+NEXT INVOICE/PROPOSAL NUMBER: ${invoiceNum}
+Always use this number on the next document you generate. It goes in the top-right header area alongside INVOICE or PROPOSAL.
+
+CURRENT DATA:
+
+CLIENTS:
+${(data.clients||[]).map(c => `- ${c.name}${c.phone?" | "+c.phone:""}${c.email?" | "+c.email:""}${c.address?" | "+c.address:""}${c.notes?" | Notes: "+c.notes:""}`).join("\n") || "None on file"}
+
+PROJECTS:
+${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
+
+CREW:
+${(data.crew||[]).map(c => `- ${c.name}${c.nickname?" ("+c.nickname+")":""}${c.role?" | "+c.role:""}${c.hourlyRate?" | Pay: $"+c.hourlyRate+"/hr":""}${c.phone?" | "+c.phone:""}${c.notes?" | "+c.notes:""}`).join("\n") || "None on file"}
+
+SUBCONTRACTORS:
+${(data.subs||[]).map(s => `- ${s.company||s.name}${s.trade?" | "+s.trade:""}${s.contact?" | Contact: "+s.contact:""}${s.phone?" | "+s.phone:""}${s.rate?" | Rate: "+s.rate:""}${s.cslbNumber?" | CSLB #"+s.cslbNumber+(s.cslbExpiration?" exp "+s.cslbExpiration:""):""}${s.glCarrier?" | GL: "+s.glCarrier+(s.glExpiration?" exp "+s.glExpiration:""):""}${s.wcCarrier?" | WC: "+s.wcCarrier+(s.wcExpiration?" exp "+s.wcExpiration:""):""}${s.notes?" | Notes: "+s.notes:""}`).join("\n") || "None on file"}
+
+UNIT PRICES:
+${(data.unitPrices||[]).map(u => `- ${u.description}${u.category?" ["+u.category+"]":""}${u.price?" | $"+u.price+" per "+(u.unit||"ea"):""}${u.notes?" | "+u.notes:""}`).join("\n") || "None on file"}
+
+DAILY ENTRIES LOG (hours worked & materials purchased, newest first):
+${(data.entries||[]).length === 0 ? "No entries logged yet" : [...(data.entries||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e => {
+  const crew = (e.crew||[]).map(c=>{const reg=c.outOfScope?0:parseFloat(c.hours||0);const oos=c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0);return `${c.name} ${reg}hr${oos>0?'+'+oos+'hr OOS':''}`;}).join(", ");
+  const mats = (e.materials||[]).map(m=>`${m.description} $${m.cost}`).join(", ");
+  const totalHrs = (e.crew||[]).reduce((s,c)=>s+parseFloat(c.hours||0),0);
+  const totalMat = (e.materials||[]).reduce((s,m)=>s+parseFloat(m.cost||0),0);
+  return `- [${e.date}] ${e.project}${crew?" | Crew: "+crew+" ("+totalHrs+"hr total)":""}${mats?" | Materials: "+mats+" ($"+totalMat.toFixed(2)+" total)":""}${e.notes?" | "+e.notes:""}`;
+}).join("\n")}
+
+GENERAL NOTES (reminders, ideas, supplier info, follow-ups):
+${(data.generalNotes||[]).length === 0 ? "No general notes yet" : [...(data.generalNotes||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(n=>`- [${n.date||""}] [${n.tag||"General"}] ${n.note}`).join("\n")}
+
+GENERAL EXPENSES (company overhead — tools, fuel, supplies NOT tied to any client project):
+${(data.generalExpenses||[]).length === 0 ? "None logged yet" : [...(data.generalExpenses||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(e=>`- [${e.date}] [${e.category||"Other"}] ${e.store?e.store+": ":""}${e.description} $${parseFloat(e.amount||0).toFixed(2)}${e.receiptNumber?" Receipt #"+e.receiptNumber:""}${e.notes?" | "+e.notes:""}`).join("\n")}
+${(data.generalExpenses||[]).length > 0 ? "All-time totals by category: "+['Tools','Fuel','Truck/Vehicle','Safety/PPE','General Supplies','Permits/Fees','Other'].map(cat=>{const t=(data.generalExpenses||[]).filter(e=>e.category===cat).reduce((s,e)=>s+parseFloat(e.amount||0),0);return t>0?cat+" $"+t.toFixed(2):null;}).filter(Boolean).join(" | ") : ""}`;
+
+  return [
+    { type: "text", text: staticPart, cache_control: { type: "ephemeral" } },
+    { type: "text", text: dynamicPart }
+  ];
 }
 
 // ── Tool definitions ──
@@ -529,6 +535,11 @@ const TOOLS = [
     }
   }
 ];
+
+// ── Prompt caching: mark the last tool so the whole TOOLS array is cached ──
+const TOOLS_CACHED = TOOLS.map((t, i) =>
+  i === TOOLS.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t
+);
 
 // ── Duplicate entry guard (30-second window) ──
 const recentSaves = new Map();
@@ -843,7 +854,7 @@ app.post("/api/chat", async (req, res) => {
       model: "claude-opus-4-8",
       max_tokens: 4096,
       system: buildSystemPrompt(data, data.theme?.invoiceAccentColor || '#e8a020'),
-      tools: TOOLS,
+      tools: TOOLS_CACHED,
       messages,
     });
 
@@ -873,7 +884,7 @@ app.post("/api/chat", async (req, res) => {
         model: "claude-opus-4-8",
         max_tokens: 4096,
         system: buildSystemPrompt(data, data.theme?.invoiceAccentColor || '#e8a020'),
-        tools: TOOLS,
+        tools: TOOLS_CACHED,
         messages,
       });
     }
