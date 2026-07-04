@@ -834,6 +834,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history, imageData, imageType } = req.body;
     let data = await loadData();
+    const chatModel = data.chatModel === "claude-sonnet-4-6" ? "claude-sonnet-4-6" : "claude-opus-4-8";
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
     const messages = [];
@@ -851,7 +852,7 @@ app.post("/api/chat", async (req, res) => {
     messages.push({ role: "user", content: userContent });
 
     let response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
+      model: chatModel,
       max_tokens: 4096,
       system: buildSystemPrompt(data, data.theme?.invoiceAccentColor || '#e8a020'),
       tools: TOOLS_CACHED,
@@ -881,7 +882,7 @@ app.post("/api/chat", async (req, res) => {
       messages.push({ role: "user", content: toolResultContents });
 
       response = await anthropic.messages.create({
-        model: "claude-opus-4-8",
+        model: chatModel,
         max_tokens: 4096,
         system: buildSystemPrompt(data, data.theme?.invoiceAccentColor || '#e8a020'),
         tools: TOOLS_CACHED,
@@ -904,6 +905,31 @@ app.post("/api/chat", async (req, res) => {
     res.json({ reply, dataSaved });
   } catch (err) {
     console.error("Chat error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Chat model setting (Opus / Sonnet toggle) ──
+app.get("/api/model", async (req, res) => {
+  try {
+    const data = await loadData();
+    res.json({ model: data.chatModel || "claude-opus-4-8" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/model", async (req, res) => {
+  try {
+    const { model } = req.body;
+    if (!["claude-opus-4-8", "claude-sonnet-4-6"].includes(model)) {
+      return res.status(400).json({ error: "invalid model" });
+    }
+    const data = await loadData();
+    data.chatModel = model;
+    await saveData(data);
+    res.json({ ok: true, model });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
