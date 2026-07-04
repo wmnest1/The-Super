@@ -2283,6 +2283,90 @@ function cwInitListeners(){
   });
 })();
 </script>
+<!-- ══ KEYBOARD NAV — arrows move between fields, Enter = Save All ══ -->
+<script>
+(function(){
+  var COLS = ['dm-crew-','dm-oos-','dm-note-'];
+
+  function crewList(){ return (typeof CREW_ORDER!=='undefined') ? CREW_ORDER : []; }
+
+  function parseDayField(id){
+    for (var c=0;c<COLS.length;c++){
+      if (id.indexOf(COLS[c])===0){
+        var worker = id.slice(COLS[c].length);
+        var r = crewList().indexOf(worker);
+        if (r>=0) return {row:r, col:c};
+      }
+    }
+    return null;
+  }
+
+  function focusDayField(row, col){
+    var crew = crewList();
+    if (row<0) row = crew.length-1;
+    if (row>=crew.length) row = 0;
+    var el = document.getElementById(COLS[col]+crew[row]);
+    if (el){ el.focus(); if (el.select) try{ el.select(); }catch(e){} }
+  }
+
+  function weekInputs(){
+    return Array.prototype.slice.call(document.querySelectorAll('#week-modal input[id^="wm-day-"]:not([disabled])'));
+  }
+
+  document.addEventListener('keydown', function(e){
+    var t = e.target;
+    if (!t) return;
+    var dm = document.getElementById('day-modal');
+    var wm = document.getElementById('week-modal');
+    var dayOpen = dm && dm.classList.contains('open');
+    var weekOpen = wm && wm.classList.contains('open');
+    if (!dayOpen && !weekOpen) return;
+
+    // ── Enter = Save All (anywhere in the modal except the notes textarea) ──
+    if (e.key==='Enter'){
+      if (t.tagName==='TEXTAREA') return;            // notes box: Enter = new line
+      if (t.tagName==='BUTTON') return;              // let buttons behave normally
+      e.preventDefault();
+      if (dayOpen && typeof saveDayModal==='function') saveDayModal();
+      else if (weekOpen && typeof saveWeekModal==='function') saveWeekModal();
+      return;
+    }
+
+    if (e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+
+    // ── Day modal: ↓/↑ move between workers in the same column ──
+    if (dayOpen && t.id){
+      var pos = parseDayField(t.id);
+      if (pos){
+        e.preventDefault();
+        focusDayField(pos.row + (e.key==='ArrowDown'?1:-1), pos.col);
+        return;
+      }
+    }
+
+    // ── Week modal: ↓/↑ move between day inputs ──
+    if (weekOpen && t.id && t.id.indexOf('wm-day-')===0){
+      var ins = weekInputs();
+      var i = ins.indexOf(t);
+      if (i<0) return;
+      e.preventDefault();
+      var next = i + (e.key==='ArrowDown'?1:-1);
+      if (next<0) next = ins.length-1;
+      if (next>=ins.length) next = 0;
+      ins[next].focus();
+      if (ins[next].select) try{ ins[next].select(); }catch(e2){}
+    }
+  }, true);
+
+  // Select-all on focus for quick overwrite
+  document.addEventListener('focusin', function(e){
+    var t = e.target;
+    if (!t || !t.id) return;
+    var quick = t.id.indexOf('dm-crew-')===0 || t.id.indexOf('dm-oos-')===0 || t.id.indexOf('wm-day-')===0;
+    if (quick && t.select) try{ t.select(); }catch(err){}
+  });
+})();
+</script>
 </body>
 </html>
 
