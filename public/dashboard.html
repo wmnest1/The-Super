@@ -2979,6 +2979,257 @@ function cwInitListeners(){
   });
 })();
 </script>
+<!-- ══ MATERIALS QUICK-ADD v2 — date steppers, store memory, subs & per-entry markup ══ -->
+<script>
+(function(){
+  var qa = document.getElementById('mat-qa');
+  if (!qa) return;
+
+  var st = document.createElement('style');
+  st.textContent = ''
+  +'#qa-datewrap{position:relative;display:inline-flex;align-items:center}'
+  +'#qa-datewrap .qa-step{display:none;flex-direction:column;margin-left:2px}'
+  +'#qa-datewrap:hover .qa-step{display:inline-flex}'
+  +'.qa-step button{background:#0f3460;border:1px solid #2a3a5e;color:#aac;font-size:8px;line-height:1;padding:2px 5px;cursor:pointer;border-radius:3px}'
+  +'.qa-step button:hover{background:#1a4a8a;color:#fff}'
+  +'#qa-kind{min-width:96px}'
+  +'#qa-mkwrap{display:inline-flex;align-items:center;gap:2px;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;padding:2px 4px}'
+  +'#qa-mkwrap button{background:none;border:none;color:#8ac;font-size:13px;cursor:pointer;padding:0 5px;line-height:1.3}'
+  +'#qa-mkwrap button:hover{color:#fff}'
+  +'#qa-mk{width:34px;background:none;border:none;color:var(--accent);font-size:12px;font-weight:bold;text-align:center;padding:0}'
+  +'#qa-billed{width:92px;background:#0a1f10!important;border-color:#2a5a3e!important;color:#8fd694!important;font-weight:bold}'
+  +'.sub-chip{font-size:9px;font-weight:bold;background:#5a3a10;color:#ffce7a;border-radius:4px;padding:1px 6px;margin-left:4px;white-space:nowrap}'
+  +'html.light #qa-billed{background:#effaf0!important;color:#1a7a2a!important}'
+  +'html.light .qa-step button{background:#eee;border-color:#ccc;color:#555}';
+  document.head.appendChild(st);
+
+  // ── Date: wrap with hover steppers ──
+  var dateEl = document.getElementById('qa-date');
+  var wrap = document.createElement('span');
+  wrap.id = 'qa-datewrap';
+  dateEl.parentNode.insertBefore(wrap, dateEl);
+  wrap.appendChild(dateEl);
+  var steps = document.createElement('span');
+  steps.className = 'qa-step';
+  steps.innerHTML = '<button type="button" title="Next day">▲</button><button type="button" title="Previous day">▼</button>';
+  wrap.appendChild(steps);
+  function shiftDate(days){
+    var v = dateEl.value || (typeof today!=='undefined'?today:new Date().toISOString().slice(0,10));
+    var p = v.split('-').map(Number);
+    var d = new Date(p[0], p[1]-1, p[2]+days);
+    dateEl.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  steps.children[0].addEventListener('click', function(){ shiftDate(1); });
+  steps.children[1].addEventListener('click', function(){ shiftDate(-1); });
+
+  // ── Store: combo box with remembered history, Home Depot default ──
+  var storeEl = document.getElementById('qa-store');
+  var dl = document.createElement('datalist');
+  dl.id = 'qa-stores';
+  document.body.appendChild(dl);
+  storeEl.setAttribute('list','qa-stores');
+  storeEl.setAttribute('placeholder','Store ▾');
+  function customStores(){
+    try { return JSON.parse(localStorage.getItem('matStores')||'[]'); } catch(e){ return []; }
+  }
+  function rememberStore(s){
+    if (!s) return;
+    var list = customStores();
+    if (list.map(function(x){return x.toLowerCase();}).indexOf(s.toLowerCase())===-1){
+      list.push(s); localStorage.setItem('matStores', JSON.stringify(list.slice(-40)));
+    }
+  }
+  function refreshStoreList(){
+    var seen = {};
+    var base = ['Home Depot','Pace Supply','Ace Hardware',"Lowe's",'Amazon'];
+    var fromData = (typeof matData!=='undefined') ? matData.map(function(m){return (m.store||'').trim();}) : [];
+    var all = base.concat(customStores()).concat(fromData).filter(Boolean);
+    dl.innerHTML = all.filter(function(s){
+      var k=s.toLowerCase(); if(seen[k]) return false; seen[k]=true; return true;
+    }).map(function(s){ return '<option value="'+s.replace(/"/g,'&quot;')+'">'; }).join('');
+  }
+
+  // ── Type: Material / Sub ──
+  var kind = document.createElement('select');
+  kind.id = 'qa-kind';
+  kind.innerHTML = '<option value="material">📦 Material</option><option value="sub">🔧 Sub</option>';
+  var projEl = document.getElementById('qa-proj');
+  projEl.parentNode.insertBefore(kind, projEl.nextSibling);
+
+  // ── Markup stepper + billed box ──
+  var amtEl = document.getElementById('qa-amt');
+  var mkwrap = document.createElement('span');
+  mkwrap.id = 'qa-mkwrap';
+  mkwrap.title = 'Markup % billed to client for this entry';
+  mkwrap.innerHTML = '<button type="button" id="qa-mk-dn">‹</button><input id="qa-mk" value="15">%<button type="button" id="qa-mk-up">›</button>';
+  amtEl.parentNode.insertBefore(mkwrap, amtEl.nextSibling);
+  var billed = document.createElement('input');
+  billed.id = 'qa-billed';
+  billed.type = 'text';
+  billed.readOnly = true;
+  billed.title = 'What the client gets billed (cost + markup)';
+  billed.value = 'bills $0.00';
+  mkwrap.parentNode.insertBefore(billed, mkwrap.nextSibling);
+
+  var mkEl = document.getElementById('qa-mk');
+  function pct(){ var v = parseFloat(mkEl.value); return isNaN(v)?0:Math.max(0,Math.min(100,v)); }
+  function paintBilled(){
+    var c = parseFloat(amtEl.value||0)||0;
+    billed.value = 'bills $' + (c*(1+pct()/100)).toFixed(2);
+  }
+  function mkDefaults(){
+    try { return JSON.parse(localStorage.getItem('matMkDefaults')||'{}'); } catch(e){ return {}; }
+  }
+  function projMarkup(name){
+    if (typeof data==='undefined') return null;
+    var p = (data.projects||[]).find(function(x){return (x.name||'')===name;});
+    if (p && p.markup!==undefined && p.markup!=='' && !isNaN(parseFloat(p.markup))) return parseFloat(p.markup);
+    return null;
+  }
+  function applyMkDefault(){
+    var key = projEl.value+'|'+kind.value;
+    var d = mkDefaults();
+    if (d[key]!=null) mkEl.value = d[key];
+    else {
+      var pm = projMarkup(projEl.value);
+      mkEl.value = (pm!=null) ? pm : (kind.value==='sub' ? 0 : 15);
+    }
+    paintBilled();
+  }
+  document.getElementById('qa-mk-up').addEventListener('click', function(){ mkEl.value = pct()+1; paintBilled(); });
+  document.getElementById('qa-mk-dn').addEventListener('click', function(){ mkEl.value = Math.max(0,pct()-1); paintBilled(); });
+  mkEl.addEventListener('input', paintBilled);
+  amtEl.addEventListener('input', paintBilled);
+  projEl.addEventListener('change', applyMkDefault);
+  kind.addEventListener('change', applyMkDefault);
+
+  // ── Reset to today + defaults each time the window opens ──
+  var _open2 = window.openMaterials;
+  window.openMaterials = async function(){
+    await _open2();
+    dateEl.value = (typeof today!=='undefined') ? today : new Date().toISOString().slice(0,10);
+    refreshStoreList();
+    if (!storeEl.value) storeEl.value = localStorage.getItem('matLastStore') || 'Home Depot';
+    applyMkDefault();
+    paintBilled();
+  };
+
+  // ── Wrap quick-add to include kind + markup, remember store & markup default ──
+  var _qadd = window.matQuickAdd;
+  window.matQuickAdd = async function(){
+    var origFetch = window.fetch;
+    // intercept the single add-batch call to enrich the item
+    window.fetch = function(url, opts){
+      if (url === '/api/materials/add-batch' && opts && opts.body){
+        try {
+          var body = JSON.parse(opts.body);
+          if (body.items && body.items.length===1){
+            body.items[0].kind = kind.value;
+            body.items[0].markupPct = pct();
+            opts.body = JSON.stringify(body);
+          }
+        } catch(e){}
+      }
+      return origFetch(url, opts);
+    };
+    try { await _qadd(); } finally { window.fetch = origFetch; }
+    var s = storeEl.value.trim();
+    if (s){ rememberStore(s); localStorage.setItem('matLastStore', s); }
+    var d = mkDefaults(); d[projEl.value+'|'+kind.value] = pct();
+    localStorage.setItem('matMkDefaults', JSON.stringify(d));
+    refreshStoreList();
+    paintBilled();
+  };
+
+  // ── SUB badges + billed hints in the list ──
+  var _render = window.renderMatList;
+  window.renderMatList = function(){
+    _render();
+    if (typeof matData==='undefined') return;
+    document.querySelectorAll('#mat-list .mat-row').forEach(function(row){
+      var mid = parseInt((row.id||'').replace('matrow-',''),10);
+      var m = matData[mid];
+      if (!m) return;
+      var desc = row.querySelector('.mat-desc');
+      if (m.kind==='sub' && desc && !desc.querySelector('.sub-chip')){
+        var chip = document.createElement('span');
+        chip.className = 'sub-chip';
+        chip.textContent = '🔧 SUB';
+        desc.insertBefore(chip, desc.firstChild);
+      }
+      var amt = row.querySelector('.mat-amt');
+      if (amt && m.markupPct!=null){
+        amt.title = 'Bills $'+(parseFloat(m.amount||0)*(1+m.markupPct/100)).toFixed(2)+' ('+m.markupPct+'% markup)';
+      }
+    });
+  };
+
+  // ── Job panels: honor per-item markup (item % → project % → 15%) ──
+  function itemPct(m, projName){
+    if (m && m.markupPct!=null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    var pm = projMarkup(projName);
+    return (pm!=null) ? pm : 15;
+  }
+  var _panel = window.renderJobPanel;
+  window.renderJobPanel = function(proj){
+    var html = _panel(proj);
+    try {
+      // recompute materials figures with per-item markup and patch the numbers in the rendered HTML
+      var ent = entriesForProjectMonth(proj, displayYear, displayMonth);
+      var allEnt = entriesForProject(proj);
+      function calc(list){
+        var sub=0, mk=0, subPay=0;
+        for (var i=0;i<list.length;i++){
+          var mats = list[i].materials||[];
+          for (var j=0;j<mats.length;j++){
+            var c = parseFloat(mats[j].cost||0)||0;
+            sub += c;
+            mk += c*(itemPct(mats[j], proj)/100);
+            if (mats[j].kind==='sub') subPay += c;
+          }
+        }
+        return {sub:sub, mk:mk, total:sub+mk, subPay:subPay};
+      }
+      var mo = calc(ent), all = calc(allEnt);
+      // month materials block
+      html = html.replace(/<div class="mat-total-row"><span class="lbl">15% Markup<\/span><span class="amt">\$[\d,.]+<\/span><\/div>/,
+        '<div class="mat-total-row"><span class="lbl">Markup (per item)</span><span class="amt">'+fmt$(mo.mk)+'</span></div>');
+      html = html.replace(/(<span class="lbl" style="color:#fff;font-weight:bold">Total Materials<\/span><span class="amt" style="color:var\(--accent\);font-weight:bold">)\$[\d,.]+(<\/span>)/,
+        '$1'+fmt$(mo.total)+'$2');
+      // all-time totals block
+      html = html.replace(/(<span class="lbl">Total Materials \(with markup\)<\/span><span>)\$[\d,.]+(<\/span>)/,
+        '$1'+fmt$(all.total)+'$2');
+      if (all.subPay>0){
+        html = html.replace(/(<div class="tot-row"><span class="lbl">Total Materials \(with markup\)<\/span><span>[^<]+<\/span><\/div>)/,
+          '$1<div class="tot-row" style="color:#ffce7a;font-size:12px"><span class="lbl">↳ incl. Sub payments (cost)</span><span>'+fmt$(all.subPay)+'</span></div>');
+      }
+      // grand total + balance due need recompute: labor(all) + all.total
+      var rate = billingRate(proj), oosR = oosRateFor(proj);
+      var labor = 0;
+      for (var k=0;k<allEnt.length;k++){
+        var crew = allEnt[k].crew||[];
+        for (var c2=0;c2<crew.length;c2++){
+          var cc=crew[c2];
+          if (cc.outOfScope) labor += parseFloat(cc.hours||0)*oosR;
+          else labor += parseFloat(cc.hours||0)*rate + parseFloat(cc.oosHours||0)*oosR;
+        }
+      }
+      var grand = labor + all.total;
+      var paid = (((typeof data!=='undefined'?data.payments:null)||{})[proj]||[]).reduce(function(s,p){return s+parseFloat(p.amount||0);},0);
+      var due = grand - paid;
+      html = html.replace(/(<div class="tot-row grand"><span class="lbl">GRAND TOTAL<\/span><span>)\$[\d,.]+(<\/span>)/,
+        '$1'+fmt$(grand)+'$2');
+      html = html.replace(/(<span class="amt (?:paid)?\s?">?)\$[\d,.]+( ?✓?<\/span>)/,'');
+      html = html.replace(/<span class="amt ([^"]*)">\$[\d,.]+(\s*✓)?<\/span>/,
+        '<span class="amt '+(due<=0?'paid':'')+'">'+fmt$(Math.abs(due))+(due<=0?' ✓':'')+'</span>');
+    } catch(e){ /* if patching fails, fall back to original html untouched */ }
+    return html;
+  };
+
+  refreshStoreList();
+  applyMkDefault();
+})();
+</script>
 </body>
 </html>
 
