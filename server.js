@@ -196,7 +196,7 @@ Moises (Moi), Abner (Ab), Chemo, Chepey, Isreal
 
 BILLING RATES VARY BY PROJECT — always confirm rate before calculating.
 Common rates: $110/hr, $120/hr, $125/hr
-Materials & subs markup: Logged material/sub items may carry their own "markupPct" (a percent number) and a "kind" ("material" or "sub"). PRIORITY: (1) if an item has markupPct, bill that line at cost x (1 + markupPct/100); (2) otherwise use the project's "markup" field; (3) otherwise no markup unless Walt specifies. Subcontractor payments (kind "sub") are billed the same way using their own markupPct — never assume subs get the materials markup. Show marked-up amounts on client documents; never reveal the raw cost or the markup % to the client.
+Materials & subs markup: Logged material/sub items may carry their own "markupPct" (a percent number) and a "kind" ("material" or "sub"). PRIORITY for MATERIALS: (1) item's own markupPct if present; (2) the project's "markup" field; (3) otherwise no markup unless Walt specifies. PRIORITY for SUBS (kind "sub"): (1) item's own markupPct if present; (2) the project's "subMarkup" field; (3) otherwise NO markup on subs. Subcontractor payments (kind "sub") are billed the same way using their own markupPct — never assume subs get the materials markup. Show marked-up amounts on client documents; never reveal the raw cost or the markup % to the client.
 Out-of-scope rate: Each project may have an "oosRate" field ($/hr billed to client for OOS/extra work). Use it for OOS line items on invoices. If not set, fall back to the project's regular "rate".
 
 APPOINTMENTS: Use save_appointment when Walt mentions a meeting/appointment/scheduled event. Use cancel_appointment (with the id from the lists above) when he cancels one. When he asks "what's my day look like" or "what's my schedule", summarize TODAY'S APPOINTMENTS conversationally. If a requested appointment time is vague ("this afternoon"), ask for a specific time before saving.
@@ -314,7 +314,7 @@ CLIENTS:
 ${(data.clients||[]).map(c => `- ${c.name}${c.phone?" | "+c.phone:""}${c.email?" | "+c.email:""}${c.address?" | "+c.address:""}${c.notes?" | Notes: "+c.notes:""}`).join("\n") || "None on file"}
 
 PROJECTS:
-${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
+${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${(p.subMarkup!==undefined&&p.subMarkup!=="")?" | Subs Markup: "+p.subMarkup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
 
 CREW:
 ${(data.crew||[]).map(c => `- ${c.name}${c.nickname?" ("+c.nickname+")":""}${c.role?" | "+c.role:""}${c.hourlyRate?" | Pay: $"+c.hourlyRate+"/hr":""}${c.phone?" | "+c.phone:""}${c.notes?" | "+c.notes:""}`).join("\n") || "None on file"}
@@ -1447,4 +1447,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
+
 
