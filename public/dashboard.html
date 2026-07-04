@@ -2038,5 +2038,50 @@ function cwInitListeners(){
   setInterval(apptLoad, 60000);
   window.addEventListener('focus', apptLoad);
 })();
+</script><!-- ══ MODEL TOGGLE (dashboard) — Opus / Sonnet switch in the header ══ -->
+<script>
+(function(){
+  var hdr = document.querySelector('.header-btns');
+  if (!hdr) return;
+  var btn = document.createElement('button');
+  btn.id = 'model-toggle-dash';
+  btn.className = 'hbtn';
+  btn.style.cssText = 'font-weight:bold;white-space:nowrap';
+  btn.textContent = '…';
+  btn.title = 'Chat brain — click to switch';
+  hdr.insertBefore(btn, hdr.firstChild);
+
+  var current = 'claude-opus-4-8';
+  function paint(){
+    if (current === 'claude-sonnet-4-6'){
+      btn.textContent = '⚡ Sonnet';
+      btn.title = 'Sonnet — fast & cheap (~5x less per message). Click for Opus.';
+      btn.style.color = '#7ec8e3';
+    } else {
+      btn.textContent = '🧠 Opus';
+      btn.title = 'Opus — max brainpower, max cost. Click for Sonnet.';
+      btn.style.color = '#e8a020';
+    }
+  }
+  async function load(){
+    try {
+      var r = await fetch('/api/model');
+      var d = await r.json();
+      current = d.model || 'claude-opus-4-8';
+    } catch(e) {}
+    paint();
+  }
+  btn.addEventListener('click', async function(){
+    var next = current === 'claude-opus-4-8' ? 'claude-sonnet-4-6' : 'claude-opus-4-8';
+    btn.textContent = '…';
+    try {
+      var r = await fetch('/api/model', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model: next }) });
+      var d = await r.json();
+      if (d.ok) current = next;
+    } catch(e) {}
+    paint();
+  });
+  load();
+})();
 </script></body>
 </html>
