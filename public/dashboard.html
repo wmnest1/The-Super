@@ -2522,6 +2522,305 @@ function cwInitListeners(){
   });
 })();
 </script>
+<!-- ══ MATERIALS UPGRADE — project colors, quick-add row, screenshot parsing ══ -->
+<script>
+(function(){
+  var EXP_CATS = ['Tools','Fuel','Truck/Vehicle','Safety/PPE','General Supplies','Permits/Fees','Other'];
+
+  // ── CSS ──
+  var st = document.createElement('style');
+  st.textContent = ''
+  +'#mat-qa{background:var(--panel);border-bottom:2px solid #2a3a5e;padding:8px 20px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}'
+  +'#mat-qa input,#mat-qa select{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px}'
+  +'#mat-qa input:focus,#mat-qa select:focus{border-color:var(--accent);outline:none}'
+  +'#mat-qa .qa-add{background:var(--accent);border:none;border-radius:6px;color:#1a1a2e;padding:7px 16px;font-size:12px;font-weight:bold;cursor:pointer;white-space:nowrap}'
+  +'#mat-qa .qa-add:hover{background:#c8881a}'
+  +'#mat-qa.dragover{outline:2px dashed var(--accent);outline-offset:-4px;background:#1a2a10}'
+  +'#mat-qa-hint{font-size:11px;color:#667;white-space:nowrap}'
+  +'#mat-stage{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(6,10,20,.92);z-index:50;display:none;flex-direction:column;padding:20px}'
+  +'#mat-stage.open{display:flex}'
+  +'.stage-box{background:var(--panel);border:2px solid var(--accent);border-radius:12px;flex:1;display:flex;flex-direction:column;overflow:hidden;max-width:1100px;margin:0 auto;width:100%}'
+  +'.stage-hdr{padding:12px 18px;border-bottom:1px solid #2a3a5e;display:flex;justify-content:space-between;align-items:center}'
+  +'.stage-hdr h3{font-size:14px;color:var(--accent);margin:0}'
+  +'.stage-body{flex:1;overflow-y:auto;padding:10px 18px}'
+  +'.stage-row{display:grid;grid-template-columns:24px 130px 110px 90px 1fr 80px 100px;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #1a2a3a}'
+  +'.stage-row.hdr{font-size:10px;color:#778;text-transform:uppercase;border-bottom:1px solid #2a3a5e}'
+  +'.stage-row input,.stage-row select{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:5px;color:var(--text);padding:4px 6px;font-size:11px;width:100%}'
+  +'.stage-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent)}'
+  +'.stage-row.dup{opacity:.55}'
+  +'.dup-tag{font-size:9px;color:#e8a020;font-weight:bold}'
+  +'.stage-ftr{padding:12px 18px;border-top:1px solid #2a3a5e;display:flex;gap:10px;justify-content:flex-end;align-items:center}'
+  +'.stage-btn{border:none;border-radius:7px;padding:8px 18px;font-size:13px;font-weight:bold;cursor:pointer}'
+  +'.stage-btn.go{background:var(--accent);color:#1a1a2e}'
+  +'.stage-btn.no{background:#1a3060;color:#aac;border:1px solid #2a3a5e}'
+  +'#mat-colorpop{position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--accent);border-radius:8px;padding:8px;display:none;box-shadow:0 6px 20px rgba(0,0,0,.5)}'
+  +'#mat-colorpop .cp-sw{display:inline-block;width:20px;height:20px;border-radius:4px;cursor:pointer;margin:2px;border:1px solid rgba(255,255,255,.25);vertical-align:middle}'
+  +'#mat-colorpop .cp-reset{display:block;margin-top:6px;font-size:11px;color:#8ac;cursor:pointer;text-align:center}'
+  +'#mat-colorpop .cp-reset:hover{color:#fff}'
+  +'html.light #mat-qa{background:#fff;border-color:#dde}'
+  +'html.light #mat-qa input,html.light #mat-qa select{background:#f8f8f8;border-color:#ccc;color:#111}'
+  +'html.light .stage-box{background:#fff}'
+  +'html.light .stage-row input,html.light .stage-row select{background:#f8f8f8;border-color:#ccc;color:#111}';
+  document.head.appendChild(st);
+
+  // ── PART 1: Colors — inherit from project, allow per-panel override ──
+  window.getMatColor = function(proj, colorMap){
+    if (typeof data !== 'undefined' && data.matColors && data.matColors[proj]) return data.matColors[proj];
+    if (proj === '__general__') return '#445566';
+    if (typeof jobColor === 'function') return jobColor(proj);
+    return '#1a5fa8';
+  };
+
+  var pop = document.createElement('div');
+  pop.id = 'mat-colorpop';
+  document.body.appendChild(pop);
+  var popProj = null;
+
+  function openColorPop(proj, x, y){
+    popProj = proj;
+    var pal = (typeof appPalette!=='undefined') ? appPalette : ['#cc4444','#e8720c','#e8c020','#2a9a2a','#1a8a8a','#1a5fa8','#6b2fbe','#b02080'];
+    pop.innerHTML = pal.map(function(c){
+      return '<span class="cp-sw" style="background:'+c+'" data-c="'+c+'"></span>';
+    }).join('') + '<span class="cp-reset">↺ Reset to project color</span>';
+    pop.style.left = Math.min(x, window.innerWidth-200)+'px';
+    pop.style.top = Math.min(y, window.innerHeight-120)+'px';
+    pop.style.display = 'block';
+  }
+  pop.addEventListener('click', async function(e){
+    if (!popProj) return;
+    if (typeof data === 'undefined') return;
+    if (!data.matColors) data.matColors = {};
+    if (e.target.classList.contains('cp-sw')){
+      data.matColors[popProj] = e.target.getAttribute('data-c');
+    } else if (e.target.classList.contains('cp-reset')){
+      delete data.matColors[popProj];
+    } else return;
+    pop.style.display = 'none';
+    await saveAll();
+    renderMatList();
+  });
+  document.addEventListener('click', function(e){
+    if (pop.style.display==='block' && !pop.contains(e.target) && !e.target.classList.contains('mat-badge')) pop.style.display='none';
+  });
+  // Click a project badge in the list → color picker
+  var matListEl = document.getElementById('mat-list');
+  if (matListEl) matListEl.addEventListener('click', function(e){
+    var b = e.target.closest('.mat-badge');
+    if (!b) return;
+    var row = b.closest('.mat-row');
+    if (!row) return;
+    var mid = parseInt((row.id||'').replace('matrow-',''),10);
+    var m = (typeof matData!=='undefined') ? matData[mid] : null;
+    if (!m) return;
+    e.stopPropagation();
+    openColorPop(m.project, e.clientX, e.clientY);
+  });
+
+  // ── PART 2: Quick-add row ──
+  var panel = document.getElementById('mat-panel');
+  var fbar = panel ? panel.querySelector('.mat-fbar') : null;
+  if (!panel || !fbar) return;
+  panel.style.position = 'relative';
+
+  var qa = document.createElement('div');
+  qa.id = 'mat-qa';
+  qa.innerHTML = '<strong style="color:var(--accent);font-size:12px;white-space:nowrap">+ Log purchase</strong>'
+    + '<select id="qa-proj" style="min-width:120px"></select>'
+    + '<select id="qa-cat" style="display:none;min-width:100px">'+EXP_CATS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>'
+    + '<input type="date" id="qa-date">'
+    + '<input type="text" id="qa-store" placeholder="Store" style="width:100px">'
+    + '<input type="text" id="qa-desc" placeholder="Description / location / Txn#" style="flex:1;min-width:140px">'
+    + '<input type="number" id="qa-amt" placeholder="$0.00" step="0.01" min="0" style="width:85px">'
+    + '<input type="text" id="qa-inv" placeholder="Invoice#" style="width:90px">'
+    + '<button class="qa-add" onclick="matQuickAdd()">➕ Add</button>'
+    + '<span id="mat-qa-hint">or drag / paste a receipt screenshot here 📷</span>';
+  fbar.parentNode.insertBefore(qa, fbar.nextSibling);
+
+  function fillQaProjects(){
+    var sel = document.getElementById('qa-proj');
+    var cur = sel.value;
+    var projs = (typeof matProjects!=='undefined' && matProjects.length) ? matProjects
+      : (typeof data!=='undefined' ? (data.projects||[]).map(function(p){return p.name;}) : []);
+    sel.innerHTML = projs.map(function(p){return '<option value="'+p.replace(/"/g,'&quot;')+'">'+p+'</option>';}).join('')
+      + '<option value="__general__">⬛ General Expense</option>';
+    var last = localStorage.getItem('matQaLast');
+    if (last){ try{ last=JSON.parse(last); if(last.proj) sel.value=last.proj; if(last.store) document.getElementById('qa-store').value=last.store; }catch(e){} }
+    if (cur) sel.value = cur;
+    toggleCat();
+  }
+  function toggleCat(){
+    document.getElementById('qa-cat').style.display = document.getElementById('qa-proj').value==='__general__' ? '' : 'none';
+  }
+  document.getElementById('qa-proj').addEventListener('change', toggleCat);
+  document.getElementById('qa-date').value = (typeof today!=='undefined') ? today : new Date().toISOString().slice(0,10);
+
+  // repopulate project list every time the panel opens
+  var _origOpenMat = window.openMaterials;
+  window.openMaterials = async function(){
+    await _origOpenMat();
+    fillQaProjects();
+  };
+
+  window.matQuickAdd = async function(){
+    var proj = document.getElementById('qa-proj').value;
+    var isGen = proj === '__general__';
+    var item = {
+      isGeneral: isGen,
+      project: proj,
+      category: isGen ? document.getElementById('qa-cat').value : undefined,
+      date: document.getElementById('qa-date').value,
+      store: document.getElementById('qa-store').value.trim(),
+      description: document.getElementById('qa-desc').value.trim(),
+      amount: parseFloat(document.getElementById('qa-amt').value || 0),
+      invoiceNum: document.getElementById('qa-inv').value.trim()
+    };
+    if (!item.amount && !item.description){ alert('Enter at least a description or amount'); return; }
+    // duplicate check
+    var dup = (typeof matData!=='undefined') && matData.some(function(m){
+      if (item.invoiceNum && m.invoiceNum && m.invoiceNum === item.invoiceNum) return true;
+      return m.date===item.date && Math.abs(parseFloat(m.amount||0)-item.amount)<0.005 && (m.store||'').toLowerCase()===(item.store||'').toLowerCase() && item.amount>0;
+    });
+    if (dup && !confirm('⚠️ This looks like a duplicate of an existing entry (same invoice# or same date/store/amount). Add anyway?')) return;
+    try {
+      var r = await fetch('/api/materials/add-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:[item]})});
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.error||'Add failed');
+      localStorage.setItem('matQaLast', JSON.stringify({proj:proj, store:item.store}));
+      document.getElementById('qa-desc').value='';
+      document.getElementById('qa-amt').value='';
+      document.getElementById('qa-inv').value='';
+      await loadMaterials();
+      fillQaProjects();
+      document.getElementById('qa-desc').focus();
+    } catch(e){ alert('Add failed: '+e.message); }
+  };
+  qa.addEventListener('keydown', function(e){
+    if (e.key==='Enter' && e.target.tagName==='INPUT'){ e.preventDefault(); matQuickAdd(); }
+  });
+
+  // ── PART 3: Screenshot → parse → staging table ──
+  var stage = document.createElement('div');
+  stage.id = 'mat-stage';
+  panel.appendChild(stage);
+  var stagedRows = [];
+
+  function compressImage(file, cb){
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var img = new Image();
+      img.onload = function(){
+        var MAX=2000, w=img.width, h=img.height;
+        if (w>MAX||h>MAX){ var r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        cb(cv.toDataURL('image/jpeg',.85).split(',')[1]);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function parseScreenshot(file){
+    stage.classList.add('open');
+    stage.innerHTML = '<div class="stage-box"><div class="stage-hdr"><h3>🤖 Reading screenshot…</h3></div><div class="stage-body" style="display:flex;align-items:center;justify-content:center;color:#778;font-size:14px">Extracting purchases — a few seconds…</div></div>';
+    compressImage(file, async function(b64){
+      try {
+        var r = await fetch('/api/materials/parse-image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageData:b64,imageType:'image/jpeg'})});
+        var d = await r.json();
+        if (!d.ok) throw new Error(d.error||'Parse failed');
+        if (!d.rows.length) throw new Error('No purchases found in that screenshot');
+        stagedRows = d.rows.map(function(row){
+          var isDup = (typeof matData!=='undefined') && matData.some(function(m){
+            if (row.invoiceNum && m.invoiceNum && m.invoiceNum===row.invoiceNum) return true;
+            return row.date && m.date===row.date && Math.abs(parseFloat(m.amount||0)-row.amount)<0.005 && row.amount>0;
+          });
+          return { checked:!isDup, dup:isDup, project:'Unsorted Materials',
+            date: row.date || ((typeof today!=='undefined')?today:new Date().toISOString().slice(0,10)),
+            store: row.store||'', description: row.description||'', amount: row.amount||0, invoiceNum: row.invoiceNum||'' };
+        });
+        renderStage();
+      } catch(e){
+        stage.innerHTML = '<div class="stage-box"><div class="stage-hdr"><h3>⚠️ '+e.message+'</h3></div><div class="stage-ftr"><button class="stage-btn no" onclick="document.getElementById(\'mat-stage\').classList.remove(\'open\')">Close</button></div></div>';
+      }
+    });
+  }
+
+  function renderStage(){
+    var projs = (typeof matProjects!=='undefined'&&matProjects.length) ? matProjects.slice() : [];
+    if (projs.indexOf('Unsorted Materials')===-1) projs.push('Unsorted Materials');
+    var opts = projs.map(function(p){return '<option value="'+p.replace(/"/g,'&quot;')+'">'+p+'</option>';}).join('')+'<option value="__general__">⬛ General</option>';
+    var rowsHtml = stagedRows.map(function(r,i){
+      return '<div class="stage-row'+(r.dup?' dup':'')+'">'
+        +'<input type="checkbox" '+(r.checked?'checked':'')+' onchange="stagedRows['+i+'].checked=this.checked">'
+        +'<span><select onchange="stagedRows['+i+'].project=this.value" data-v="'+r.project+'">'+opts+'</select>'+(r.dup?'<span class="dup-tag">possible dup</span>':'')+'</span>'
+        +'<input type="date" value="'+r.date+'" onchange="stagedRows['+i+'].date=this.value">'
+        +'<input type="text" value="'+(r.store||'').replace(/"/g,'&quot;')+'" onchange="stagedRows['+i+'].store=this.value">'
+        +'<input type="text" value="'+(r.description||'').replace(/"/g,'&quot;')+'" onchange="stagedRows['+i+'].description=this.value">'
+        +'<input type="number" step="0.01" value="'+r.amount+'" onchange="stagedRows['+i+'].amount=parseFloat(this.value)||0">'
+        +'<input type="text" value="'+(r.invoiceNum||'').replace(/"/g,'&quot;')+'" onchange="stagedRows['+i+'].invoiceNum=this.value">'
+        +'</div>';
+    }).join('');
+    stage.innerHTML = '<div class="stage-box">'
+      +'<div class="stage-hdr"><h3>📷 Found '+stagedRows.length+' purchases — review, fix, uncheck any bad ones</h3>'
+      +'<span style="font-size:11px;color:#778">grayed rows look like duplicates of entries already logged</span></div>'
+      +'<div class="stage-body">'
+      +'<div class="stage-row hdr"><span></span><span>Project</span><span>Date</span><span>Store</span><span>Description</span><span>Amount</span><span>Invoice#</span></div>'
+      + rowsHtml
+      +'</div>'
+      +'<div class="stage-ftr">'
+      +'<span id="stage-status" style="font-size:12px;color:#8c8;margin-right:auto"></span>'
+      +'<button class="stage-btn no" onclick="document.getElementById(\'mat-stage\').classList.remove(\'open\')">Cancel</button>'
+      +'<button class="stage-btn go" onclick="stageCommit()">✅ Add checked items</button>'
+      +'</div></div>';
+    // set select values (can't via value attr in innerHTML reliably)
+    stage.querySelectorAll('select[data-v]').forEach(function(s){ s.value = s.getAttribute('data-v'); if(!s.value) s.value='Unsorted Materials'; });
+    window.stagedRows = stagedRows;
+  }
+  window.stagedRows = stagedRows;
+
+  window.stageCommit = async function(){
+    var items = stagedRows.filter(function(r){return r.checked;}).map(function(r){
+      return { isGeneral: r.project==='__general__', project: r.project, category: 'Other',
+        date: r.date, store: r.store, description: r.description, amount: r.amount, invoiceNum: r.invoiceNum };
+    });
+    if (!items.length){ alert('Nothing checked'); return; }
+    var el = document.getElementById('stage-status');
+    if (el) el.textContent = 'Adding '+items.length+'…';
+    try {
+      var r = await fetch('/api/materials/add-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items})});
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.error||'Add failed');
+      stage.classList.remove('open');
+      await loadMaterials();
+      fillQaProjects();
+    } catch(e){ if (el){ el.textContent='Failed: '+e.message; el.style.color='#e88'; } }
+  };
+
+  // Drag & drop + paste targets
+  ['dragover','dragenter'].forEach(function(ev){
+    qa.addEventListener(ev, function(e){ e.preventDefault(); qa.classList.add('dragover'); });
+    panel.addEventListener(ev, function(e){ e.preventDefault(); });
+  });
+  ['dragleave','drop'].forEach(function(ev){ qa.addEventListener(ev, function(){ qa.classList.remove('dragover'); }); });
+  function handleDrop(e){
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && f.type.indexOf('image/')===0) parseScreenshot(f);
+  }
+  qa.addEventListener('drop', handleDrop);
+  panel.addEventListener('drop', handleDrop);
+  document.addEventListener('paste', function(e){
+    if (!panel.classList.contains('open')) return;
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i=0;i<items.length;i++){
+      if (items[i].type.indexOf('image/')===0){ parseScreenshot(items[i].getAsFile()); e.preventDefault(); return; }
+    }
+  });
+
+  fillQaProjects();
+})();
+</script>
 </body>
 </html>
 
