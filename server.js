@@ -1058,7 +1058,7 @@ function buildProposalPage(record, opts) {
           const btn = document.getElementById('accept-btn');
           btn.disabled = true; btn.textContent = 'Submitting…';
           try {
-            const resp = await fetch(window.location.pathname + '/accept', {
+            const resp = await fetch('/api/proposal/${record.id}/accept', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name, email })
@@ -1087,6 +1087,16 @@ function buildProposalPage(record, opts) {
   body{font-family:Arial,sans-serif;background:#eef1f5;margin:0;padding:24px 12px;}
   .wrap{max-width:820px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);padding:8px 8px 32px;}
   .topbar{padding:16px 24px;border-bottom:1px solid #eee;font-size:13px;color:#888;}
+  @media (max-width: 640px) {
+    body{padding:0;}
+    .wrap{border-radius:0;}
+    .wrap div[style]{padding:12px !important;}
+    .wrap div[style*="display:flex"]{flex-wrap:wrap !important;}
+    .wrap div[style*="text-align:right"]{text-align:left !important;margin-top:10px;}
+    .wrap table{width:100% !important;font-size:12px !important;}
+    .wrap th, .wrap td{padding:6px 4px !important;word-break:break-word;}
+    .wrap h1{font-size:19px !important;}
+  }
 </style>
 </head>
 <body>
@@ -1787,4 +1797,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
-
