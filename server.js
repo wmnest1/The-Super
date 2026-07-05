@@ -91,6 +91,7 @@ const EMPTY_DATA = () => ({
   appointments: [],
   payments: {},
   nextInvoiceNumber: 1001,
+  proposals: [],
 });
 
 let _client = null;
@@ -116,7 +117,14 @@ async function loadData() {
   if (!doc.nextInvoiceNumber) doc.nextInvoiceNumber = 1001;
   if (!doc.entries) doc.entries = [];
   if (!doc.appointments) doc.appointments = [];
+  if (!doc.proposals) doc.proposals = [];
   return doc;
+}
+
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://the-super-1.onrender.com";
+
+function makeProposalToken() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 }
 
 async function saveData(data) {
@@ -263,6 +271,14 @@ EMAIL CAPABILITIES:
 - The email body (email_body field) should be a short, professional, friendly message — 3-4 sentences max. Always address client by first name. For invoices: mention the total amount due and payment instructions (check payable to Mullins Construction or Zelle). For proposals: mention the job address and invite them to reply with questions.
 - PDF filename format: "Invoice-[number]-[ClientLastName].pdf" or "Proposal-[JobName]-[Date].pdf"
 - After sending confirm: "✅ Email sent to [email] with PDF attachment: [filename]"
+
+E-SIGNATURE PROPOSALS:
+- For PROPOSALS ONLY (never invoices), Walt can also send a signable link instead of a plain PDF, using the send_proposal_link tool. The client opens a webpage showing the proposal, checks authorization boxes, and clicks Accept — Walt sees the status update on the job's dashboard panel automatically (sent → viewed → accepted, with timestamps).
+- Default to send_email (PDF attachment) unless Walt specifically asks for e-signature, a signable link, online acceptance, or says something like "send it for signature" / "let them approve it online" / "send a link they can sign."
+- Workflow is the same as send_email: generate the proposal HTML first, confirm the destination email, then call send_proposal_link only after Walt confirms with yes/send/go ahead.
+- The html_body passed to send_proposal_link should be the same complete proposal HTML you would otherwise email as a PDF — it will be shown to the client on the acceptance page, plus an Accept Proposal control appended automatically by the server. Do not add your own accept/signature block to the HTML.
+- email_body should briefly invite the client to review and accept online — do not mention a PDF attachment since none is sent.
+- After sending confirm: "✅ Signable proposal link sent to [email] — you'll see it update to Viewed and Accepted on the [project] job panel."
 
 HOW YOU RESPOND:
 - Plain English, direct, no fluff
@@ -549,6 +565,23 @@ const TOOLS = [
         pdf_filename: { type: "string", description: "Filename for the PDF attachment, e.g. 'Invoice-1006-Cooney.pdf' or 'Proposal-Cooney-Kitchen.pdf'" }
       },
       required: ["to_email", "subject", "html_body"]
+    }
+  },
+  {
+    name: "send_proposal_link",
+    description: `Send a PROPOSAL (never an invoice) to a client as a secure e-signature link instead of a PDF attachment. Use only when Walt specifically asks for e-signature / a signable link / online acceptance — e.g. "send this for signature", "let them approve it online", "send a link they can accept". Otherwise keep using send_email for proposals. The client receives an email with a "Review Proposal" button that opens a webpage showing the proposal content with checkboxes and an Accept Proposal button. Walt will see live status (sent/viewed/accepted, with timestamps) on that project's dashboard job panel. Always confirm before sending: "Ready to send [client] a signable proposal link at [email] — shall I send it?" Then send only after Walt confirms.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project/job name this proposal is for. Match to an existing project name if possible." },
+        to_email: { type: "string", description: "Client's email address." },
+        to_name: { type: "string", description: "Client's full name." },
+        client_name: { type: "string", description: "Client's first name for the email greeting." },
+        subject: { type: "string", description: "Email subject line, e.g. 'Proposal — Kitchen Remodel — Mullins Construction'" },
+        html_body: { type: "string", description: "Complete HTML content of the proposal exactly as generated — this is what the client will see and accept. Do not simplify, strip, or add your own signature block to it." },
+        email_body: { type: "string", description: "Short 2-3 sentence friendly email message inviting the client to review and accept the proposal online. Mention the job address. Do not mention a PDF attachment." }
+      },
+      required: ["project", "to_email", "subject", "html_body"]
     }
   },
   {
@@ -887,6 +920,60 @@ async function executeTool(toolName, input, data) {
         return { success: false, error: e.message };
       }
     }
+    case "send_proposal_link": {
+      try {
+        const token = makeProposalToken();
+        const record = {
+          id: token,
+          project: input.project,
+          clientName: input.to_name || input.client_name || "",
+          clientEmail: input.to_email,
+          subject: input.subject,
+          htmlBody: input.html_body,
+          status: "sent",
+          sentDate: new Date().toISOString(),
+          viewedDates: [],
+          acceptedBy: null,
+          acceptedEmail: null,
+          acceptedIP: null,
+          acceptedAt: null,
+          acceptedSnapshot: null
+        };
+        if (!data.proposals) data.proposals = [];
+        data.proposals.push(record);
+
+        const link = `${PUBLIC_BASE_URL}/proposal/${token}`;
+        const firstName = input.client_name || (input.to_name ? input.to_name.split(" ")[0] : "there");
+        const bodyHtml = emailWrapper(`
+          <div style="padding:30px;font-family:Arial,sans-serif;font-size:15px;color:#333;line-height:1.6;">
+            <p>Hi ${firstName},</p>
+            <p>${input.email_body || "Mullins Construction has prepared your proposal. Please review it and let us know if you have any questions."}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="background:#1a5fa8;border-radius:6px">
+              <a href="${link}" style="display:inline-block;padding:14px 28px;color:#fff;text-decoration:none;font-weight:bold;font-size:15px">Review Proposal</a>
+            </td></tr></table>
+            <p style="font-size:13px;color:#888">If the button doesn't work, copy and paste this link into your browser:<br>${link}</p>
+            <p>Thank you,<br>
+            <strong>Walt Mullins</strong><br>
+            Mullins Construction Inc.<br>
+            License #855578<br>
+            408-569-3434</p>
+          </div>
+        `);
+        const toField = input.to_name ? `${input.to_name} <${input.to_email}>` : input.to_email;
+        await emailTransporter.sendMail({
+          from: `"Mullins Construction Inc." <${process.env.YAHOO_EMAIL}>`,
+          to: toField,
+          subject: input.subject,
+          html: bodyHtml,
+          text: `${input.email_body || "Please review your proposal."}\n\nReview it here: ${link}`
+        });
+        return { ok: true, action: "created", type: "proposal", data: record,
+          message: `Proposal link sent to ${input.to_email}. Walt can track viewed/accepted status on the ${input.project} job panel.` };
+      } catch (e) {
+        console.error("send_proposal_link error:", e.message);
+        return { ok: false, error: e.message };
+      }
+    }
     default:
       return { ok: false, error: "Unknown tool: " + toolName };
   }
@@ -929,6 +1016,154 @@ app.post('/api/send-email', async (req, res) => {
   } catch (e) {
     console.error('Email error:', e);
     res.status(500).json({ error: e.message });
+  }
+});
+
+// ── E-signature proposal page ──
+function buildProposalPage(record, opts) {
+  const { alreadyAccepted } = opts;
+  const acceptedAtDisplay = record.acceptedAt
+    ? new Date(record.acceptedAt).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+    : "";
+  const actionBlock = alreadyAccepted
+    ? `<div style="margin-top:32px;padding:20px 24px;background:#eafbea;border:1px solid #b6e6b6;border-radius:8px;font-family:Arial,sans-serif;">
+        <div style="font-size:16px;font-weight:bold;color:#1a7a1a;margin-bottom:6px;">✓ Signed</div>
+        <div style="font-size:14px;color:#333;">Accepted by <strong>${(record.acceptedBy || record.acceptedEmail || "").replace(/</g,"&lt;")}</strong> on ${acceptedAtDisplay}.</div>
+        <div style="font-size:12px;color:#888;margin-top:8px;">This proposal has been signed and is locked. Contact Mullins Construction with any questions.</div>
+      </div>`
+    : `<div id="accept-block" style="margin-top:32px;padding:24px;background:#f7f9fc;border:1px solid #dbe3ee;border-radius:8px;font-family:Arial,sans-serif;">
+        <div style="font-size:16px;font-weight:bold;color:#222;margin-bottom:14px;">Proposal Acceptance</div>
+        <label style="display:block;font-size:14px;color:#333;margin-bottom:10px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I have reviewed this proposal.</label>
+        <label style="display:block;font-size:14px;color:#333;margin-bottom:10px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I approve the scope of work and pricing shown above.</label>
+        <label style="display:block;font-size:14px;color:#333;margin-bottom:16px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I authorize Mullins Construction Inc. to proceed with the work described above.</label>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;color:#666;margin-bottom:4px;">Your Name</div>
+          <input id="accept-name" type="text" placeholder="Full name" style="width:100%;max-width:320px;padding:9px 10px;border:1px solid #ccc;border-radius:5px;font-size:14px;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;color:#666;margin-bottom:4px;">Your Email</div>
+          <input id="accept-email" type="email" placeholder="you@example.com" style="width:100%;max-width:320px;padding:9px 10px;border:1px solid #ccc;border-radius:5px;font-size:14px;box-sizing:border-box;">
+        </div>
+        <button id="accept-btn" onclick="submitAcceptance()" style="background:#1a5fa8;color:#fff;border:none;border-radius:6px;padding:13px 26px;font-size:15px;font-weight:bold;cursor:pointer;">Accept Proposal</button>
+        <div id="accept-error" style="color:#c0392b;font-size:13px;margin-top:10px;display:none;"></div>
+      </div>
+      <script>
+        async function submitAcceptance(){
+          const boxes = document.querySelectorAll('.accept-chk');
+          for (const b of boxes) if (!b.checked) { showErr('Please check all three boxes before accepting.'); return; }
+          const name = document.getElementById('accept-name').value.trim();
+          const email = document.getElementById('accept-email').value.trim();
+          if (!name) { showErr('Please enter your name.'); return; }
+          if (!email) { showErr('Please enter your email.'); return; }
+          const btn = document.getElementById('accept-btn');
+          btn.disabled = true; btn.textContent = 'Submitting…';
+          try {
+            const resp = await fetch(window.location.pathname + '/accept', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, email })
+            });
+            const j = await resp.json();
+            if (!resp.ok || !j.ok) throw new Error(j.error || 'Something went wrong.');
+            window.location.reload();
+          } catch (e) {
+            showErr(e.message || 'Something went wrong — please try again.');
+            btn.disabled = false; btn.textContent = 'Accept Proposal';
+          }
+        }
+        function showErr(msg){
+          const el = document.getElementById('accept-error');
+          el.textContent = msg; el.style.display = 'block';
+        }
+      </script>`;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proposal — Mullins Construction Inc.</title>
+<style>
+  body{font-family:Arial,sans-serif;background:#eef1f5;margin:0;padding:24px 12px;}
+  .wrap{max-width:820px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);padding:8px 8px 32px;}
+  .topbar{padding:16px 24px;border-bottom:1px solid #eee;font-size:13px;color:#888;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">Mullins Construction Inc. &middot; License #855578</div>
+    <div style="padding:24px;">
+      ${record.htmlBody}
+      ${actionBlock}
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+async function notifyWaltProposalAccepted(record) {
+  try {
+    const acceptedAtDisplay = new Date(record.acceptedAt).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    await emailTransporter.sendMail({
+      from: `"The Super" <${process.env.YAHOO_EMAIL}>`,
+      to: process.env.YAHOO_EMAIL,
+      subject: `✅ Proposal Accepted — ${record.project}`,
+      html: emailWrapper(`
+        <div style="padding:30px;font-family:Arial,sans-serif;font-size:15px;color:#333;line-height:1.6;">
+          <p><strong>${record.project}</strong> — proposal accepted.</p>
+          <p>Signed by: <strong>${record.acceptedBy}</strong> (${record.acceptedEmail})<br>
+          Date: ${acceptedAtDisplay}<br>
+          IP address: ${record.acceptedIP}</p>
+          <p>Job can be scheduled. Full accepted proposal copy is attached below.</p>
+          <hr style="border:none;border-top:1px solid #ddd;margin:20px 0;">
+          ${record.acceptedSnapshot}
+        </div>
+      `),
+      text: `${record.project} proposal accepted by ${record.acceptedBy} (${record.acceptedEmail}) on ${acceptedAtDisplay}. IP: ${record.acceptedIP}`
+    });
+  } catch (e) {
+    console.error("notifyWaltProposalAccepted error:", e.message);
+  }
+}
+
+app.get("/proposal/:token", async (req, res) => {
+  try {
+    const data = await loadData();
+    const record = (data.proposals || []).find(p => p.id === req.params.token);
+    if (!record) return res.status(404).send("<h2 style='font-family:Arial'>Proposal not found.</h2>");
+    if (record.status !== "accepted") {
+      record.viewedDates = record.viewedDates || [];
+      record.viewedDates.push(new Date().toISOString());
+      await saveData(data);
+    }
+    res.send(buildProposalPage(record, { alreadyAccepted: record.status === "accepted" }));
+  } catch (err) {
+    console.error("proposal view error:", err);
+    res.status(500).send("<h2 style='font-family:Arial'>Something went wrong loading this proposal.</h2>");
+  }
+});
+
+app.post("/api/proposal/:token/accept", async (req, res) => {
+  try {
+    const data = await loadData();
+    const record = (data.proposals || []).find(p => p.id === req.params.token);
+    if (!record) return res.status(404).json({ ok: false, error: "Proposal not found." });
+    if (record.status === "accepted") return res.json({ ok: true, alreadyAccepted: true });
+    const { name, email } = req.body || {};
+    if (!name || !email) return res.status(400).json({ ok: false, error: "Name and email are required." });
+    const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").toString().split(",")[0].trim();
+    record.status = "accepted";
+    record.acceptedBy = name;
+    record.acceptedEmail = email;
+    record.acceptedIP = ip;
+    record.acceptedAt = new Date().toISOString();
+    record.acceptedSnapshot = record.htmlBody;
+    await saveData(data);
+    notifyWaltProposalAccepted(record);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("proposal accept error:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -1552,3 +1787,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
+
