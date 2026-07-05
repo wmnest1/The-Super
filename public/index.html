@@ -518,6 +518,7 @@ Type below or hit the mic and talk to me.</div>
           <div class="field"><label>OOS Rate ($/hr to client)</label><input id="p-oosrate" type="text" placeholder="Leave blank = regular rate"></div>
           <div class="field"><label>Contract Amount ($)</label><input id="p-contract" type="text" placeholder="15000"></div>
           <div class="field" style="max-width:130px"><label>Materials Markup %</label><input id="p-markup" type="number" min="0" max="100" step="1" placeholder="0"></div>
+          <div class="field" style="max-width:130px"><label>Subs Markup %</label><input id="p-submarkup" type="number" min="0" max="100" step="1" placeholder="0"></div>
         </div>
         <div class="form-row">
           <div class="field full"><label>Scope / Notes</label><textarea id="p-notes" placeholder="Scope of work, special conditions, what's included/excluded..."></textarea></div>
@@ -1359,7 +1360,7 @@ Type below or hit the mic and talk to me.</div>
   function populateForm(tab, record) {
     const map = {
       clients:    [['c-name',record.name],['c-phone',record.phone],['c-email',record.email],['c-address',record.address],['c-notes',record.notes]],
-      projects:   [['p-name',record.name],['p-client',record.client],['p-address',record.address],['p-status',record.status],['p-start',record.startDate],['p-rate',record.rate],['p-oosrate',record.oosRate],['p-contract',record.contractAmount],['p-markup',record.markup],['p-notes',record.notes],['p-color',record.color]],
+      projects:   [['p-name',record.name],['p-client',record.client],['p-address',record.address],['p-status',record.status],['p-start',record.startDate],['p-rate',record.rate],['p-oosrate',record.oosRate],['p-contract',record.contractAmount],['p-markup',record.markup],['p-submarkup',record.subMarkup],['p-notes',record.notes],['p-color',record.color]],
       crew:       [['cr-name',record.name],['cr-nick',record.nickname],['cr-role',record.role],['cr-rate',record.hourlyRate],['cr-phone',record.phone],['cr-notes',record.notes]],
       subs:       [['s-company',record.company],['s-trade',record.trade],['s-contact',record.contact],['s-phone',record.phone],['s-email',record.email],['s-rate',record.rate],['s-cslb',record.cslbNumber],['s-cslb-exp',record.cslbExpiration],['s-gl-carrier',record.glCarrier],['s-gl-policy',record.glPolicy],['s-gl-exp',record.glExpiration],['s-gl-agent',record.glAgent],['s-wc-carrier',record.wcCarrier],['s-wc-policy',record.wcPolicy],['s-wc-exp',record.wcExpiration],['s-wc-agent',record.wcAgent],['s-notes',record.notes]],
       unitPrices: [['u-desc',record.description],['u-category',record.category],['u-unit',record.unit],['u-price',record.price],['u-notes',record.notes]]
@@ -1384,7 +1385,7 @@ Type below or hit the mic and talk to me.</div>
     }
     const maps = {
       clients:    () => ({ name:g('c-name'), phone:g('c-phone'), email:g('c-email'), address:g('c-address'), notes:g('c-notes') }),
-      projects:   () => ({ name:g('p-name'), client:g('p-client'), address:g('p-address'), status:g('p-status'), startDate:g('p-start'), rate:g('p-rate'), oosRate:g('p-oosrate'), contractAmount:g('p-contract'), markup:g('p-markup'), notes:g('p-notes'), color:g('p-color') }),
+      projects:   () => ({ name:g('p-name'), client:g('p-client'), address:g('p-address'), status:g('p-status'), startDate:g('p-start'), rate:g('p-rate'), oosRate:g('p-oosrate'), contractAmount:g('p-contract'), markup:g('p-markup'), subMarkup:g('p-submarkup'), notes:g('p-notes'), color:g('p-color') }),
       crew:       () => ({ name:g('cr-name'), nickname:g('cr-nick'), role:g('cr-role'), hourlyRate:g('cr-rate'), phone:g('cr-phone'), notes:g('cr-notes') }),
       subs:       () => ({ company:g('s-company'), trade:g('s-trade'), contact:g('s-contact'), phone:g('s-phone'), email:g('s-email'), rate:g('s-rate'), cslbNumber:g('s-cslb'), cslbExpiration:g('s-cslb-exp'), glCarrier:g('s-gl-carrier'), glPolicy:g('s-gl-policy'), glExpiration:g('s-gl-exp'), glAgent:g('s-gl-agent'), wcCarrier:g('s-wc-carrier'), wcPolicy:g('s-wc-policy'), wcExpiration:g('s-wc-exp'), wcAgent:g('s-wc-agent'), notes:g('s-notes') }),
       unitPrices: () => ({ description:g('u-desc'), category:g('u-category'), unit:g('u-unit'), price:g('u-price'), notes:g('u-notes') })
@@ -1494,7 +1495,7 @@ Type below or hit the mic and talk to me.</div>
       const badge = r.status ? `<span style="background:#0f3460;border-radius:4px;padding:1px 7px;font-size:11px;margin-left:8px;color:#aac;">${r.status}</span>` : '';
       const dot = r.color ? `<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:${r.color};margin-right:7px;vertical-align:middle;flex-shrink:0"></span>` : '';
       name = dot + (r.name || '—') + badge;
-      details = [r.client && `👤 ${r.client}`, r.address && `📍 ${r.address}`, r.startDate && `📅 Start: ${r.startDate}`, r.contractAmount && `💰 Contract: $${r.contractAmount}`, r.rate && `⏱ $${r.rate}/hr billed${(r.oosRate&&String(r.oosRate).trim()!=='')?' · OOS: $'+r.oosRate+'/hr':''}`, (r.markup !== undefined && r.markup !== '') && `🏷 Materials markup: ${r.markup}%`].filter(Boolean).join('<br>');
+      details = [r.client && `👤 ${r.client}`, r.address && `📍 ${r.address}`, r.startDate && `📅 Start: ${r.startDate}`, r.contractAmount && `💰 Contract: $${r.contractAmount}`, r.rate && `⏱ $${r.rate}/hr billed${(r.oosRate&&String(r.oosRate).trim()!=='')?' · OOS: $'+r.oosRate+'/hr':''}`, (r.markup !== undefined && r.markup !== '') && `🏷 Materials markup: ${r.markup}%`, (r.subMarkup !== undefined && r.subMarkup !== '') && `🔧 Subs markup: ${r.subMarkup}%`].filter(Boolean).join('<br>');
     } else if (tab === 'crew') {
       name = r.name + (r.nickname ? ` (${r.nickname})` : '');
       details = [r.role && `🔧 ${r.role}`, r.hourlyRate && `💵 $${r.hourlyRate}/hr`, r.phone && `📞 ${r.phone}`].filter(Boolean).join('  ·  ');
@@ -2286,133 +2287,7 @@ Type below or hit the mic and talk to me.</div>
   });
   load();
 })();
-</script><!-- ══ SUBS MARKUP % — Projects tab field (paste above </body> in index.html) ══ -->
-<script>
-(function(){
-  var FIELD_ID = 'pj-submarkup';
-
-  function findMatMarkupInput(){
-    // locate the existing MATERIALS MARKUP % label, then the input that follows it
-    var labels = document.querySelectorAll('label, div, span');
-    for (var i=0;i<labels.length;i++){
-      var t = (labels[i].textContent||'').trim().toUpperCase();
-      if (t === 'MATERIALS MARKUP %'){
-        var el = labels[i];
-        // input might be a sibling or inside the next element
-        var scope = el.parentElement;
-        var inp = null;
-        var next = el.nextElementSibling;
-        while (next && !inp){
-          inp = (next.tagName==='INPUT') ? next : next.querySelector && next.querySelector('input');
-          next = next.nextElementSibling;
-        }
-        if (!inp && scope) inp = scope.querySelector('input');
-        if (inp) return { label: el, input: inp };
-      }
-    }
-    return null;
-  }
-
-  function injectField(){
-    if (document.getElementById(FIELD_ID)) return true;
-    var found = findMatMarkupInput();
-    if (!found) return false;
-    // clone the structure: new label + new input styled identically
-    var lbl = found.label.cloneNode(false);
-    lbl.textContent = 'SUBS MARKUP %';
-    var inp = found.input.cloneNode(false);
-    inp.id = FIELD_ID;
-    inp.value = '';
-    inp.placeholder = '0';
-    // place directly after the materials markup input (same row area)
-    var anchor = found.input;
-    // wrap side-by-side if the input sits alone in a block
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'display:inline-block;margin-left:16px;vertical-align:top';
-    wrap.appendChild(lbl);
-    wrap.appendChild(document.createElement('br'));
-    wrap.appendChild(inp);
-    // make the materials markup block inline too so they sit side by side
-    var matWrap = document.createElement('div');
-    matWrap.style.cssText = 'display:inline-block;vertical-align:top';
-    anchor.parentNode.insertBefore(matWrap, found.label);
-    matWrap.appendChild(found.label);
-    matWrap.appendChild(anchor);
-    matWrap.parentNode.insertBefore(wrap, matWrap.nextSibling);
-    return true;
-  }
-
-  function currentJobName(){
-    // the JOB NAME input is the first text input after a "JOB NAME" label
-    var labels = document.querySelectorAll('label, div, span');
-    for (var i=0;i<labels.length;i++){
-      if ((labels[i].textContent||'').trim().toUpperCase()==='JOB NAME'){
-        var el = labels[i], next = el.nextElementSibling;
-        while (next){
-          var inp = (next.tagName==='INPUT') ? next : next.querySelector && next.querySelector('input');
-          if (inp) return inp.value.trim();
-          next = next.nextElementSibling;
-        }
-        var scoped = el.parentElement && el.parentElement.querySelector('input');
-        if (scoped) return scoped.value.trim();
-      }
-    }
-    return '';
-  }
-
-  function prefill(){
-    var inp = document.getElementById(FIELD_ID);
-    if (!inp) return;
-    var name = currentJobName();
-    var d = window.data;
-    if (!name || !d || !d.projects){ return; }
-    var p = d.projects.find(function(x){ return (x.name||'')===name; });
-    inp.value = (p && p.subMarkup!==undefined && p.subMarkup!=='') ? p.subMarkup : '';
-  }
-
-  // keep trying to inject + prefill whenever the page changes (Data modal opens, Edit clicked)
-  var mo = new MutationObserver(function(){
-    if (injectField()) prefill();
-  });
-  mo.observe(document.body, { childList: true, subtree: true });
-  document.addEventListener('click', function(e){
-    // Edit buttons repopulate the form a moment later
-    setTimeout(function(){ if (injectField()) prefill(); }, 150);
-  }, true);
-  injectField();
-
-  // ── Save hook: ride along with the existing Save (whole-doc save to the server) ──
-  var origFetch = window.fetch;
-  window.fetch = function(url, opts){
-    try {
-      if (opts && opts.body && typeof opts.body==='string' && (opts.method||'GET').toUpperCase()!=='GET'){
-        var body = JSON.parse(opts.body);
-        var doc = body && body.projects ? body : (body && body.data && body.data.projects ? body.data : null);
-        var inp = document.getElementById(FIELD_ID);
-        if (doc && inp){
-          var name = currentJobName();
-          var p = name && doc.projects.find(function(x){ return (x.name||'')===name; });
-          if (p){
-            var v = inp.value.trim();
-            if (v==='' ) { delete p.subMarkup; }
-            else if (!isNaN(parseFloat(v))) { p.subMarkup = parseFloat(v); }
-            // also preserve subMarkup on every OTHER project from the live data
-            // (in case the form rebuild dropped fields it doesn't know about)
-            if (window.data && window.data.projects){
-              doc.projects.forEach(function(dp){
-                if (dp.name===name) return;
-                var live = window.data.projects.find(function(x){ return (x.name||'')===dp.name; });
-                if (live && live.subMarkup!==undefined && dp.subMarkup===undefined) dp.subMarkup = live.subMarkup;
-              });
-            }
-            opts.body = JSON.stringify(body);
-          }
-        }
-      }
-    } catch(e){ /* never block a save */ }
-    return origFetch(url, opts);
-  };
-})();
 </script>
 </body>
 </html>
+
