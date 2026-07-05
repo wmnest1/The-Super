@@ -3390,7 +3390,7 @@ function cwInitListeners(){
   }
 })();
 </script>
-<!-- ══ JOB PANEL v2.3 — PROJECT TOTALS w/ category rollups (REPLACES the v2.2 block) ══ -->
+<!-- ══ JOB PANEL v2.4 — PROJECT TOTALS + CHANGE ORDERS section (REPLACES any v2.x job panel block) ══ -->
 <script>
 (function(){
   window.renderJobPanel = function(proj){
@@ -3398,14 +3398,19 @@ function cwInitListeners(){
   const rate=billingRate(proj);
   const oosR=oosRateFor(proj);
   const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
-  const allEnt=entriesForProject(proj);
+  const allEntRaw=entriesForProject(proj);
+  const projCOs=(((typeof data!=='undefined'?data.changeOrders:null)||{})[proj]||[]).filter(c=>c.status==='open');
+  const stripCO=list=>list.map(e=>({...e,crew:(e.crew||[]).filter(c=>!c.coId),materials:(e.materials||[]).filter(m=>!m.coId)}));
+  const allEnt=projCOs.length?stripCO(allEntRaw):allEntRaw;
+  const entRaw=ent;
+  const entBase=projCOs.length?stripCO(entRaw):entRaw;
   const weeks=monthWeeks(displayYear,displayMonth);
   const payments=((data.payments||{})[proj]||[]);
   const projId=proj.replace(/[^a-z0-9]/gi,'_');
 
   // Crew set
   const crewSet=new Set();
-  for(const en of ent)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
+  for(const en of entBase)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
   const crew=[...CREW_ORDER.filter(c=>crewSet.has(c)),...[...crewSet].filter(c=>!CREW_ORDER.includes(c))];
 
   // Weekly hours table
@@ -3413,7 +3418,7 @@ function cwInitListeners(){
   let wkRows='';const wkLabor=weeks.map(()=>0);let grandLaborHrs=0;
   const wkOOSHrs=weeks.map(()=>0);
   for(const worker of crew){
-    const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(ent,wk.start,wk.end),worker));
+    const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(entBase,wk.start,wk.end),worker));
     const total=wkHrs.reduce((a,b)=>a+b,0);grandLaborHrs+=total;
     wkHrs.forEach((h,i)=>wkLabor[i]+=h);
     const billed=total*rate;
@@ -3426,7 +3431,7 @@ function cwInitListeners(){
   }
   // Tally OOS hours per week (legacy safety — new OOS work will go through the CO system)
   weeks.forEach((wk,wi)=>{
-    const wkEnt=entriesInWeek(ent,wk.start,wk.end);
+    const wkEnt=entriesInWeek(entBase,wk.start,wk.end);
     for(const en of wkEnt)for(const c of(en.crew||[])){if(c.outOfScope)wkOOSHrs[wi]+=parseFloat(c.hours||0);else wkOOSHrs[wi]+=parseFloat(c.oosHours||0);}
   });
   const grandOOSHrs=wkOOSHrs.reduce((a,b)=>a+b,0);
@@ -3442,7 +3447,7 @@ function cwInitListeners(){
 
   // ── THIS MONTH's materials list (activity only — quiet styling) ──
   const matItems=[];
-  for(const en of ent)for(let mi=0;mi<(en.materials||[]).length;mi++){
+  for(const en of entBase)for(let mi=0;mi<(en.materials||[]).length;mi++){
     const m=en.materials[mi];if(m.description||m.cost)matItems.push({date:en.date,m,mi});
   }
   const matsSub=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0),0);
@@ -3479,7 +3484,40 @@ function cwInitListeners(){
     if(m.kind==='sub'){subCostAll+=c;subMkAll+=mk;}
     else{matCostAll+=c;matMkAll+=mk;}
   }
-  const grandTotal=allLaborBilled+matCostAll+matMkAll+subCostAll+subMkAll;
+  const projectTotal=allLaborBilled+matCostAll+matMkAll+subCostAll+subMkAll;
+
+  // ── CHANGE ORDERS (only when open COs exist) ──
+  let coSectionHtml='', coGrand=0;
+  if(projCOs.length){
+    const coBlocks=projCOs.map(co=>{
+      let hrs=0, matCost=0, matBilled=0, lines=[];
+      for(const en of allEntRaw){
+        for(const c of(en.crew||[]))if(c.coId===co.id){const h=parseFloat(c.hours||0);hrs+=h;if(h>0)lines.push(`${esc(en.date.slice(5))} ${esc(c.name)} — ${h}hr`);}
+        for(const m of(en.materials||[]))if(m.coId===co.id){const cc=parseFloat(m.cost||0);matCost+=cc;matBilled+=cc*(1+window.__itemPct(m,proj)/100);lines.push(`${esc(en.date.slice(5))} ${esc(m.description||'')} — ${fmt$(cc)}`);}
+      }
+      const laborBilled=hrs*oosR;
+      const billed=co.type==='fixed'?parseFloat(co.fixedAmount||0):(laborBilled+matBilled);
+      coGrand+=billed;
+      const meta=co.type==='fixed'
+        ?`FIXED ${fmt$(parseFloat(co.fixedAmount||0))}`
+        :`T&M · ${hrs}hr @ $${oosR}/hr${matBilled>0?' + materials':''}`;
+      const internal=co.type==='fixed'&&(hrs>0||matCost>0)
+        ?`<div style="font-size:11px;color:#8a7a55;padding:1px 0 2px 12px">↳ internal cost logged: ${hrs>0?hrs+'hr':''}${hrs>0&&matCost>0?' · ':''}${matCost>0?fmt$(matCost)+' materials':''} (not billed)</div>`
+        :'';
+      return `<div style="padding:4px 0 2px">
+        <div class="tot-row"><span class="lbl" style="color:#ffce7a">CO #${co.num} — ${esc(co.name)} <span style="color:#997a44;font-size:10px">${meta}</span></span><span style="color:#ffce7a">${fmt$(billed)}</span></div>
+        ${lines.length?`<div style="font-size:11px;color:#667;padding-left:12px">${lines.join('<br>')}</div>`:''}
+        ${internal}
+      </div>`;
+    }).join('');
+    coSectionHtml=`<div class="proj-totals" style="border-top:1px solid #7a5a20;padding-top:8px">
+      <div class="mat-label" style="margin-bottom:4px;color:#ffce7a">Change Orders</div>
+      ${coBlocks}
+      <div class="tot-row" style="border-top:1px solid #3a2a10"><span class="lbl" style="color:#ffce7a;font-weight:bold">CHANGE ORDERS TOTAL</span><span style="color:#ffce7a;font-weight:bold">${fmt$(coGrand)}</span></div>
+    </div>`;
+  }
+
+  const grandTotal=projectTotal+coGrand;
   const totalPaid=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
   const balanceDue=grandTotal-totalPaid;
 
@@ -3519,7 +3557,11 @@ function cwInitListeners(){
         <div class="tot-row"><span class="lbl">Total Sub Markup</span><span>${fmt$(subMkAll)}</span></div>
         <div class="tot-row" style="font-size:12px;color:#8a9ab5"><span class="lbl">&nbsp;&nbsp;\u21B3 Subs Total (billed)</span><span>${fmt$(subCostAll+subMkAll)}</span></div>`
         :`<div class="tot-row"><span class="lbl">Total Subs</span><span>${fmt$(0)}</span></div>`}
-        <div class="tot-row grand"><span class="lbl">GRAND TOTAL</span><span>${fmt$(grandTotal)}</span></div>
+        <div class="tot-row" style="border-top:1px solid #2a3a5e"><span class="lbl" style="font-weight:bold">${projCOs.length?'PROJECT TOTAL (base contract)':'PROJECT TOTAL'}</span><span style="font-weight:bold">${fmt$(projectTotal)}</span></div>
+      </div>
+      ${coSectionHtml}
+      <div class="proj-totals" style="border-top:2px solid var(--accent);padding-top:6px">
+        <div class="tot-row grand"><span class="lbl">GRAND TOTAL${projCOs.length?' DUE':''}</span><span>${fmt$(grandTotal)}</span></div>
       </div>
       <div class="pay-section">
         <div class="pay-label">Payments Received</div>
@@ -3554,4 +3596,3 @@ function cwInitListeners(){
 </script>
 </body>
 </html>
-
