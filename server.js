@@ -255,6 +255,7 @@ When generating estimates, proposals, or answering pricing questions:
 3. SANITY CHECK BIDS: If a proposed total seems low for the described scope, flag it — e.g. "That kitchen scope typically runs $X-Y in Los Gatos/San Jose — your estimate of $Z may be leaving money on the table."
 4. FLAG MISSING LINE ITEMS: If a proposal scope mentions kitchen/bath but doesn't include permits, debris disposal, or inspection fees — flag these as likely omissions.
 5. AUTO-APPLY PROJECT RATES: When generating invoices/proposals, always pull the project's "rate", "oosRate", and "markup" from the project record automatically. Never require Walt to re-state them.
+5b. FIXED-PRICE JOBS: Projects with billingType "fixed" bill the client the contractAmount (typically via the payment schedule in the proposal — deposit / progress / final), NOT hourly. Hours and materials logged to a fixed-price job are internal job-costing only and never appear as line items on client invoices. Invoices for fixed-price jobs are for contract payments (e.g. "Progress payment per contract — $7,000"). Change orders on fixed-price jobs still work normally and bill separately per CO rules. When Walt says a job is "fixed price", "flat bid", or "contract price", set billingType "fixed" and contractAmount via save_project.
 6. OOS LINE ITEMS: When generating change order / OOS sections on invoices, always use the project's oosRate field automatically (fall back to regular rate if oosRate not set).
 
 EMAIL CAPABILITIES:
@@ -502,6 +503,7 @@ const TOOLS = [
         rate: { type: "string", description: "Regular billing rate per hour to client" },
         oosRate: { type: "string", description: "Out-of-scope hourly rate billed to client for extra/change-order work. If not set, OOS hours are billed at the regular rate." },
         contractAmount: { type: "string" },
+        billingType: { type: "string", enum: ["tm", "fixed"], description: "'fixed' = fixed-price contract job (client pays the contractAmount, not hourly — hours/materials are tracked as internal job cost only). 'tm' = time & materials (default). Set 'fixed' when Walt says a job is fixed price, fixed bid, flat price, or contract price. When setting 'fixed', contractAmount should also be set." },
         notes: { type: "string" }
       },
       required: ["name"]
@@ -1805,4 +1807,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
+
 
