@@ -3602,6 +3602,20 @@ function cwInitListeners(){
   }
 })();
 </script>
+Redesign the financial summary section of each Job Panel to improve the visual hierarchy and make the project's overall financial status the primary focus.
+The monthly section should remain as-is functionally, but its totals (Monthly Materials Subtotal, Monthly Material Markup, and Total Materials) should not be bold or draw excessive attention. These are simply current-month activity numbers that reset every month and are secondary information.
+Instead, create a new section titled PROJECT TOTALS that becomes the primary financial summary for the job. This section should contain:
+•	Total Labor (Billed) 
+•	Total Materials 
+•	Total Material Markup 
+•	Total Subs 
+•	Total Sub Markup 
+•	Change Orders (+) 
+•	Grand Total
+Follow this with a divider and the existing payments received and the “BALANCE DUE”, which should remain the most prominent number on the panel.
+Keep Materials and Subs separated rather than combining them. Likewise, keep Material Markup and Sub Markup as separate totals. This provides complete financial transparency, allows different markup percentages for materials and subcontractors, makes auditing easier, and removes any uncertainty about whether both categories were properly marked up. Just for my own visual verification and takes away guessing on my part.
+Remove the text "(only visible to you)" from the internal cost/markup information. This dashboard is already an internal management tool, so the reminder is unnecessary and only adds visual clutter.
+The overall design should feel more like professional accounting/project management software, where the running project totals receive the greatest visual emphasis rather than the current month's activity.
 </body>
 </html>
 
