@@ -279,6 +279,7 @@ E-SIGNATURE PROPOSALS:
 - The html_body passed to send_proposal_link should be the same complete proposal HTML you would otherwise email as a PDF — it will be shown to the client on the acceptance page, plus an Accept Proposal control appended automatically by the server. Do not add your own accept/signature block to the HTML.
 - email_body should briefly invite the client to review and accept online — do not mention a PDF attachment since none is sent.
 - After sending confirm: "✅ Signable proposal link sent to [email] — you'll see it update to Viewed and Accepted on the [project] job panel."
+- If Walt indicates upfront that a proposal will be sent for e-signature (before you generate the HTML), omit the blank "Authorized Signature / Client Signature" wet-signature lines from the bottom of the document — the online checkbox acceptance replaces that block, and leaving blank signature lines on a page that's accepted by checkbox is confusing. Still include the rest of the document (scope, pricing, terms) as normal. If Walt asks to send an already-generated proposal (with a signature block already in it) for e-signature, that's fine too — just send it as-is.
 
 HOW YOU RESPOND:
 - Plain English, direct, no fluff
@@ -1090,11 +1091,13 @@ function buildProposalPage(record, opts) {
   @media (max-width: 640px) {
     body{padding:0;}
     .wrap{border-radius:0;}
+    .wrap{word-break:normal;overflow-wrap:normal;}
     .wrap div[style]{padding:12px !important;}
     .wrap div[style*="display:flex"]{flex-wrap:wrap !important;}
-    .wrap div[style*="text-align:right"]{text-align:left !important;margin-top:10px;}
+    .wrap div[style*="text-align:right"]{text-align:left !important;margin-top:10px;width:100% !important;}
+    .wrap div[style*="font-size:22px"], .wrap div[style*="font-size:26px"]{font-size:18px !important;}
     .wrap table{width:100% !important;font-size:12px !important;}
-    .wrap th, .wrap td{padding:6px 4px !important;word-break:break-word;}
+    .wrap th, .wrap td{padding:6px 4px !important;word-break:break-word;overflow-wrap:break-word;}
     .wrap h1{font-size:19px !important;}
   }
 </style>
@@ -1114,22 +1117,27 @@ function buildProposalPage(record, opts) {
 async function notifyWaltProposalAccepted(record) {
   try {
     const acceptedAtDisplay = new Date(record.acceptedAt).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    const link = `${PUBLIC_BASE_URL}/proposal/${record.id}`;
     await emailTransporter.sendMail({
       from: `"The Super" <${process.env.YAHOO_EMAIL}>`,
       to: process.env.YAHOO_EMAIL,
       subject: `✅ Proposal Accepted — ${record.project}`,
       html: emailWrapper(`
         <div style="padding:30px;font-family:Arial,sans-serif;font-size:15px;color:#333;line-height:1.6;">
-          <p><strong>${record.project}</strong> — proposal accepted.</p>
-          <p>Signed by: <strong>${record.acceptedBy}</strong> (${record.acceptedEmail})<br>
-          Date: ${acceptedAtDisplay}<br>
-          IP address: ${record.acceptedIP}</p>
-          <p>Job can be scheduled. Full accepted proposal copy is attached below.</p>
-          <hr style="border:none;border-top:1px solid #ddd;margin:20px 0;">
-          ${record.acceptedSnapshot}
+          <p style="font-size:17px;font-weight:bold;color:#1a7a1a;">✅ ${record.project} — proposal accepted</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:16px 0;font-size:14px;">
+            <tr><td style="padding:3px 12px 3px 0;color:#888;">Signed by</td><td><strong>${record.acceptedBy}</strong> (${record.acceptedEmail})</td></tr>
+            <tr><td style="padding:3px 12px 3px 0;color:#888;">Date</td><td>${acceptedAtDisplay}</td></tr>
+            <tr><td style="padding:3px 12px 3px 0;color:#888;">IP address</td><td>${record.acceptedIP}</td></tr>
+          </table>
+          <p>Job can be scheduled. The signed copy is locked and viewable anytime at the link below.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0"><tr><td style="background:#1a5fa8;border-radius:6px">
+            <a href="${link}" style="display:inline-block;padding:12px 24px;color:#fff;text-decoration:none;font-weight:bold;font-size:14px">View Signed Proposal</a>
+          </td></tr></table>
+          <p style="font-size:12px;color:#888">${link}</p>
         </div>
       `),
-      text: `${record.project} proposal accepted by ${record.acceptedBy} (${record.acceptedEmail}) on ${acceptedAtDisplay}. IP: ${record.acceptedIP}`
+      text: `${record.project} proposal accepted by ${record.acceptedBy} (${record.acceptedEmail}) on ${acceptedAtDisplay}. IP: ${record.acceptedIP}\n\nView signed proposal: ${link}`
     });
   } catch (e) {
     console.error("notifyWaltProposalAccepted error:", e.message);
@@ -1797,3 +1805,4 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
+
