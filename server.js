@@ -199,6 +199,15 @@ Common rates: $110/hr, $120/hr, $125/hr
 Materials & subs markup: Logged material/sub items may carry their own "markupPct" (a percent number) and a "kind" ("material" or "sub"). PRIORITY for MATERIALS: (1) item's own markupPct if present; (2) the project's "markup" field; (3) otherwise no markup unless Walt specifies. PRIORITY for SUBS (kind "sub"): (1) item's own markupPct if present; (2) the project's "subMarkup" field; (3) otherwise NO markup on subs. Subcontractor payments (kind "sub") are billed the same way using their own markupPct — never assume subs get the materials markup. Show marked-up amounts on client documents; never reveal the raw cost or the markup % to the client.
 Out-of-scope rate: Each project may have an "oosRate" field ($/hr billed to client for OOS/extra work). Use it for OOS line items on invoices. If not set, fall back to the project's regular "rate".
 
+CHANGE ORDERS (COs):
+A change order is client-approved billable work OUTSIDE the base contract. COs are rare. Rules:
+1. When Walt says a client approved a change order / extra work / added scope — use save_change_order. You need: project, a short name, and the type: "fixed" (agreed flat price — get the amount) or "tm" (time & materials). If Walt doesn't specify fixed vs T&M, ask one short question.
+2. Logging work to a CO: when Walt logs hours or materials "for the [name] change order" / "on CO #2", pass changeOrder on those crew/material items in save_entry. If the project has exactly ONE open CO and Walt clearly means CO work, use it without asking. If several, ask which. If none exists, ask whether to create one first.
+3. FIXED-PRICE CO billing: the client is billed exactly the fixedAmount on the CO's own invoice — one line, the agreed price. Hours and materials logged to a fixed CO are Walt's INTERNAL COST TRACKING ONLY: never bill them, never show them to the client, never add markup to them.
+4. T&M CO billing: hours tagged to the CO bill at the project's oosRate (or rate if unset), listed separately from base-contract labor; materials/subs tagged to it bill with the normal markup chain.
+5. INVOICE SEPARATION: base-contract invoices EXCLUDE anything tagged with a coId/coName. A CO is invoiced on its own separate document titled with the CO number and name (e.g. "INVOICE — Change Order #1: Deck Footing"). Never mix base and CO charges on one invoice unless Walt explicitly asks.
+6. The legacy per-crew "oosHours" field still exists for old data — going forward, prefer tagging hours to a named change order instead.
+
 APPOINTMENTS: Use save_appointment when Walt mentions a meeting/appointment/scheduled event. Use cancel_appointment (with the id from the lists above) when he cancels one. When he asks "what's my day look like" or "what's my schedule", summarize TODAY'S APPOINTMENTS conversationally. If a requested appointment time is vague ("this afternoon"), ask for a specific time before saving.
 
 DOCUMENT DATE: Default to ${dateOnly} on all invoices and proposals. If Walt specifies a different date, use that instead. Show date only — never show a time on invoices or proposals.
@@ -212,7 +221,7 @@ When Walt tells you to log hours, record work, add a client, add a project, add 
 - DUPLICATE MATERIALS: The system automatically checks for duplicate materials before saving. If a tool result comes back with action "duplicate_material" and dupType "exact" — tell Walt it's already logged and don't retry. If dupType "fuzzy" — ask Walt: "⚠️ That looks like it might already be logged from [date] — want me to save it anyway or skip it?" If Walt confirms ("save it", "yes", "go ahead", "save anyway") — call the same save tool again with force:true.
 - HD PRO / HOME DEPOT PRO BULK PASTE: When Walt pastes a purchase history with multiple line items (has columns like Order Date, Item, SKU, Qty, Price — or is clearly a receipt/export with many items), DO NOT save anything immediately. Instead: (1) Parse each line. Match "Job Name" or job column against Walt's active projects using fuzzy match. If no match or blank → general expense. (2) Group line items by same date + same project into single subtotaled entries. (3) Generate a PREVIEW summary in your chat response (call NO save tools yet): list each group like "✅ [Project] — [Date]: [item summary] $[total]", flag unmatched items as "⚠️ [N] items no job match → [category] $[total]", flag any potential duplicates. End with "Reply 'confirm' to save all, or tell me what to change." (4) ONLY after Walt replies "confirm", "yes save it", "go ahead", or similar — THEN call save_entry / save_general_expense for all items. (5) After saving, summarize: "Saved X entries across Y projects + $Z to General Expenses."
 - For project name: pick the closest matching project from the PROJECTS list above. "Cronce job" → "Cronce Remodel", "Viraj house" → "Viraj Remodel", etc. Never invent a new project name if an existing one is a reasonable match.
-- For out-of-scope hours: if Walt says "out of scope", "extra work", "change order", "additional work", "bill separately", or similar — use the oosHours field on that crew member entry. For a mixed day (e.g. "Abner worked 8 hours, 5 regular and 3 out of scope") set hours: "5" and oosHours: "3" — do NOT put all hours in the hours field. When generating invoices, show regular hours and OOS hours as SEPARATE line items (e.g. "Labor — Contract Work" at the regular rate and "Labor — Additional Work (Out of Scope)" at the project's oosRate — or the regular rate if oosRate is not set).
+- For out-of-scope / change-order hours: if Walt says "out of scope", "extra work", "change order", "additional work", "bill separately", or similar — this belongs to a CHANGE ORDER. Follow the CHANGE ORDERS rules above: tag the hours to the project's open CO via the crew item's changeOrder field (or help Walt create the CO first). Only fall back to the legacy oosHours field if Walt explicitly declines to use a change order. For a mixed day (e.g. "Abner worked 8 hours, 5 regular and 3 out of scope") set hours: "5" and oosHours: "3" — do NOT put all hours in the hours field. When generating invoices, show regular hours and OOS hours as SEPARATE line items (e.g. "Labor — Contract Work" at the regular rate and "Labor — Additional Work (Out of Scope)" at the project's oosRate — or the regular rate if oosRate is not set).
 
 TIME-AWARE QUERY HANDLING:
 Reference dates for this session:
@@ -316,6 +325,9 @@ ${(data.clients||[]).map(c => `- ${c.name}${c.phone?" | "+c.phone:""}${c.email?"
 PROJECTS:
 ${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${(p.subMarkup!==undefined&&p.subMarkup!=="")?" | Subs Markup: "+p.subMarkup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
 
+CHANGE ORDERS (client-approved extra work, invoiced separately):
+${(() => { const cos = data.changeOrders || {}; const lines = []; for (const pj of Object.keys(cos)) for (const c of cos[pj]) if (c.status === "open") lines.push(`- ${pj} | CO #${c.num} "${c.name}" | ${c.type === "fixed" ? "FIXED $" + c.fixedAmount : "T&M"} | approved ${c.date}${c.notes ? " | " + c.notes : ""}`); return lines.join("\n") || "None — create with save_change_order when a client approves extra work"; })()}
+
 CREW:
 ${(data.crew||[]).map(c => `- ${c.name}${c.nickname?" ("+c.nickname+")":""}${c.role?" | "+c.role:""}${c.hourlyRate?" | Pay: $"+c.hourlyRate+"/hr":""}${c.phone?" | "+c.phone:""}${c.notes?" | "+c.notes:""}`).join("\n") || "None on file"}
 
@@ -367,7 +379,8 @@ const TOOLS = [
               hours: { type: "string", description: "Regular (contract) hours worked, e.g. '8' or '5'. Use '0' if all hours were out of scope or if the person did not work that day." },
               oosHours: { type: "string", description: "Out-of-scope hours for this crew member on this same entry. Use when Walt says 'out of scope', 'extra work', 'change order', or 'bill separately'. Can accompany regular hours for a mixed day — e.g. { hours: '5', oosHours: '3' } for 5 regular + 3 OOS. Omit or leave '0' if no OOS hours." },
               note: { type: "string", description: "Optional status note for this crew member on this day, e.g. 'Sick', 'Vacation', 'No show', 'Half day'. Use when Walt mentions a person's absence or status instead of hours." },
-              color: { type: "string", description: "Optional hex color for the note. Match by name: red: #cc4444, orange: #e8720c, yellow: #e8c020, green: #2a9a2a, teal: #1a8a8a, blue: #1a5fa8, purple: #6b2fbe, pink: #b02080. Default for absences: #884444. Omit if no note." }
+              color: { type: "string", description: "Optional hex color for the note. Match by name: red: #cc4444, orange: #e8720c, yellow: #e8c020, green: #2a9a2a, teal: #1a8a8a, blue: #1a5fa8, purple: #6b2fbe, pink: #b02080. Default for absences: #884444. Omit if no note." },
+              changeOrder: { type: "string", description: "Name or number of the change order these hours belong to (e.g. 'deck footing' or 'CO #1'). Use when the hours are for client-approved extra work tied to a change order. Omit for regular contract work." }
             },
             required: ["name", "hours"]
           }
@@ -379,7 +392,10 @@ const TOOLS = [
             type: "object",
             properties: {
               description: { type: "string" },
-              cost: { type: "string", description: "Dollar amount, e.g. '245.00'" }
+              cost: { type: "string", description: "Dollar amount, e.g. '245.00'" },
+              kind: { type: "string", enum: ["material", "sub"], description: "Use 'sub' when this is a payment to a subcontractor rather than a material purchase. Default 'material'." },
+              markupPct: { type: "number", description: "Per-item markup percent, ONLY if Walt explicitly states one for this item. Otherwise omit — the project defaults apply." },
+              changeOrder: { type: "string", description: "Name or number of the change order this item belongs to. Omit for base-contract purchases." }
             },
             required: ["description"]
           }
@@ -388,6 +404,34 @@ const TOOLS = [
         force: { type: "boolean", description: "Set true to force-save even if a material duplicate warning was returned. Use only after Walt confirms he wants to save anyway." }
       },
       required: ["date", "project"]
+    }
+  },
+  {
+    name: "save_change_order",
+    description: "Create a change order (CO) on a project — client-approved billable work outside the base contract. Use when Walt says a client approved a change order, extra work, or additional scope. COs are invoiced separately from the base contract.",
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project/job name. Match to an existing project." },
+        name: { type: "string", description: "Short name for the change order, e.g. 'deck footing' or 'upstairs bath add'. If Walt gives none, use a concise description of the work." },
+        type: { type: "string", enum: ["fixed", "tm"], description: "'fixed' = agreed flat price; 'tm' = time & materials (hours at the project's OOS rate + materials with markup). Ask Walt if unclear." },
+        fixedAmount: { type: "string", description: "Required when type is 'fixed' — the agreed dollar amount, e.g. '1500.00'." },
+        date: { type: "string", description: "Approval date YYYY-MM-DD. Default today." },
+        notes: { type: "string", description: "Scope description / what the client approved." }
+      },
+      required: ["project", "name", "type"]
+    }
+  },
+  {
+    name: "cancel_change_order",
+    description: "Cancel/void a change order on a project. Use only when Walt explicitly says a change order is cancelled or was created by mistake.",
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project/job name." },
+        name: { type: "string", description: "Name or number of the change order to cancel." }
+      },
+      required: ["project", "name"]
     }
   },
   {
@@ -629,23 +673,84 @@ async function executeTool(toolName, input, data) {
       data.appointments[apptIdx].status = "cancelled";
       return { ok: true, action: "cancelled", type: "appointment", data: data.appointments[apptIdx] };
     }
+    case "save_change_order": {
+      if (!data.changeOrders) data.changeOrders = {};
+      const coProj = fuzzyMatchProject(input.project, data.projects || []);
+      if (!data.changeOrders[coProj]) data.changeOrders[coProj] = [];
+      const list = data.changeOrders[coProj];
+      const num = list.reduce((mx, c) => Math.max(mx, c.num || 0), 0) + 1;
+      const co = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        num,
+        name: input.name,
+        type: input.type === "fixed" ? "fixed" : "tm",
+        ...(input.type === "fixed" ? { fixedAmount: String(parseFloat(input.fixedAmount || 0).toFixed(2)) } : {}),
+        date: input.date || new Date().toISOString().slice(0, 10),
+        notes: input.notes || "",
+        status: "open",
+        created_at: new Date().toISOString()
+      };
+      if (co.type === "fixed" && parseFloat(co.fixedAmount || 0) <= 0) {
+        return { ok: false, message: "Fixed-price change order needs a dollar amount — ask Walt for the agreed price." };
+      }
+      list.push(co);
+      return { ok: true, action: "created", type: "change_order", data: { project: coProj, ...co },
+        message: `Created CO #${num} "${co.name}" on ${coProj} (${co.type === "fixed" ? "fixed price $" + co.fixedAmount : "time & materials"}).` };
+    }
+    case "cancel_change_order": {
+      const coProj2 = fuzzyMatchProject(input.project, data.projects || []);
+      const list2 = ((data.changeOrders || {})[coProj2] || []);
+      const q = String(input.name || "").toLowerCase();
+      const co2 = list2.find(c => c.status === "open" && (String(c.num) === q.replace(/[^0-9]/g, "") || (c.name || "").toLowerCase().includes(q)));
+      if (!co2) return { ok: false, message: "No matching open change order found on " + coProj2 + " — ask Walt to clarify which one." };
+      co2.status = "cancelled";
+      return { ok: true, action: "cancelled", type: "change_order", data: { project: coProj2, ...co2 } };
+    }
     case "save_entry": {
       if (!data.entries) data.entries = [];
       // Fuzzy-match project name against existing projects
       const matchedProject = fuzzyMatchProject(input.project, data.projects || []);
+      const resolveCO = (name) => {
+        if (!name) return null;
+        const list = ((data.changeOrders || {})[matchedProject] || []).filter(c => c.status === "open");
+        if (!list.length) return null;
+        const q = String(name).toLowerCase();
+        const qNum = q.replace(/[^0-9]/g, "");
+        return list.find(c => (qNum && String(c.num) === qNum) || (c.name || "").toLowerCase().includes(q) || q.includes((c.name || "").toLowerCase())) || null;
+      };
+      const unresolvedCOs = [];
       const entry = {
         date: input.date,
         project: matchedProject,
-        crew: (input.crew || []).map(c => ({
-          name: c.name,
-          hours: c.hours || '0',
-          ...(parseFloat(c.oosHours||0) > 0 ? { oosHours: String(c.oosHours) } : {}),
-          ...(c.note ? { note: c.note } : {}),
-          ...(c.color ? { color: c.color } : {})
-        })),
-        materials: input.materials || [],
+        crew: (input.crew || []).map(c => {
+          const co = resolveCO(c.changeOrder);
+          if (c.changeOrder && !co) unresolvedCOs.push(c.changeOrder);
+          return {
+            name: c.name,
+            hours: c.hours || '0',
+            ...(parseFloat(c.oosHours||0) > 0 ? { oosHours: String(c.oosHours) } : {}),
+            ...(c.note ? { note: c.note } : {}),
+            ...(c.color ? { color: c.color } : {}),
+            ...(co ? { coId: co.id, coName: "CO #" + co.num + " " + co.name } : {})
+          };
+        }),
+        materials: (input.materials || []).map(m => {
+          const co = resolveCO(m.changeOrder);
+          if (m.changeOrder && !co) unresolvedCOs.push(m.changeOrder);
+          return {
+            description: m.description,
+            cost: m.cost || '0',
+            ...(m.kind === 'sub' ? { kind: 'sub' } : {}),
+            ...(m.markupPct != null && !isNaN(parseFloat(m.markupPct)) ? { markupPct: parseFloat(m.markupPct) } : {}),
+            ...(co ? { coId: co.id, coName: "CO #" + co.num + " " + co.name } : {})
+          };
+        }),
         notes: input.notes || ""
       };
+      if (unresolvedCOs.length) {
+        return { ok: false, action: "co_not_found",
+          message: `No open change order matching "${unresolvedCOs[0]}" on ${matchedProject}. Ask Walt: create it first with save_change_order (get fixed price or T&M), or check the CHANGE ORDERS list for the right name. Nothing was saved.` };
+      }
       // Material duplicate check (per-material, before committing)
       if (!input.force && (input.materials || []).length > 0) {
         for (const mat of input.materials) {
