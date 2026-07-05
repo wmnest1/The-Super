@@ -3594,9 +3594,10 @@ function cwInitListeners(){
   if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
 })();
 </script>
-<!-- ══ PROPOSAL STATUS — paste above </body>, same as job panel v2.4 ══ -->
+<!-- ══ PROPOSALS — paste above </body>, REPLACES the earlier proposal-status-snippet.html ══ -->
 <script>
 (function(){
+  // ---- 1) Job Panel Proposal block (same as before) ----
   const _origRenderJobPanel = window.renderJobPanel;
   window.renderJobPanel = function(proj){
     let html = _origRenderJobPanel(proj);
@@ -3643,9 +3644,77 @@ function cwInitListeners(){
   }
 
   if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+
+  // ---- 2) Top-level Proposals activity bar (like Today's Appointments / Flags & Alerts) ----
+  const css = ''
+    + '.prop-card{background:var(--panel);border-radius:12px;margin:0 20px 16px;overflow:hidden}'
+    + '.prop-card-hdr{padding:12px 16px;font-weight:bold;font-size:14px;border-bottom:1px solid #2a3a5e}'
+    + '.prop-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #1e2c47;font-size:13px;flex-wrap:wrap}'
+    + '.prop-row:last-child{border-bottom:none}'
+    + '.prop-empty{padding:10px 16px;font-size:12px;color:#667}'
+    + '.prop-badge{font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap}'
+    + '.prop-badge.sent{background:#1a2f4e;color:#8ab4ff}'
+    + '.prop-badge.viewed{background:#2f2a1a;color:#ffce7a}'
+    + '.prop-badge.accepted{background:#173a1a;color:#7be07b}'
+    + 'html.light .prop-card{background:#fff}'
+    + 'html.light .prop-row{border-color:#eee}';
+  const st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  function escP(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+
+  function renderProposalsBar(){
+    const wrapEl = document.getElementById('prop-card-wrap');
+    if (!wrapEl) return;
+    const list = (data.proposals || []).slice().sort((a, b) => {
+      const at = new Date(a.acceptedAt || (a.viewedDates||[])[a.viewedDates.length-1] || a.sentDate);
+      const bt = new Date(b.acceptedAt || (b.viewedDates||[])[b.viewedDates.length-1] || b.sentDate);
+      return bt - at;
+    }).slice(0, 8);
+
+    if (!list.length) {
+      wrapEl.innerHTML = '<div class="prop-card"><div class="prop-card-hdr">\u{1F4C4} Proposals</div><div class="prop-empty">No proposals sent yet.</div></div>';
+      return;
+    }
+
+    const rows = list.map(p => {
+      const views = (p.viewedDates || []).length;
+      const link = window.location.origin + '/proposal/' + p.id;
+      let badge, when;
+      if (p.status === 'accepted') {
+        badge = '<span class="prop-badge accepted">\u{1F7E2} Accepted</span>';
+        when = fmtWhen(p.acceptedAt);
+      } else if (views > 0) {
+        badge = '<span class="prop-badge viewed">\u{1F441} Viewed ' + views + 'x</span>';
+        when = 'Last viewed ' + fmtWhen(p.viewedDates[p.viewedDates.length-1]);
+      } else {
+        badge = '<span class="prop-badge sent">\u{1F4E4} Sent</span>';
+        when = 'Sent ' + fmtWhen(p.sentDate);
+      }
+      return '<div class="prop-row">'
+        + '<span><strong>' + escP(p.project) + '</strong> \u2014 ' + escP(p.clientName || p.clientEmail || '') + '</span>'
+        + '<span style="display:flex;align-items:center;gap:8px">' + badge + '<span style="color:#778;font-size:11px">' + when + '</span>'
+        + '<a href="' + link + '" target="_blank" style="color:var(--accent);font-size:11px">View \u2192</a></span>'
+        + '</div>';
+    }).join('');
+
+    wrapEl.innerHTML = '<div class="prop-card"><div class="prop-card-hdr">\u{1F4C4} Proposals</div>' + rows + '</div>';
+  }
+
+  const flagsWrap = document.getElementById('flags-wrap');
+  if (flagsWrap) {
+    const wrap = document.createElement('div');
+    wrap.id = 'prop-card-wrap';
+    flagsWrap.parentNode.insertBefore(wrap, flagsWrap);
+    renderProposalsBar();
+    // Refresh alongside the rest of the dashboard
+    const _origRender = window.render;
+    if (typeof _origRender === 'function') {
+      window.render = function(){ _origRender(); renderProposalsBar(); };
+    }
+  }
 })();
 </script>
-</body>
-</html>
 </body>
 </html>
