@@ -3594,5 +3594,58 @@ function cwInitListeners(){
   if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
 })();
 </script>
+<!-- ══ PROPOSAL STATUS — paste above </body>, same as job panel v2.4 ══ -->
+<script>
+(function(){
+  const _origRenderJobPanel = window.renderJobPanel;
+  window.renderJobPanel = function(proj){
+    let html = _origRenderJobPanel(proj);
+    const p = getLatestProposal(proj);
+    if (p) {
+      const block = buildProposalStatusHtml(p);
+      html = html.replace('<div class="pay-section">', block + '<div class="pay-section">');
+    }
+    return html;
+  };
+
+  function getLatestProposal(proj){
+    const list = (data.proposals || []).filter(x => x.project === proj);
+    if (!list.length) return null;
+    return list.slice().sort((a, b) => new Date(b.sentDate) - new Date(a.sentDate))[0];
+  }
+
+  function fmtWhen(iso){
+    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function buildProposalStatusHtml(p){
+    const views = (p.viewedDates || []).length;
+    const lastView = views ? fmtWhen(p.viewedDates[p.viewedDates.length - 1]) : null;
+    const link = window.location.origin + '/proposal/' + p.id;
+
+    if (p.status === 'accepted') {
+      return `<div class="proj-totals" style="border-top:2px solid #2a9a2a;padding-top:8px">
+        <div class="mat-label" style="margin-bottom:4px;color:#7be07b">Proposal</div>
+        <div class="tot-row"><span class="lbl">Status</span><span style="color:#7be07b;font-weight:bold">\u{1F7E2} Accepted</span></div>
+        <div class="tot-row"><span class="lbl">Accepted by</span><span>${esc(p.acceptedBy || p.acceptedEmail || '\u2014')}</span></div>
+        <div class="tot-row"><span class="lbl">Date</span><span>${fmtWhen(p.acceptedAt)}</span></div>
+        <div style="margin-top:6px"><a href="${link}" target="_blank" style="color:var(--accent);font-size:12px">View Signed Copy \u2192</a></div>
+      </div>`;
+    }
+
+    return `<div class="proj-totals" style="border-top:2px solid #3a5a8e;padding-top:8px">
+      <div class="mat-label" style="margin-bottom:4px;color:#8ab4ff">Proposal</div>
+      <div class="tot-row"><span class="lbl">Status</span><span style="color:#8ab4ff">\u{1F4E4} Sent \u2014 ${views ? 'Viewed ' + views + 'x' : 'Not yet viewed'}</span></div>
+      <div class="tot-row"><span class="lbl">Sent</span><span>${fmtWhen(p.sentDate)}</span></div>
+      ${lastView ? `<div class="tot-row"><span class="lbl">Last viewed</span><span>${lastView}</span></div>` : ''}
+      <div style="margin-top:6px"><a href="${link}" target="_blank" style="color:var(--accent);font-size:12px">View Proposal Link \u2192</a></div>
+    </div>`;
+  }
+
+  if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+})();
+</script>
+</body>
+</html>
 </body>
 </html>
