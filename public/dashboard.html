@@ -3681,19 +3681,23 @@ function cwInitListeners(){
     const rows = list.map(p => {
       const views = (p.viewedDates || []).length;
       const link = window.location.origin + '/proposal/' + p.id;
-      let badge, when;
+      let badge, when, dotColor;
       if (p.status === 'accepted') {
         badge = '<span class="prop-badge accepted">\u{1F7E2} Accepted</span>';
         when = fmtWhen(p.acceptedAt);
+        dotColor = '#2ecc40';
       } else if (views > 0) {
         badge = '<span class="prop-badge viewed">\u{1F441} Viewed ' + views + 'x</span>';
         when = 'Last viewed ' + fmtWhen(p.viewedDates[p.viewedDates.length-1]);
+        dotColor = '#ffce30';
       } else {
         badge = '<span class="prop-badge sent">\u{1F4E4} Sent</span>';
         when = 'Sent ' + fmtWhen(p.sentDate);
+        dotColor = '#ff9f1a';
       }
+      const dot = '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:' + dotColor + ';margin-right:8px;flex:none"></span>';
       return '<div class="prop-row">'
-        + '<span><strong>' + escP(p.project) + '</strong> \u2014 ' + escP(p.clientName || p.clientEmail || '') + '</span>'
+        + '<span style="display:flex;align-items:center">' + dot + '<strong>' + escP(p.project) + '</strong>&nbsp;\u2014&nbsp;' + escP(p.clientName || p.clientEmail || '') + '</span>'
         + '<span style="display:flex;align-items:center;gap:8px">' + badge + '<span style="color:#778;font-size:11px">' + when + '</span>'
         + '<a href="' + link + '" target="_blank" style="color:var(--accent);font-size:11px">View \u2192</a></span>'
         + '</div>';
