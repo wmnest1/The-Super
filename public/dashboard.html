@@ -3493,6 +3493,115 @@ function cwInitListeners(){
   }
 })();
 </script>
+<!-- ══ SUBS MARKUP + PRIVATE PROFIT VIEW — paste above </body> in dashboard.html, AFTER all other blocks ══ -->
+<script>
+(function(){
+  function projField(name, field){
+    if (typeof data==='undefined') return null;
+    var p = (data.projects||[]).find(function(x){ return (x.name||'')===name; });
+    if (p && p[field]!==undefined && p[field]!=='' && !isNaN(parseFloat(p[field]))) return parseFloat(p[field]);
+    return null;
+  }
+
+  // ── markup priority, sub-aware ──
+  //   materials: item % → project "markup"    → 15
+  //   subs:      item % → project "subMarkup" → 0
+  window.__itemPct = function(m, projName){
+    if (m && m.markupPct!=null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    if (m && m.kind==='sub'){
+      var s = projField(projName, 'subMarkup');
+      return (s!=null) ? s : 0;
+    }
+    var pm = projField(projName, 'markup');
+    return (pm!=null) ? pm : 15;
+  };
+
+  // ── quick-add stepper default, same chain (your remembered % still wins) ──
+  var projEl = document.getElementById('qa-proj');
+  var kindEl = document.getElementById('qa-kind');
+  var mkEl   = document.getElementById('qa-mk');
+  if (projEl && kindEl && mkEl){
+    function applySmartDefault(){
+      var key = projEl.value+'|'+kindEl.value;
+      var d = {};
+      try { d = JSON.parse(localStorage.getItem('matMkDefaults')||'{}'); } catch(e){}
+      if (d[key]!=null) return; // you've used this combo before — your last % stands
+      var v;
+      if (kindEl.value==='sub'){
+        var s = projField(projEl.value, 'subMarkup');
+        v = (s!=null) ? s : 0;
+      } else {
+        var pm = projField(projEl.value, 'markup');
+        v = (pm!=null) ? pm : 15;
+      }
+      mkEl.value = v;
+      mkEl.dispatchEvent(new Event('input')); // refresh the green "bills $" box
+    }
+    projEl.addEventListener('change', applySmartDefault);
+    kindEl.addEventListener('change', applySmartDefault);
+    if (typeof window.openMaterials === 'function'){
+      var _open3 = window.openMaterials;
+      window.openMaterials = async function(){ await _open3(); applySmartDefault(); };
+    }
+  }
+
+  // ── Materials Log footer: add BILLED total next to the cost total (private view) ──
+  if (typeof window.renderMatList === 'function'){
+    var _rml = window.renderMatList;
+    window.renderMatList = function(){
+      _rml.apply(this, arguments);
+      try {
+        if (typeof applyMatFilters !== 'function') return;
+        var items = applyMatFilters().items || [];
+        var billed = 0;
+        for (var i=0;i<items.length;i++){
+          var m = items[i];
+          billed += parseFloat(m.amount||0) * (1 + window.__itemPct(m, m.project)/100);
+        }
+        var el = document.getElementById('mat-f-total');
+        if (el && items.length){
+          el.insertAdjacentHTML('beforeend',
+            '<span style="color:#7ecb8f;font-size:12px;margin-left:14px" title="With each item\'s markup applied — only you see this">Billed: <strong>$'
+            + billed.toFixed(2) + '</strong></span>');
+        }
+      } catch(e){ /* never break the list */ }
+    };
+  }
+
+  // ── Job panel: all-time cost + markup breakdown under "Total Materials & Subs (billed)" ──
+  if (typeof window.renderJobPanel === 'function'){
+    var _rjp = window.renderJobPanel;
+    window.renderJobPanel = function(proj){
+      var html = _rjp.apply(this, arguments);
+      try {
+        if (typeof entriesForProject !== 'function') return html;
+        var allEnt = entriesForProject(proj) || [];
+        var cost = 0, markup = 0;
+        for (var i=0;i<allEnt.length;i++){
+          var mats = allEnt[i].materials || [];
+          for (var j=0;j<mats.length;j++){
+            var c = parseFloat(mats[j].cost||0);
+            cost += c;
+            markup += c * (window.__itemPct(mats[j], proj)/100);
+          }
+        }
+        if (cost > 0){
+          var line = '<div class="tot-row" style="color:#7a8aa0;font-size:11px">'
+            + '<span class="lbl">\u21B3 cost $' + cost.toFixed(2)
+            + ' \u00B7 markup $' + markup.toFixed(2)
+            + ' <span style="color:#556">(all time \u2014 only visible to you)</span></span><span></span></div>';
+          // insert just above the GRAND TOTAL row — split/join is $-safe
+          var marker = '<div class="tot-row grand"';
+          var parts = html.split(marker);
+          if (parts.length === 2) html = parts[0] + line + marker + parts[1];
+        }
+      } catch(e){ /* never break the panel */ }
+      return html;
+    };
+    if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+  }
+})();
+</script>
 </body>
 </html>
 
