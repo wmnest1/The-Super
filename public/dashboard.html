@@ -3601,21 +3601,164 @@ function cwInitListeners(){
     if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
   }
 })();
+</script><!-- ══ JOB PANEL v2.2 — PROJECT TOTALS redesign (paste above </body>, AFTER all other blocks) ══ -->
+<script>
+(function(){
+  window.renderJobPanel = function(proj){
+  const color=jobColor(proj);
+  const rate=billingRate(proj);
+  const oosR=oosRateFor(proj);
+  const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+  const allEnt=entriesForProject(proj);
+  const weeks=monthWeeks(displayYear,displayMonth);
+  const payments=((data.payments||{})[proj]||[]);
+  const projId=proj.replace(/[^a-z0-9]/gi,'_');
+
+  // Crew set
+  const crewSet=new Set();
+  for(const en of ent)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
+  const crew=[...CREW_ORDER.filter(c=>crewSet.has(c)),...[...crewSet].filter(c=>!CREW_ORDER.includes(c))];
+
+  // Weekly hours table
+  let wkCols=weeks.map((wk,wi)=>`<th style="cursor:default">Wk ${wk.n}</th>`).join('')+'<th>Total</th><th>Billed</th>';
+  let wkRows='';const wkLabor=weeks.map(()=>0);let grandLaborHrs=0;
+  const wkOOSHrs=weeks.map(()=>0);
+  for(const worker of crew){
+    const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(ent,wk.start,wk.end),worker));
+    const total=wkHrs.reduce((a,b)=>a+b,0);grandLaborHrs+=total;
+    wkHrs.forEach((h,i)=>wkLabor[i]+=h);
+    const billed=total*rate;
+    wkRows+=`<tr>
+      <td>${esc(worker)}</td>
+      ${wkHrs.map((h,wi)=>`<td class="hrs-cell${h===0?' zero':''}" onclick="openWeekModal('${esc(proj)}','${esc(worker)}',${wi})" title="Click to edit ${worker} Week ${wi+1}">${h===0?'—':h}</td>`).join('')}
+      <td><strong>${total}</strong></td>
+      <td>${billed>0?fmt$(billed):'—'}</td>
+    </tr>`;
+  }
+  // Tally OOS hours per week (legacy safety — new OOS work will go through the CO system)
+  weeks.forEach((wk,wi)=>{
+    const wkEnt=entriesInWeek(ent,wk.start,wk.end);
+    for(const en of wkEnt)for(const c of(en.crew||[])){if(c.outOfScope)wkOOSHrs[wi]+=parseFloat(c.hours||0);else wkOOSHrs[wi]+=parseFloat(c.oosHours||0);}
+  });
+  const grandOOSHrs=wkOOSHrs.reduce((a,b)=>a+b,0);
+  const wkLaborTotals=wkLabor.map(h=>fmt$(h*rate)).join('</td><td>');
+  const totalLabor=grandLaborHrs*rate;
+  wkRows+=`<tr class="wk-labor"><td>Wk Labor $</td><td>${wkLaborTotals}</td><td></td><td>${fmt$(totalLabor)}</td></tr>`;
+  if(grandOOSHrs>0){
+    const oosHrCells=wkOOSHrs.map(h=>h>0?h:'—').join('</td><td>');
+    const oosLabCells=wkOOSHrs.map(h=>h>0?fmt$(h*oosR):'—').join('</td><td>');
+    wkRows+=`<tr class="wk-oos"><td>↳ OOS Hrs</td><td>${oosHrCells}</td><td>${grandOOSHrs}</td><td>—</td></tr>`;
+    wkRows+=`<tr class="wk-oos-labor"><td>↳ OOS Labor $</td><td>${oosLabCells}</td><td></td><td>${fmt$(grandOOSHrs*oosR)}</td></tr>`;
+  }
+
+  // ── THIS MONTH's materials list (activity only — quiet styling) ──
+  const matItems=[];
+  for(const en of ent)for(let mi=0;mi<(en.materials||[]).length;mi++){
+    const m=en.materials[mi];if(m.description||m.cost)matItems.push({date:en.date,m,mi});
+  }
+  const matsSub=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0),0);
+  const matsMarkup=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0)*(window.__itemPct(m,proj)/100),0);
+  const matsTotal2=matsSub+matsMarkup;
+  const monthSubPay=matItems.reduce((s,{m})=>s+(m.kind==='sub'?parseFloat(m.cost||0):0),0);
+
+  let matsRows=matItems.length===0
+    ?`<div style="font-size:12px;color:#444;padding:4px 0">No materials logged this month — <a style="color:var(--accent);cursor:pointer" onclick="openDayModal('${today}')">add one</a></div>`
+    :matItems.map(({date,m,mi})=>`
+      <div class="mat-row-wrap">
+        <span class="mat-row-desc" title="${esc(m.description)}">${m.kind==='sub'?'<span style="font-size:9px;background:#3a2a10;color:#ffce7a;border-radius:3px;padding:0 4px;margin-right:4px">SUB</span>':''}${esc(date.slice(5))} ${esc(m.description)}</span>
+        <span class="mat-row-amt">${fmt$(m.cost)}</span>
+        <button class="mat-icon-btn edit" onclick="openEditMat('${esc(proj)}','${esc(date)}')" title="Edit">✎</button>
+        <button class="mat-icon-btn del" onclick="deleteMatInPanel('${esc(proj)}','${esc(date)}',${mi})" title="Delete">✕</button>
+      </div>`).join('');
+
+  let matsHtml='';
+  if(matItems.length>0){
+    matsHtml=`<div class="mat-total-row" style="color:#778"><span class="lbl" style="color:#778;font-size:11px">Subtotal (this month)</span><span class="amt" style="color:#99a;font-size:11px;font-weight:normal">${fmt$(matsSub)}</span></div>
+    <div class="mat-total-row"><span class="lbl" style="color:#778;font-size:11px">Markup (this month)</span><span class="amt" style="color:#99a;font-size:11px;font-weight:normal">${fmt$(matsMarkup)}</span></div>
+    ${monthSubPay>0?`<div class="mat-total-row"><span class="lbl" style="color:#8a7a55;font-size:11px">↳ incl. Sub payments (cost)</span><span class="amt" style="color:#8a7a55;font-size:11px;font-weight:normal">${fmt$(monthSubPay)}</span></div>`:''}
+    <div class="mat-total-row" style="border-top:1px solid #2a3a5e"><span class="lbl" style="color:#889;font-size:11px">Month Total (billed)</span><span class="amt" style="color:#99a;font-size:11px;font-weight:normal">${fmt$(matsTotal2)}</span></div>`;
+  }
+
+  // ── PROJECT TOTALS — all time, split by category, the primary financial view ──
+  const allLaborBilled=(()=>{let t=0;for(const en of allEnt)for(const c of(en.crew||[])){if(c.outOfScope)t+=parseFloat(c.hours||0)*oosR;else t+=parseFloat(c.hours||0)*rate+parseFloat(c.oosHours||0)*oosR;}return t;})();
+  const allOOSHrs=allEnt.reduce((t,e)=>t+(e.crew||[]).reduce((s,c)=>s+(c.outOfScope?parseFloat(c.hours||0):parseFloat(c.oosHours||0)),0),0);
+  const allOOSLabor=allOOSHrs*oosR;
+  let matCostAll=0, matMkAll=0, subCostAll=0, subMkAll=0;
+  for(const en of allEnt)for(const m of(en.materials||[])){
+    const c=parseFloat(m.cost||0);
+    const mk=c*(window.__itemPct(m,proj)/100);
+    if(m.kind==='sub'){subCostAll+=c;subMkAll+=mk;}
+    else{matCostAll+=c;matMkAll+=mk;}
+  }
+  const grandTotal=allLaborBilled+matCostAll+matMkAll+subCostAll+subMkAll;
+  const totalPaid=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+  const balanceDue=grandTotal-totalPaid;
+
+  // Payments
+  const payRows=payments.length===0
+    ?'<div style="font-size:12px;color:#444;padding:4px 0">No payments recorded</div>'
+    :`<div class="pay-row hdr"><span>Date</span><span>Check</span><span>Amount</span><span>Notes</span></div>`
+    +payments.map(p=>`<div class="pay-row"><span>${p.date||''}</span><span>${p.check||''}</span><span>${fmt$(p.amount||0)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes||'')}</span></div>`).join('');
+
+  const balColor=balanceDue<=0?'paid':'';
+
+  return `<div class="job-panel">
+    <div class="jp-header" style="background:${color}">
+      <span>${esc(proj)} • $${rate}/hr${oosR!==rate?' · OOS: $'+oosR+'/hr':''}</span>
+      <span style="font-size:12px;opacity:.85">${grandLaborHrs}hr this month</span>
+    </div>
+    <div class="jp-body">
+      <div class="wk-table-wrap">
+        <div class="mat-label">Weekly Hours <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— click any cell to edit</span></div>
+        <table class="wk-table"><thead><tr><th>Worker</th>${wkCols}</tr></thead><tbody>${wkRows}</tbody></table>
+      </div>
+      <div class="mat-section">
+        <div class="mat-label" style="color:#889">Materials &amp; Subs <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— this month</span></div>
+        ${matsRows}
+        ${matsHtml}
+        <button class="mat-add-btn" onclick="openDayModal('${today}')">+ Add Material (log to today)</button>
+      </div>
+      <div class="proj-totals" style="border-top:2px solid var(--accent);padding-top:8px">
+        <div class="mat-label" style="margin-bottom:6px">Project Totals</div>
+        <div class="tot-row"><span class="lbl">Total Labor (billed)</span><span>${fmt$(allLaborBilled)}</span></div>
+        ${allOOSLabor>0?`<div class="tot-row" style="color:#ffe066;font-size:12px"><span class="lbl">↳ incl. Out-of-Scope Labor (${allOOSHrs}hr)</span><span>${fmt$(allOOSLabor)}</span></div>`:''}
+        <div class="tot-row"><span class="lbl">Total Materials</span><span>${fmt$(matCostAll)}</span></div>
+        <div class="tot-row"><span class="lbl">Total Material Markup</span><span>${fmt$(matMkAll)}</span></div>
+        <div class="tot-row"><span class="lbl">Total Subs</span><span>${fmt$(subCostAll)}</span></div>
+        <div class="tot-row"><span class="lbl">Total Sub Markup</span><span>${fmt$(subMkAll)}</span></div>
+        <div class="tot-row grand"><span class="lbl">GRAND TOTAL</span><span>${fmt$(grandTotal)}</span></div>
+      </div>
+      <div class="pay-section">
+        <div class="pay-label">Payments Received</div>
+        ${payRows}
+        <div class="pay-total-row"><span>Total Paid</span><span>${fmt$(totalPaid)}</span></div>
+        <div class="balance-due">
+          <span class="lbl">BALANCE DUE</span>
+          <span class="amt ${balColor}">${fmt$(Math.abs(balanceDue))}${balanceDue<=0?' ✓':''}</span>
+        </div>
+        <button class="add-pay-toggle" onclick="togglePayForm('${projId}')">+ Log Payment</button>
+        <div id="payform-${projId}" style="display:none">
+          <div class="add-pay-form" style="margin-top:8px">
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Date</div><input type="date" id="pf-date-${projId}" value="${today}"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Check #</div><input type="text" id="pf-check-${projId}" placeholder="Optional"></div>
+            </div>
+            <div class="add-pay-row">
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Amount ($)</div><input type="number" id="pf-amt-${projId}" placeholder="0.00"></div>
+              <div><div style="font-size:10px;color:#888;margin-bottom:3px">Notes</div><input type="text" id="pf-notes-${projId}" placeholder="Optional"></div>
+            </div>
+            <button class="add-pay-btn" onclick="savePayment('${esc(proj)}','${projId}')">💾 Save Payment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  };
+
+  // repaint immediately with the new layout
+  if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+})();
 </script>
-Redesign the financial summary section of each Job Panel to improve the visual hierarchy and make the project's overall financial status the primary focus.
-The monthly section should remain as-is functionally, but its totals (Monthly Materials Subtotal, Monthly Material Markup, and Total Materials) should not be bold or draw excessive attention. These are simply current-month activity numbers that reset every month and are secondary information.
-Instead, create a new section titled PROJECT TOTALS that becomes the primary financial summary for the job. This section should contain:
-•	Total Labor (Billed) 
-•	Total Materials 
-•	Total Material Markup 
-•	Total Subs 
-•	Total Sub Markup 
-•	Change Orders (+) 
-•	Grand Total
-Follow this with a divider and the existing payments received and the “BALANCE DUE”, which should remain the most prominent number on the panel.
-Keep Materials and Subs separated rather than combining them. Likewise, keep Material Markup and Sub Markup as separate totals. This provides complete financial transparency, allows different markup percentages for materials and subcontractors, makes auditing easier, and removes any uncertainty about whether both categories were properly marked up. Just for my own visual verification and takes away guessing on my part.
-Remove the text "(only visible to you)" from the internal cost/markup information. This dashboard is already an internal management tool, so the reminder is unnecessary and only adds visual clutter.
-The overall design should feel more like professional accounting/project management software, where the running project totals receive the greatest visual emphasis rather than the current month's activity.
 </body>
 </html>
 
