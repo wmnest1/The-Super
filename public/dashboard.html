@@ -3720,5 +3720,238 @@ function cwInitListeners(){
   }
 })();
 </script>
+<!-- ══ JOB PANEL — FIXED PRICE v1 — paste above </body>, AFTER the proposals snippet ══ -->
+<script>
+(function(){
+  const _prevRenderJobPanel = window.renderJobPanel;
+
+  function projectRecord(name){
+    return (data.projects||[]).find(p=>(p.name||'').toLowerCase()===(name||'').toLowerCase());
+  }
+  function crewPayRate(name){
+    const canon=normName(name).toLowerCase();
+    const rec=(data.crew||[]).find(c=>{
+      const n=(c.name||'').toLowerCase();
+      const nick=(c.nickname||'').toLowerCase();
+      return n===canon||nick===canon||n.includes(canon)||canon.includes(n);
+    });
+    return rec&&rec.hourlyRate?parseFloat(rec.hourlyRate):null;
+  }
+  window.getBurdenPct=function(){
+    const v=parseFloat(data.payrollBurdenPct);
+    return isNaN(v)?25:v;
+  };
+  window.saveBurdenPct=async function(projId){
+    const inp=document.getElementById('burden-input-'+projId);
+    const v=parseFloat(inp.value);
+    if(isNaN(v)||v<0||v>100){inp.value=getBurdenPct();return;}
+    data.payrollBurdenPct=v;
+    await saveAll();
+    render();
+  };
+  function fmtWhenFP(iso){
+    return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+
+  window.renderJobPanel = function(proj){
+    const rec=projectRecord(proj);
+    if(!rec||rec.billingType!=='fixed') return _prevRenderJobPanel(proj);
+
+    // ══ FIXED PRICE PANEL ══
+    const color=jobColor(proj);
+    const contract=parseFloat(rec.contractAmount||0);
+    const allEnt=entriesForProject(proj);           // ALL entries incl. CO-tagged — everything is cost on a fixed job
+    const ent=entriesForProjectMonth(proj,displayYear,displayMonth);
+    const weeks=monthWeeks(displayYear,displayMonth);
+    const payments=((data.payments||{})[proj]||[]);
+    const projId=proj.replace(/[^a-z0-9]/gi,'_');
+    const projCOs=(((typeof data!=='undefined'?data.changeOrders:null)||{})[proj]||[]).filter(c=>c.status==='open');
+
+    // Crew set (this month, for the weekly table)
+    const crewSet=new Set();
+    for(const en of ent)for(const c of(en.crew||[]))crewSet.add(normName(c.name));
+    const crew=[...CREW_ORDER.filter(c=>crewSet.has(c)),...[...crewSet].filter(c=>!CREW_ORDER.includes(c))];
+
+    // Weekly hours table — Cost column at crew PAY rate (not client billing rate)
+    let wkCols=weeks.map(wk=>`<th style="cursor:default">Wk ${wk.n}</th>`).join('')+'<th>Total</th><th>Cost</th>';
+    let wkRows='';const wkHrsTot=weeks.map(()=>0);let monthHrs=0;const missingRates=[];
+    for(const worker of crew){
+      const wkHrs=weeks.map(wk=>workerHours(entriesInWeek(ent,wk.start,wk.end),worker));
+      const total=wkHrs.reduce((a,b)=>a+b,0);monthHrs+=total;
+      wkHrs.forEach((h,i)=>wkHrsTot[i]+=h);
+      const pr=crewPayRate(worker);
+      if(pr==null&&total>0)missingRates.push(worker);
+      const cost=pr!=null?total*pr:0;
+      wkRows+=`<tr>
+        <td>${esc(worker)}</td>
+        ${wkHrs.map((h,wi)=>`<td class="hrs-cell${h===0?' zero':''}" onclick="openWeekModal('${esc(proj)}','${esc(worker)}',${wi})" title="Click to edit ${worker} Week ${wi+1}">${h===0?'—':h}</td>`).join('')}
+        <td><strong>${total}</strong></td>
+        <td>${pr!=null?(cost>0?fmt$(cost):'—'):'<span style="color:#b06060" title="No pay rate on crew record">no rate</span>'}</td>
+      </tr>`;
+    }
+    const wkHrCells=wkHrsTot.map(h=>h>0?h+'hr':'—').join('</td><td>');
+    wkRows+=`<tr class="wk-labor"><td>Wk Hours</td><td>${wkHrCells}</td><td><strong>${monthHrs}hr</strong></td><td></td></tr>`;
+
+    // ── ALL-TIME job costing ──
+    let hrsToDate=0, laborCost=0;
+    const perWorker={};
+    for(const en of allEnt)for(const c of(en.crew||[])){
+      const h=parseFloat(c.hours||0)+parseFloat(c.oosHours||0);
+      if(h<=0)continue;
+      const nm=normName(c.name);
+      hrsToDate+=h;
+      perWorker[nm]=(perWorker[nm]||0)+h;
+    }
+    for(const [nm,h] of Object.entries(perWorker)){
+      const pr=crewPayRate(nm);
+      if(pr!=null)laborCost+=h*pr;
+      else if(!missingRates.includes(nm))missingRates.push(nm);
+    }
+    const burdenPct=getBurdenPct();
+    const burdenAmt=laborCost*(burdenPct/100);
+
+    // Materials + subs at RAW cost (no markup — markup is a T&M billing concept)
+    let matCost=0, subCost=0;
+    for(const en of allEnt)for(const m of(en.materials||[])){
+      const c=parseFloat(m.cost||0);
+      if(m.kind==='sub')subCost+=c;else matCost+=c;
+    }
+    const totalCost=laborCost+burdenAmt+matCost+subCost;
+
+    // This month materials list (raw cost)
+    const matItems=[];
+    for(const en of ent)for(let mi=0;mi<(en.materials||[]).length;mi++){
+      const m=en.materials[mi];if(m.description||m.cost)matItems.push({date:en.date,m,mi});
+    }
+    const monthMatCost=matItems.reduce((s,{m})=>s+parseFloat(m.cost||0),0);
+    let matsRows=matItems.length===0
+      ?`<div style="font-size:12px;color:#444;padding:4px 0">No materials logged this month — <a style="color:var(--accent);cursor:pointer" onclick="openDayModal('${today}')">add one</a></div>`
+      :matItems.map(({date,m,mi})=>`
+        <div class="mat-row-wrap">
+          <span class="mat-row-desc" title="${esc(m.description)}">${m.kind==='sub'?'<span style="font-size:9px;background:#3a2a10;color:#ffce7a;border-radius:3px;padding:0 4px;margin-right:4px">SUB</span>':''}${esc(date.slice(5))} ${esc(m.description)}</span>
+          <span class="mat-row-amt">${fmt$(m.cost)}</span>
+          <button class="mat-icon-btn edit" onclick="openEditMat('${esc(proj)}','${esc(date)}')" title="Edit">✎</button>
+          <button class="mat-icon-btn del" onclick="deleteMatInPanel('${esc(proj)}','${esc(date)}',${mi})" title="Delete">✕</button>
+        </div>`).join('');
+    if(matItems.length>0)matsRows+=`<div class="mat-total-row" style="border-top:1px solid #2a3a5e"><span class="lbl" style="color:#889;font-size:11px">Month Total (cost)</span><span class="amt" style="color:#99a;font-size:11px;font-weight:normal">${fmt$(monthMatCost)}</span></div>`;
+
+    // ── Contract status from proposal system ──
+    const props=(data.proposals||[]).filter(x=>x.project===proj).sort((a,b)=>new Date(b.sentDate)-new Date(a.sentDate));
+    const prop=props[0]||null;
+    let statusRow='';
+    if(prop&&prop.status==='accepted'){
+      statusRow=`<div class="tot-row"><span class="lbl">Contract Status</span><span style="color:#7be07b;font-weight:bold">\u{1F7E2} Accepted ${fmtWhenFP(prop.acceptedAt)}</span></div>`;
+    }else if(prop){
+      const views=(prop.viewedDates||[]).length;
+      statusRow=`<div class="tot-row"><span class="lbl">Contract Status</span><span style="color:#8ab4ff">\u{1F4E4} Proposal sent${views?' \u00b7 viewed '+views+'x':''}</span></div>`;
+    }
+
+    // ── Change orders (same rules as v2.4 — separate revenue on top of contract) ──
+    let coSectionHtml='', coGrand=0;
+    if(projCOs.length){
+      const oosR=oosRateFor(proj);
+      const coBlocks=projCOs.map(co=>{
+        let hrs=0, coMatCost=0, coMatBilled=0, lines=[];
+        for(const en of allEnt){
+          for(const c of(en.crew||[]))if(c.coId===co.id){const h=parseFloat(c.hours||0);hrs+=h;if(h>0)lines.push(`${esc(en.date.slice(5))} ${esc(c.name)} — ${h}hr`);}
+          for(const m of(en.materials||[]))if(m.coId===co.id){const cc=parseFloat(m.cost||0);coMatCost+=cc;coMatBilled+=cc*(1+window.__itemPct(m,proj)/100);lines.push(`${esc(en.date.slice(5))} ${esc(m.description||'')} — ${fmt$(cc)}`);}
+        }
+        const billed=co.type==='fixed'?parseFloat(co.fixedAmount||0):(hrs*oosR+coMatBilled);
+        coGrand+=billed;
+        const meta=co.type==='fixed'?`FIXED ${fmt$(parseFloat(co.fixedAmount||0))}`:`T&M \u00b7 ${hrs}hr @ $${oosR}/hr${coMatBilled>0?' + materials':''}`;
+        return `<div style="padding:4px 0 2px">
+          <div class="tot-row"><span class="lbl" style="color:#ffce7a">CO #${co.num} — ${esc(co.name)} <span style="color:#997a44;font-size:10px">${meta}</span></span><span style="color:#ffce7a">${fmt$(billed)}</span></div>
+          ${lines.length?`<div style="font-size:11px;color:#667;padding-left:12px">${lines.join('<br>')}</div>`:''}
+        </div>`;
+      }).join('');
+      coSectionHtml=`<div class="proj-totals" style="border-top:1px solid #7a5a20;padding-top:8px">
+        <div class="mat-label" style="margin-bottom:4px;color:#ffce7a">Change Orders</div>
+        ${coBlocks}
+        <div class="tot-row" style="border-top:1px solid #3a2a10"><span class="lbl" style="color:#ffce7a;font-weight:bold">CHANGE ORDERS TOTAL</span><span style="color:#ffce7a;font-weight:bold">${fmt$(coGrand)}</span></div>
+      </div>`;
+    }
+
+    const revenue=contract+coGrand;
+    const estProfit=revenue-totalCost;
+    const totalPaid=payments.reduce((s,p)=>s+parseFloat(p.amount||0),0);
+    const balanceDue=revenue-totalPaid;
+    const profitColor=estProfit>=0?'#7be07b':'#ff7070';
+    const balColor=balanceDue<=0?'paid':'';
+
+    const missingNote=missingRates.length
+      ?`<div style="font-size:11px;color:#b06060;padding:2px 0 4px">\u26A0 No pay rate on crew record for: ${missingRates.map(esc).join(', ')} — their hours are excluded from labor cost. Add rates in Data \u2192 Crew.</div>`
+      :'';
+
+    const payRows=payments.length===0
+      ?'<div style="font-size:12px;color:#444;padding:4px 0">No payments recorded</div>'
+      :`<div class="pay-row hdr"><span>Date</span><span>Check</span><span>Amount</span><span>Notes</span></div>`
+      +payments.map(p=>`<div class="pay-row"><span>${p.date||''}</span><span>${p.check||''}</span><span>${fmt$(p.amount||0)}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes||'')}</span></div>`).join('');
+
+    return `<div class="job-panel">
+      <div class="jp-header" style="background:${color}">
+        <span>${esc(proj)} <span style="font-size:10px;background:rgba(0,0,0,.25);border-radius:4px;padding:1px 6px;margin-left:6px;letter-spacing:.5px">FIXED PRICE</span></span>
+        <span style="font-size:12px;opacity:.9">Contract ${fmt$(contract)}</span>
+      </div>
+      <div class="jp-body">
+        <div class="wk-table-wrap">
+          <div class="mat-label">Weekly Hours <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— job costing, not billed \u00b7 click any cell to edit</span></div>
+          <table class="wk-table"><thead><tr><th>Worker</th>${wkCols}</tr></thead><tbody>${wkRows}</tbody></table>
+        </div>
+        <div class="mat-section">
+          <div class="mat-label" style="color:#889">Materials &amp; Subs <span style="font-size:10px;color:#666;font-weight:normal;text-transform:none">— this month, at cost</span></div>
+          ${matsRows}
+          <button class="mat-add-btn" onclick="openDayModal('${today}')">+ Add Material (log to today)</button>
+        </div>
+        <div class="proj-totals" style="border-top:2px solid var(--accent);padding-top:8px">
+          <div class="mat-label" style="margin-bottom:6px">Contract &amp; Job Costing</div>
+          <div class="tot-row"><span class="lbl" style="font-weight:bold">Contract Price</span><span style="font-weight:bold">${fmt$(contract)}</span></div>
+          ${statusRow}
+          <div class="tot-row"><span class="lbl">Hours To Date</span><span>${hrsToDate}hr</span></div>
+          ${missingNote}
+          <div class="tot-row"><span class="lbl">Labor Cost (crew pay)</span><span>${fmt$(laborCost)}</span></div>
+          <div class="tot-row"><span class="lbl">Payroll Burden (est.)
+            <input id="burden-input-${projId}" type="number" min="0" max="100" step="0.5" value="${burdenPct}" onchange="saveBurdenPct('${projId}')" style="width:52px;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:4px;color:var(--text);padding:1px 4px;font-size:11px;margin:0 3px;text-align:right">%
+            <span style="font-size:10px;color:#667;text-transform:none;font-weight:normal">taxes + workers comp</span></span><span>${fmt$(burdenAmt)}</span></div>
+          <div class="tot-row"><span class="lbl">Materials Cost</span><span>${fmt$(matCost)}</span></div>
+          ${subCost>0?`<div class="tot-row"><span class="lbl">Subs Cost</span><span>${fmt$(subCost)}</span></div>`:''}
+          <div class="tot-row" style="border-top:1px solid #2a3a5e"><span class="lbl" style="font-weight:bold">Est. Total Cost</span><span style="font-weight:bold">${fmt$(totalCost)}</span></div>
+          <div class="tot-row"><span class="lbl" style="font-weight:bold;color:${profitColor}">Est. Gross Profit</span><span style="font-weight:bold;color:${profitColor}">${fmt$(estProfit)}${revenue>0?' <span style="font-size:10px;font-weight:normal">('+Math.round(estProfit/revenue*100)+'%)</span>':''}</span></div>
+        </div>
+        ${coSectionHtml}
+        <div class="proj-totals" style="border-top:2px solid var(--accent);padding-top:6px">
+          <div class="tot-row grand"><span class="lbl">GRAND TOTAL${projCOs.length?' DUE':''}</span><span>${fmt$(revenue)}</span></div>
+        </div>
+        <div class="pay-section">
+          <div class="pay-label">Payments Received</div>
+          ${payRows}
+          <div class="pay-total-row"><span>Total Paid</span><span>${fmt$(totalPaid)}</span></div>
+          <div class="balance-due">
+            <span class="lbl">BALANCE DUE</span>
+            <span class="amt ${balColor}">${fmt$(Math.abs(balanceDue))}${balanceDue<=0?' \u2713':''}</span>
+          </div>
+          <button class="add-pay-toggle" onclick="togglePayForm('${projId}')">+ Log Payment</button>
+          <div id="payform-${projId}" style="display:none">
+            <div class="add-pay-form" style="margin-top:8px">
+              <div class="add-pay-row">
+                <div><div style="font-size:10px;color:#888;margin-bottom:3px">Date</div><input type="date" id="pf-date-${projId}" value="${today}"></div>
+                <div><div style="font-size:10px;color:#888;margin-bottom:3px">Check #</div><input type="text" id="pf-check-${projId}" placeholder="Optional"></div>
+              </div>
+              <div class="add-pay-row">
+                <div><div style="font-size:10px;color:#888;margin-bottom:3px">Amount ($)</div><input type="number" id="pf-amt-${projId}" placeholder="0.00"></div>
+                <div><div style="font-size:10px;color:#888;margin-bottom:3px">Notes</div><input type="text" id="pf-notes-${projId}" placeholder="Optional"></div>
+              </div>
+              <button class="add-pay-btn" onclick="savePayment('${esc(proj)}','${projId}')">\u{1F4BE} Save Payment</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+})();
+</script>
+</body>
+</html>
 </body>
 </html>
