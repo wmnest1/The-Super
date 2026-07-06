@@ -430,7 +430,7 @@ I'm your Mullins Construction business manager. Tell me what you need:
 Type below or hit the mic and talk to me.</div>
 </div>
 <div id="status-bar">The Super — Ready</div>
-<input type="file" id="img-upload" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+<input type="file" id="img-upload" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.tsv,.txt,.md" style="display:none" onchange="handleImageUpload(event)">
 <div id="img-preview-bar">
   <div class="img-thumb-wrap">
     <img id="img-thumb" src="" class="img-thumb" alt="preview">
@@ -439,7 +439,7 @@ Type below or hit the mic and talk to me.</div>
   <span class="img-preview-label">Image ready — add a message or send now</span>
 </div>
 <div id="input-area">
-  <button class="btn" id="upload-btn" onclick="document.getElementById('img-upload').click()" title="Upload photo or screenshot">📎</button>
+  <button class="btn" id="upload-btn" onclick="document.getElementById('img-upload').click()" title="Upload photo, PDF, Word, Excel, CSV, or text file">📎</button>
   <button class="btn" id="mic-btn" onclick="toggleMic()" title="Tap to speak">🎤</button>
   <textarea id="message-input" placeholder="Type or speak — what do you need?" onkeydown="handleKey(event)" rows="1"></textarea>
   <button class="btn" id="send-btn" onclick="sendMessage()">➤</button>
@@ -907,42 +907,115 @@ Type below or hit the mic and talk to me.</div>
   let accumulatedTranscript = '';
   let pendingImage = null;
 
-  function handleImageUpload(event) {
+  const TEXT_EXTS = ['csv','tsv','txt','md'];
+  const MAX_TEXT_CHARS = 60000;
+  function extOf(name){ return (name.split('.').pop()||'').toLowerCase(); }
+  function loadScriptOnce(src){
+    return new Promise((resolve, reject) => {
+      if (document.querySelector('script[src="'+src+'"]')) return resolve();
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Could not load reader library — check your connection.'));
+      document.head.appendChild(s);
+    });
+  }
+  function fileIconDataUri(label, color){
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="56"><rect width="80" height="56" rx="8" fill="'+color+'"/><text x="40" y="35" font-family="Arial" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">'+label+'</text></svg>';
+    return 'data:image/svg+xml;base64,' + btoa(svg);
+  }
+  function setFilePreview(iconLabel, iconColor, fileName, note){
+    document.getElementById('img-thumb').src = fileIconDataUri(iconLabel, iconColor);
+    const lbl = document.querySelector('.img-preview-label');
+    if (lbl) lbl.textContent = fileName + ' — ' + (note || 'ready, add a message or send now');
+    document.getElementById('img-preview-bar').classList.add('active');
+    document.getElementById('upload-btn').classList.add('has-image');
+  }
+  function stashTextFile(text, name, label, color){
+    if (!text || !text.trim()) { addMessage('That file appears to be empty (no readable text found).', 'system'); return; }
+    let truncated = false;
+    if (text.length > MAX_TEXT_CHARS) { text = text.slice(0, MAX_TEXT_CHARS); truncated = true; }
+    pendingImage = { kind: 'text', text: text, name: name };
+    setFilePreview(label, color, name, truncated ? 'large file — first part will be sent' : null);
+  }
+  function arrayBufferToBase64(buf){
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    return btoa(binary);
+  }
+
+  async function handleImageUpload(event) {
     const file = event.target.files[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      addMessage('Please select an image file (JPG, PNG, GIF, WebP).', 'system'); return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1500;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          const ratio = Math.min(MAX / w, MAX / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const compressed = canvas.toDataURL('image/jpeg', 0.82);
-        const base64 = compressed.split(',')[1];
-        pendingImage = { data: base64, type: 'image/jpeg', name: file.name };
-        document.getElementById('img-thumb').src = compressed;
-        document.getElementById('img-preview-bar').classList.add('active');
-        document.getElementById('upload-btn').classList.add('has-image');
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
     event.target.value = '';
+    if (!file) return;
+    const ext = extOf(file.name);
+    try {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX = 1500;
+            let w = img.width, h = img.height;
+            if (w > MAX || h > MAX) {
+              const ratio = Math.min(MAX / w, MAX / h);
+              w = Math.round(w * ratio);
+              h = Math.round(h * ratio);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const compressed = canvas.toDataURL('image/jpeg', 0.82);
+            const base64 = compressed.split(',')[1];
+            pendingImage = { kind: 'image', data: base64, type: 'image/jpeg', name: file.name };
+            document.getElementById('img-thumb').src = compressed;
+            const lbl = document.querySelector('.img-preview-label');
+            if (lbl) lbl.textContent = 'Image ready — add a message or send now';
+            document.getElementById('img-preview-bar').classList.add('active');
+            document.getElementById('upload-btn').classList.add('has-image');
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      } else if (ext === 'pdf' || file.type === 'application/pdf') {
+        if (file.size > 10 * 1024 * 1024) { addMessage('That PDF is over 10 MB — too large to send. Try uploading just the key pages.', 'system'); return; }
+        const buf = await file.arrayBuffer();
+        pendingImage = { kind: 'pdf', data: arrayBufferToBase64(buf), type: 'application/pdf', name: file.name };
+        setFilePreview('PDF', '#b03030', file.name);
+      } else if (ext === 'docx') {
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js');
+        const buf = await file.arrayBuffer();
+        const result = await window.mammoth.extractRawText({ arrayBuffer: buf });
+        stashTextFile(result.value, file.name, 'DOCX', '#2a5aa0');
+      } else if (ext === 'doc') {
+        addMessage('Old .doc files aren\'t supported — open it in Word and save as .docx, then upload that.', 'system');
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+        const buf = await file.arrayBuffer();
+        const wb = window.XLSX.read(buf, { type: 'array' });
+        const parts = [];
+        for (const sheetName of wb.SheetNames) {
+          const csv = window.XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]);
+          if (csv.trim()) parts.push('--- Sheet: ' + sheetName + ' ---\n' + csv);
+        }
+        stashTextFile(parts.join('\n\n'), file.name, ext.toUpperCase(), '#1a7a3a');
+      } else if (TEXT_EXTS.includes(ext)) {
+        const text = await file.text();
+        const colors = { csv: '#1a7a3a', tsv: '#1a7a3a', txt: '#555a66', md: '#555a66' };
+        stashTextFile(text, file.name, ext.toUpperCase(), colors[ext] || '#555a66');
+      } else {
+        addMessage('Unsupported file type. I can read: images (JPG, PNG, GIF, WebP), PDF, Word (.docx), Excel (.xlsx), CSV, TXT, and Markdown (.md).', 'system');
+      }
+    } catch (err) {
+      addMessage('Could not read that file: ' + err.message, 'system');
+    }
   }
 
   function clearPendingImage() {
     pendingImage = null;
     document.getElementById('img-thumb').src = '';
+    const lbl = document.querySelector('.img-preview-label');
+    if (lbl) lbl.textContent = 'Image ready — add a message or send now';
     document.getElementById('img-preview-bar').classList.remove('active');
     document.getElementById('upload-btn').classList.remove('has-image');
   }
@@ -1051,18 +1124,30 @@ Type below or hit the mic and talk to me.</div>
     if (!message && !pendingImage) { isSending = false; return; }
 
     const imageToSend = pendingImage;
-    const displayText = message || 'Analyze this image.';
+    const kind = imageToSend ? (imageToSend.kind || 'image') : null;
+    const displayText = message || (kind === 'image' ? 'Analyze this image.' : kind ? 'Read this file and give me the key points.' : '');
     input.value = '';
     input.style.height = 'auto';
     if (imageToSend) clearPendingImage();
 
-    if (imageToSend) {
+    if (kind === 'image') {
       const div = document.createElement('div');
       div.className = 'message user';
       const img = document.createElement('img');
       img.src = `data:${imageToSend.type};base64,${imageToSend.data}`;
       img.style.cssText = 'max-width:220px;max-height:160px;border-radius:8px;display:block;margin-bottom:' + (message ? '6px' : '0');
       div.appendChild(img);
+      if (message) { const t = document.createElement('div'); t.textContent = message; div.appendChild(t); }
+      const chatBox = document.getElementById('chat-box');
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    } else if (kind) {
+      const div = document.createElement('div');
+      div.className = 'message user';
+      const chip = document.createElement('div');
+      chip.textContent = '📄 ' + imageToSend.name;
+      chip.style.cssText = 'background:rgba(0,0,0,.25);border-radius:6px;padding:5px 10px;font-size:12px;display:inline-block;margin-bottom:' + (message ? '6px' : '0');
+      div.appendChild(chip);
       if (message) { const t = document.createElement('div'); t.textContent = message; div.appendChild(t); }
       const chatBox = document.getElementById('chat-box');
       chatBox.appendChild(div);
@@ -1079,10 +1164,14 @@ Type below or hit the mic and talk to me.</div>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: displayText,
+          message: kind === 'text'
+            ? '[Attached file: ' + imageToSend.name + ']\n```\n' + imageToSend.text + '\n```\n\n' + displayText
+            : displayText,
           history,
-          imageData: imageToSend ? imageToSend.data : null,
-          imageType: imageToSend ? imageToSend.type : null
+          imageData: kind === 'image' ? imageToSend.data : null,
+          imageType: kind === 'image' ? imageToSend.type : null,
+          documentData: kind === 'pdf' ? imageToSend.data : null,
+          documentName: kind === 'pdf' ? imageToSend.name : null
         })
       });
       const data = await response.json();
@@ -2290,4 +2379,6 @@ Type below or hit the mic and talk to me.</div>
 </script>
 </body>
 </html>
+
+
 
