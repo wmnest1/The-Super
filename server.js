@@ -1192,7 +1192,7 @@ app.post("/api/chat", async (req, res) => {
   req.setTimeout(120000);
   res.setTimeout(120000);
   try {
-    const { message, history, imageData, imageType } = req.body;
+    const { message, history, imageData, imageType, documentData, documentName } = req.body;
     let data = await loadData();
     const chatModel = data.chatModel === "claude-sonnet-4-6" ? "claude-sonnet-4-6" : "claude-opus-4-8";
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
@@ -1201,11 +1201,17 @@ app.post("/api/chat", async (req, res) => {
     if (history && history.length > 0) messages.push(...history.slice(-20));
 
     let userContent;
+    const contentBlocks = [];
     if (imageData && imageType) {
-      userContent = [
-        { type: "image", source: { type: "base64", media_type: imageType, data: imageData } },
-        { type: "text", text: message || "Please analyze this image." }
-      ];
+      contentBlocks.push({ type: "image", source: { type: "base64", media_type: imageType, data: imageData } });
+    }
+    if (documentData) {
+      contentBlocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: documentData } });
+    }
+    if (contentBlocks.length) {
+      const label = documentName ? `[Attached PDF: ${documentName}] ` : "";
+      contentBlocks.push({ type: "text", text: label + (message || "Please analyze this file.") });
+      userContent = contentBlocks;
     } else {
       userContent = message;
     }
