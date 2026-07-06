@@ -290,7 +290,7 @@
   .cancel-btn:hover { color: #fff; }
   .add-new-btn { background: var(--accent); border: none; border-radius: 8px; color: #1a1a2e; padding: 8px 16px; font-size: 13px; font-weight: bold; cursor: pointer; margin-bottom: 14px; }
   .add-new-btn:hover { background: #c8881a; }
-  .record-card { background: #0f1a2e; border: 1px solid #2a3a5e; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .record-card { background: #0f1a2e; border: 1px solid #2a3a5e; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
   .record-card:hover { border-color: var(--accent); }
   .record-info { flex: 1; }
   .record-name { font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 3px; }
@@ -1387,6 +1387,7 @@ Type below or hit the mic and talk to me.</div>
       if (idx >= 0) populateForm(tab, appData[tab][idx]);
       else clearForm(tab);
     }
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
   function hideForm(tab) {
     document.getElementById('form-' + tab).style.display = 'none';
@@ -1559,7 +1560,10 @@ Type below or hit the mic and talk to me.</div>
         if (showArchived) {
           html += archivedItems.map(r => {
             const card = renderCard(tab, r, allEntries.indexOf(r));
-            return card.replace('<div class="record-card">', '<div class="record-card" style="opacity:0.55;position:relative"><span style="position:absolute;top:8px;right:84px;font-size:9px;background:#1a1a00;color:#886;border-radius:3px;padding:1px 5px;pointer-events:none">archived</span>');
+            return card
+              .replace('class="record-card"', 'class="record-card" data-archived="1"')
+              .replace('title="Click to open"', 'title="Click to open" style="opacity:0.55;position:relative"')
+              .replace('<div class="record-info">', '<span style="position:absolute;top:8px;right:84px;font-size:9px;background:#1a1a00;color:#886;border-radius:3px;padding:1px 5px;pointer-events:none">archived</span><div class="record-info">');
           }).join('');
         }
       }
@@ -1612,8 +1616,8 @@ Type below or hit the mic and talk to me.</div>
         notesHtml
       ].filter(Boolean).join('<br>');
     }
-    const docsBtn = tab === 'projects' ? `<button class="edit-btn" style="background:#0f3460" onclick="openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>` : '';
-    return `<div class="record-card"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${docsBtn}<button class="edit-btn" onclick="showForm('${tab}', ${i})">Edit</button><button class="del-btn" onclick="deleteRecord('${tab}', ${i})">Del</button></div></div>`;
+    const docsBtn = tab === 'projects' ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>` : '';
+    return `<div class="record-card" onclick="showForm('${tab}', ${i})" title="Click to open"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
   }
 
   document.getElementById('data-modal').addEventListener('click', function(e) {
