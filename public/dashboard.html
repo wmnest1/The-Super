@@ -4195,5 +4195,188 @@ function cwInitListeners(){
   if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
 })();
 </script>
+<!-- ══ FLOATING JOB PANELS v1 — paste above </body>, AFTER all other snippets ══ -->
+<script>
+(function(){
+  const MAX_FLOATS = 3;
+  const LS_KEY = 'jpFloaters_v1';
+  let zCounter = 8000;
+  let restored = false;
+
+  // ---- Styles ----
+  const css = ''
+    + '.jp-float{position:fixed;z-index:8000;background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:330px;min-height:280px;width:430px;height:560px}'
+    + '.jp-float-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f3460;cursor:move;user-select:none;flex-shrink:0;font-size:13px;font-weight:bold}'
+    + '.jp-float-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.jp-float-x{background:none;border:none;color:#aab;font-size:15px;cursor:pointer;flex-shrink:0;padding:0 2px}'
+    + '.jp-float-x:hover{color:#fff}'
+    + '.jp-float-body{overflow-y:auto;flex:1;padding:0 4px 8px}'
+    + '.jp-float-body .job-panel{margin:0;box-shadow:none}'
+    + '#panels-wrap .job-panel .jp-header{cursor:pointer}'
+    + '#panels-wrap .job-panel .jp-header:hover{filter:brightness(1.12)}'
+    + '.jp-float .jp-header{cursor:default}'
+    + '.modal-overlay{z-index:8990 !important}'; // keep hour/day modals above floaters
+  const st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  // ---- Tag every panel with its project name so clicks can identify it ----
+  const _prevRJP_flt = window.renderJobPanel;
+  window.renderJobPanel = function(proj){
+    let html = _prevRJP_flt(proj);
+    const attr = String(proj).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    html = html.replace('<div class="job-panel">', '<div class="job-panel" data-proj="' + attr + '">');
+    return html;
+  };
+
+  // ---- Remap element IDs inside a floater so its forms don't collide with the bottom panel's ----
+  function remapIds(html, proj){
+    const projId = String(proj).replace(/[^a-z0-9]/gi, '_');
+    const fid = projId + '_flt';
+    return html
+      .split('id="payform-' + projId + '"').join('id="payform-' + fid + '"')
+      .split('id="pf-date-' + projId + '"').join('id="pf-date-' + fid + '"')
+      .split('id="pf-check-' + projId + '"').join('id="pf-check-' + fid + '"')
+      .split('id="pf-amt-' + projId + '"').join('id="pf-amt-' + fid + '"')
+      .split('id="pf-notes-' + projId + '"').join('id="pf-notes-' + fid + '"')
+      .split('id="burden-input-' + projId + '"').join('id="burden-input-' + fid + '"')
+      .split("togglePayForm('" + projId + "')").join("togglePayForm('" + fid + "')")
+      .split("saveBurdenPct('" + projId + "')").join("saveBurdenPct('" + fid + "')")
+      .split(",'" + projId + "')").join(",'" + fid + "')");
+  }
+
+  // ---- State persistence ----
+  function loadState(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || { open: [], pos: {} }; }
+    catch (e) { return { open: [], pos: {} }; }
+  }
+  function saveState(){
+    const open = [...document.querySelectorAll('.jp-float')].map(f => f.dataset.proj);
+    const state = loadState();
+    state.open = open;
+    for (const f of document.querySelectorAll('.jp-float')) {
+      state.pos[f.dataset.proj] = { x: f.offsetLeft, y: f.offsetTop, w: f.offsetWidth, h: f.offsetHeight };
+    }
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function bringToFront(el){
+    zCounter += 1;
+    el.style.zIndex = zCounter;
+  }
+
+  window.openJobFloat = function(proj){
+    // Already open → bring to front
+    const existing = [...document.querySelectorAll('.jp-float')].find(f => f.dataset.proj === proj);
+    if (existing) { bringToFront(existing); return; }
+
+    // Cap: close the oldest
+    const floats = document.querySelectorAll('.jp-float');
+    if (floats.length >= MAX_FLOATS) closeJobFloat(floats[0].dataset.proj);
+
+    const state = loadState();
+    const pos = state.pos[proj] || {};
+    const idx = document.querySelectorAll('.jp-float').length;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'jp-float';
+    wrap.dataset.proj = proj;
+    wrap.style.left = (pos.x != null ? pos.x : 80 + idx * 40) + 'px';
+    wrap.style.top = (pos.y != null ? pos.y : 80 + idx * 40) + 'px';
+    if (pos.w) wrap.style.width = pos.w + 'px';
+    if (pos.h) wrap.style.height = pos.h + 'px';
+
+    const safe = String(proj).replace(/</g, '&lt;');
+    wrap.innerHTML = '<div class="jp-float-bar"><span>\u{1F4CC} ' + safe + '</span><button class="jp-float-x" title="Close">\u2715</button></div>'
+      + '<div class="jp-float-body"></div>';
+
+    document.body.appendChild(wrap);
+    bringToFront(wrap);
+    refreshFloatBody(wrap);
+
+    // Close button
+    wrap.querySelector('.jp-float-x').addEventListener('click', () => closeJobFloat(proj));
+    // Any click brings to front
+    wrap.addEventListener('pointerdown', () => bringToFront(wrap));
+
+    // Dragging via the titlebar
+    const bar = wrap.querySelector('.jp-float-bar');
+    bar.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.jp-float-x')) return;
+      e.preventDefault();
+      const startX = e.clientX, startY = e.clientY;
+      const origL = wrap.offsetLeft, origT = wrap.offsetTop;
+      function move(ev){
+        let nl = origL + (ev.clientX - startX);
+        let nt = origT + (ev.clientY - startY);
+        nl = Math.max(-wrap.offsetWidth + 80, Math.min(nl, window.innerWidth - 60));
+        nt = Math.max(0, Math.min(nt, window.innerHeight - 40));
+        wrap.style.left = nl + 'px';
+        wrap.style.top = nt + 'px';
+      }
+      function up(){
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        saveState();
+      }
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    });
+
+    // Persist size changes from the native resize handle
+    if (window.ResizeObserver) {
+      let t = null;
+      new ResizeObserver(() => { clearTimeout(t); t = setTimeout(saveState, 400); }).observe(wrap);
+    }
+
+    saveState();
+  };
+
+  window.closeJobFloat = function(proj){
+    const f = [...document.querySelectorAll('.jp-float')].find(x => x.dataset.proj === proj);
+    if (f) f.remove();
+    saveState();
+  };
+
+  function refreshFloatBody(wrap){
+    const proj = wrap.dataset.proj;
+    try {
+      wrap.querySelector('.jp-float-body').innerHTML = remapIds(window.renderJobPanel(proj), proj);
+    } catch (e) {
+      wrap.querySelector('.jp-float-body').innerHTML = '<div style="padding:16px;font-size:12px;color:#889">Could not load this job\u2019s panel. The project may have been renamed or deleted.</div>';
+    }
+  }
+
+  function refreshAllFloats(){
+    for (const f of document.querySelectorAll('.jp-float')) refreshFloatBody(f);
+  }
+
+  // ---- Open on header click (bottom panels only, not inside floaters) ----
+  document.addEventListener('click', (e) => {
+    const hdr = e.target.closest('.jp-header');
+    if (!hdr || e.target.closest('.jp-float')) return;
+    const panel = hdr.closest('.job-panel');
+    const proj = panel && panel.dataset ? panel.dataset.proj : null;
+    if (proj) openJobFloat(proj);
+  });
+
+  // ---- Keep floaters in sync with every dashboard refresh, restore saved ones on first load ----
+  const _prevRender_flt = window.render;
+  if (typeof _prevRender_flt === 'function') {
+    window.render = function(){
+      _prevRender_flt();
+      if (!restored) {
+        restored = true;
+        const state = loadState();
+        for (const proj of (state.open || []).slice(0, MAX_FLOATS)) {
+          if ((data.projects || []).some(p => (p.name || '') === proj)) openJobFloat(proj);
+        }
+      }
+      refreshAllFloats();
+    };
+  }
+})();
+</script>
 </body>
 </html>
+
