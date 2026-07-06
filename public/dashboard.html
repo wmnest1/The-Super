@@ -4034,7 +4034,166 @@ function cwInitListeners(){
   if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
 })();
 </script>
-</body>
-</html>
+<!-- ══ JOB DOCS v1 — paste above </body>, AFTER all other snippets ══ -->
+<script>
+(function(){
+  // ---- Styles ----
+  const css = ''
+    + '#docs-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;align-items:center;justify-content:center}'
+    + '#docs-overlay.active{display:flex}'
+    + '#docs-modal{background:var(--panel,#16213e);border:1px solid #2a3a5e;border-radius:12px;width:min(560px,94vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden}'
+    + '#docs-hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid #2a3a5e;font-weight:bold;font-size:15px}'
+    + '#docs-close{background:none;border:none;color:#778;font-size:18px;cursor:pointer}'
+    + '#docs-list{overflow-y:auto;padding:8px 18px;flex:1}'
+    + '.docs-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #1e2c47;font-size:13px;flex-wrap:wrap}'
+    + '.docs-row:last-child{border-bottom:none}'
+    + '.docs-name{flex:1;min-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.docs-tag{font-size:10px;padding:1px 7px;border-radius:8px;white-space:nowrap}'
+    + '.docs-tag.invoice{background:#1a2f4e;color:#8ab4ff}.docs-tag.proposal{background:#173a1a;color:#7be07b}'
+    + '.docs-tag.file{background:#2a2a3a;color:#99a}.docs-tag.receipt{background:#3a2a10;color:#ffce7a}'
+    + '.docs-tag.permit{background:#2a1a3a;color:#c9a0ff}.docs-tag.contract{background:#173a1a;color:#7be07b}'
+    + '.docs-meta{font-size:10px;color:#667;white-space:nowrap}'
+    + '.docs-view{color:var(--accent);font-size:12px;cursor:pointer;text-decoration:none;white-space:nowrap}'
+    + '.docs-del{background:none;border:none;color:#7a4a4a;cursor:pointer;font-size:12px}'
+    + '#docs-foot{padding:12px 18px;border-top:1px solid #2a3a5e;display:flex;gap:10px;align-items:center}'
+    + '#docs-upload-btn{background:#0f3460;border:none;border-radius:6px;color:var(--text,#eee);padding:8px 16px;font-size:12px;cursor:pointer}'
+    + '#docs-upload-btn:disabled{opacity:.5}'
+    + '.docs-empty{padding:20px 0;font-size:12px;color:#667;text-align:center}'
+    + '.jp-docs-btn{background:#0f3460;border:none;border-radius:6px;color:var(--text,#eee);padding:7px 12px;font-size:12px;cursor:pointer;margin:6px 0 2px;width:100%}'
+    + 'html.light #docs-modal{background:#fff;border-color:#ddd}'
+    + 'html.light .docs-row{border-color:#eee}';
+  const st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  // ---- Modal shell ----
+  const overlay = document.createElement('div');
+  overlay.id = 'docs-overlay';
+  overlay.innerHTML = '<div id="docs-modal">'
+    + '<div id="docs-hdr"><span id="docs-title">\u{1F4C1} Job Docs</span><button id="docs-close" onclick="closeDocsModal()">\u2715</button></div>'
+    + '<div id="docs-list"><div class="docs-empty">Loading\u2026</div></div>'
+    + '<div id="docs-foot">'
+    + '<input type="file" id="docs-file-input" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md" style="display:none" onchange="docsHandleUpload(event)">'
+    + '<button id="docs-upload-btn" onclick="document.getElementById(\'docs-file-input\').click()">\u2B06 Upload to this job</button>'
+    + '<span id="docs-upload-status" style="font-size:11px;color:#667"></span>'
+    + '</div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDocsModal(); });
+
+  let docsCurrentProject = null;
+
+  window.openDocsModal = function(proj){
+    docsCurrentProject = proj;
+    document.getElementById('docs-title').textContent = '\u{1F4C1} Job Docs — ' + proj;
+    document.getElementById('docs-overlay').classList.add('active');
+    refreshDocsList();
+  };
+  window.closeDocsModal = function(){
+    document.getElementById('docs-overlay').classList.remove('active');
+  };
+
+  function fmtDocWhen(iso){
+    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function fmtSize(bytes){
+    if (!bytes) return '';
+    if (bytes > 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes > 1024) return Math.round(bytes / 1024) + ' KB';
+    return bytes + ' B';
+  }
+  function escD(s){ return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+  async function refreshDocsList(){
+    const listEl = document.getElementById('docs-list');
+    listEl.innerHTML = '<div class="docs-empty">Loading\u2026</div>';
+    let files = [];
+    try {
+      const res = await fetch('/api/docs?project=' + encodeURIComponent(docsCurrentProject));
+      files = await res.json();
+      if (!Array.isArray(files)) files = [];
+    } catch (e) { files = []; }
+
+    // Merge in e-signature proposals for this project (stored separately in data.proposals)
+    const sigProps = ((typeof data !== 'undefined' && data.proposals) || [])
+      .filter(p => p.project === docsCurrentProject)
+      .map(p => ({
+        id: null, sig: true, token: p.id,
+        name: (p.subject || 'Proposal') + (p.status === 'accepted' ? ' (signed)' : ''),
+        docType: 'proposal',
+        uploadedAt: p.acceptedAt || p.sentDate,
+        size: 0
+      }));
+
+    const rows = [...files, ...sigProps].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';
+      return;
+    }
+
+    listEl.innerHTML = rows.map(d => {
+      const href = d.sig ? ('/proposal/' + d.token) : ('/api/docs/' + d.id + '/view');
+      const tag = escD(d.docType || 'file');
+      return '<div class="docs-row">'
+        + '<span class="docs-name" title="' + escD(d.name) + '">' + escD(d.name) + '</span>'
+        + '<span class="docs-tag ' + tag + '">' + tag + '</span>'
+        + '<span class="docs-meta">' + fmtDocWhen(d.uploadedAt) + (d.size ? ' \u00b7 ' + fmtSize(d.size) : '') + '</span>'
+        + '<a class="docs-view" href="' + href + '" target="_blank">View \u2192</a>'
+        + (d.sig ? '' : '<button class="docs-del" onclick="docsDelete(\'' + d.id + '\')" title="Delete">\u2715</button>')
+        + '</div>';
+    }).join('');
+  }
+
+  window.docsDelete = async function(id){
+    if (!confirm('Delete this document? This cannot be undone.')) return;
+    try {
+      await fetch('/api/docs/' + id, { method: 'DELETE' });
+    } catch (e) {}
+    refreshDocsList();
+  };
+
+  window.docsHandleUpload = async function(event){
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > 9 * 1024 * 1024) { document.getElementById('docs-upload-status').textContent = 'Too large — keep files under 9 MB.'; return; }
+    const statusEl = document.getElementById('docs-upload-status');
+    const btn = document.getElementById('docs-upload-btn');
+    statusEl.textContent = 'Uploading\u2026';
+    btn.disabled = true;
+    try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      const b64 = btoa(binary);
+      const res = await fetch('/api/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: docsCurrentProject, name: file.name, mimeType: file.type || 'application/octet-stream', data: b64 })
+      });
+      const j = await res.json();
+      if (!res.ok || j.error) throw new Error(j.error || 'Upload failed');
+      statusEl.textContent = 'Saved \u2713';
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+      refreshDocsList();
+    } catch (e) {
+      statusEl.textContent = 'Upload failed: ' + e.message;
+    }
+    btn.disabled = false;
+  };
+
+  // ---- Add the Job Docs button to every job panel (T&M and Fixed Price) ----
+  const _prevRJP = window.renderJobPanel;
+  window.renderJobPanel = function(proj){
+    let html = _prevRJP(proj);
+    const btn = '<button class="jp-docs-btn" onclick="openDocsModal(\'' + proj.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\')">\u{1F4C1} Job Docs</button>';
+    html = html.replace('<div class="pay-section">', btn + '<div class="pay-section">');
+    return html;
+  };
+  if (typeof window.renderJobPanels === 'function') try { renderJobPanels(); } catch(e){}
+})();
+</script>
 </body>
 </html>
