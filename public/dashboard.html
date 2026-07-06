@@ -1734,10 +1734,12 @@ async function cwSend(){
   const message=input.value.trim();
   if(!message&&!cwPendingImg) return;
   cwIsSending=true;
-  const img=cwPendingImg, displayText=message||'Analyze this image.';
+  const img=cwPendingImg;
+  const kind=img?(img.kind||'image'):null;
+  const displayText=message||(kind==='image'?'Analyze this image.':kind?'Read this file and give me the key points.':'');
   input.value=''; input.style.height='auto';
   if(img) cwClearImg();
-  if(img){
+  if(kind==='image'){
     const d=document.createElement('div'); d.className='cw-msg user';
     const im=document.createElement('img');
     im.src=`data:${img.type};base64,${img.data}`;
@@ -1745,11 +1747,26 @@ async function cwSend(){
     d.appendChild(im);
     if(message){const t=document.createElement('div');t.textContent=message;d.appendChild(t);}
     const m=document.getElementById('cw-msgs'); m.appendChild(d); m.scrollTop=m.scrollHeight;
+  } else if(kind){
+    const d=document.createElement('div'); d.className='cw-msg user';
+    const chip=document.createElement('div');
+    chip.textContent='📄 '+img.name;
+    chip.style.cssText='background:rgba(0,0,0,.25);border-radius:6px;padding:4px 8px;font-size:11px;display:inline-block'+(message?';margin-bottom:4px':'');
+    d.appendChild(chip);
+    if(message){const t=document.createElement('div');t.textContent=message;d.appendChild(t);}
+    const m=document.getElementById('cw-msgs'); m.appendChild(d); m.scrollTop=m.scrollHeight;
   } else { cwAddMsg(displayText,'user'); }
   const thinking=cwAddMsg('Thinking…','thinking');
   document.getElementById('cw-send').disabled=true;
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:displayText,history:cwHistory,imageData:img?.data||null,imageType:img?.type||null})});
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      message: kind==='text' ? '[Attached file: '+img.name+']\n```\n'+img.text+'\n```\n\n'+displayText : displayText,
+      history:cwHistory,
+      imageData: kind==='image'?img.data:null,
+      imageType: kind==='image'?img.type:null,
+      documentData: kind==='pdf'?img.data:null,
+      documentName: kind==='pdf'?img.name:null
+    })});
     const d=await res.json();
     thinking.remove();
     if(d.error){ cwAddMsg('Error: '+d.error,'system'); }
@@ -1780,27 +1797,93 @@ async function cwRefreshDashboard(){
   }catch(e){}
 }
 
-// Image upload
-function cwHandleImg(event){
+// File upload (images, PDF, Word, Excel, CSV, text)
+const CW_TEXT_EXTS=['csv','tsv','txt','md'];
+const CW_MAX_TEXT_CHARS=60000;
+function cwExtOf(name){ return (name.split('.').pop()||'').toLowerCase(); }
+function cwLoadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector('script[src="'+src+'"]')) return resolve();
+    const s=document.createElement('script');
+    s.src=src; s.onload=resolve; s.onerror=()=>reject(new Error('Could not load reader library — check your connection.'));
+    document.head.appendChild(s);
+  });
+}
+function cwFileIcon(label,color){
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42"><rect width="42" height="42" rx="6" fill="'+color+'"/><text x="21" y="27" font-family="Arial" font-size="10" font-weight="bold" fill="#fff" text-anchor="middle">'+label+'</text></svg>';
+  return 'data:image/svg+xml;base64,'+btoa(svg);
+}
+function cwSetFilePreview(iconLabel,iconColor,fileName){
+  document.getElementById('cw-img-thumb').src=cwFileIcon(iconLabel,iconColor);
+  document.getElementById('cw-img-name').textContent=fileName;
+  document.getElementById('cw-img-bar').classList.add('active');
+}
+function cwStashText(text,name,label,color){
+  if(!text||!text.trim()){cwAddMsg('That file appears to be empty (no readable text found).','system');return;}
+  if(text.length>CW_MAX_TEXT_CHARS)text=text.slice(0,CW_MAX_TEXT_CHARS);
+  cwPendingImg={kind:'text',text:text,name:name};
+  cwSetFilePreview(label,color,name);
+}
+function cwBufToB64(buf){
+  const bytes=new Uint8Array(buf);let binary='';const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode.apply(null,bytes.subarray(i,i+chunk));
+  return btoa(binary);
+}
+async function cwHandleImg(event){
   const file=event.target.files[0];
-  if(!file||!file.type.startsWith('image/')) return;
-  const reader=new FileReader();
-  reader.onload=(e)=>{
-    const img=new Image();
-    img.onload=()=>{
-      const MAX=1500; let w=img.width,h=img.height;
-      if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
-      const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      const compressed=canvas.toDataURL('image/jpeg',.82);
-      cwPendingImg={data:compressed.split(',')[1],type:'image/jpeg',name:file.name};
-      document.getElementById('cw-img-thumb').src=compressed;
-      document.getElementById('cw-img-name').textContent=file.name;
-      document.getElementById('cw-img-bar').classList.add('active');
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(file); event.target.value='';
+  event.target.value='';
+  if(!file) return;
+  const ext=cwExtOf(file.name);
+  try{
+    if(file.type.startsWith('image/')){
+      const reader=new FileReader();
+      reader.onload=(e)=>{
+        const img=new Image();
+        img.onload=()=>{
+          const MAX=1500; let w=img.width,h=img.height;
+          if(w>MAX||h>MAX){const r=Math.min(MAX/w,MAX/h);w=Math.round(w*r);h=Math.round(h*r);}
+          const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          const compressed=canvas.toDataURL('image/jpeg',.82);
+          cwPendingImg={kind:'image',data:compressed.split(',')[1],type:'image/jpeg',name:file.name};
+          document.getElementById('cw-img-thumb').src=compressed;
+          document.getElementById('cw-img-name').textContent=file.name;
+          document.getElementById('cw-img-bar').classList.add('active');
+        };
+        img.src=e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }else if(ext==='pdf'||file.type==='application/pdf'){
+      if(file.size>10*1024*1024){cwAddMsg('That PDF is over 10 MB — too large to send. Try uploading just the key pages.','system');return;}
+      const buf=await file.arrayBuffer();
+      cwPendingImg={kind:'pdf',data:cwBufToB64(buf),type:'application/pdf',name:file.name};
+      cwSetFilePreview('PDF','#b03030',file.name);
+    }else if(ext==='docx'){
+      await cwLoadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js');
+      const buf=await file.arrayBuffer();
+      const result=await window.mammoth.extractRawText({arrayBuffer:buf});
+      cwStashText(result.value,file.name,'DOCX','#2a5aa0');
+    }else if(ext==='doc'){
+      cwAddMsg('Old .doc files aren\'t supported — save it as .docx in Word first.','system');
+    }else if(ext==='xlsx'||ext==='xls'){
+      await cwLoadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+      const buf=await file.arrayBuffer();
+      const wb=window.XLSX.read(buf,{type:'array'});
+      const parts=[];
+      for(const sheetName of wb.SheetNames){
+        const csv=window.XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]);
+        if(csv.trim())parts.push('--- Sheet: '+sheetName+' ---\n'+csv);
+      }
+      cwStashText(parts.join('\n\n'),file.name,ext.toUpperCase(),'#1a7a3a');
+    }else if(CW_TEXT_EXTS.includes(ext)){
+      const text=await file.text();
+      cwStashText(text,file.name,ext.toUpperCase(),ext==='csv'||ext==='tsv'?'#1a7a3a':'#555a66');
+    }else{
+      cwAddMsg('Unsupported file type. I can read: images, PDF, Word (.docx), Excel (.xlsx), CSV, TXT, and Markdown (.md).','system');
+    }
+  }catch(err){
+    cwAddMsg('Could not read that file: '+err.message,'system');
+  }
 }
 function cwClearImg(){
   cwPendingImg=null;
@@ -1901,8 +1984,8 @@ function cwInitListeners(){
     <button onclick="cwClearImg()" style="background:none;border:none;color:#778;cursor:pointer;font-size:16px;flex-shrink:0">✕</button>
   </div>
   <div id="cw-bar">
-    <input type="file" id="cw-file" accept="image/*" style="display:none" onchange="cwHandleImg(event)">
-    <button class="cw-bar-btn" onclick="document.getElementById('cw-file').click()" title="Upload image">📎</button>
+    <input type="file" id="cw-file" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.tsv,.txt,.md" style="display:none" onchange="cwHandleImg(event)">
+    <button class="cw-bar-btn" onclick="document.getElementById('cw-file').click()" title="Upload photo, PDF, Word, Excel, CSV, or text file">📎</button>
     <button class="cw-bar-btn" id="cw-mic" onclick="cwToggleMic()" title="Voice input">🎤</button>
     <textarea id="cw-input" placeholder="Ask anything…" onkeydown="cwHandleKey(event)" oninput="cwAutoResize(this)" rows="1"></textarea>
     <button class="cw-bar-btn send" id="cw-send" onclick="cwSend()">➤</button>
