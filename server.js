@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 const nodemailer = require('nodemailer');
 const puppeteer = require('puppeteer');
 
@@ -125,6 +125,30 @@ const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || "https://the-super-1.onre
 
 function makeProposalToken() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+}
+
+// ── Job documents (stored in a separate "files" collection so the main doc stays light) ──
+async function filesCol() {
+  const db = await connectDB();
+  return db.collection("files");
+}
+
+async function saveJobDocument({ project, name, docType, mimeType, data, html, source }) {
+  const col = await filesCol();
+  const record = {
+    project: project || null,
+    name: name || "Untitled",
+    docType: docType || "file",           // 'invoice' | 'proposal' | 'file'
+    kind: html ? "generated" : "upload",  // generated = HTML we produced; upload = binary file
+    mimeType: mimeType || (html ? "text/html" : "application/octet-stream"),
+    data: data || null,                    // base64 for uploads
+    html: html || null,                    // HTML for generated docs
+    size: data ? Math.round(data.length * 0.75) : (html ? html.length : 0),
+    uploadedAt: new Date().toISOString(),
+    source: source || "chat"
+  };
+  const result = await col.insertOne(record);
+  return { id: result.insertedId.toString(), name: record.name, docType: record.docType };
 }
 
 async function saveData(data) {
@@ -256,6 +280,7 @@ When generating estimates, proposals, or answering pricing questions:
 4. FLAG MISSING LINE ITEMS: If a proposal scope mentions kitchen/bath but doesn't include permits, debris disposal, or inspection fees — flag these as likely omissions.
 5. AUTO-APPLY PROJECT RATES: When generating invoices/proposals, always pull the project's "rate", "oosRate", and "markup" from the project record automatically. Never require Walt to re-state them.
 5b. FIXED-PRICE JOBS: Projects with billingType "fixed" bill the client the contractAmount (typically via the payment schedule in the proposal — deposit / progress / final), NOT hourly. Hours and materials logged to a fixed-price job are internal job-costing only and never appear as line items on client invoices. Invoices for fixed-price jobs are for contract payments (e.g. "Progress payment per contract — $7,000"). Change orders on fixed-price jobs still work normally and bill separately per CO rules. When Walt says a job is "fixed price", "flat bid", or "contract price", set billingType "fixed" and contractAmount via save_project.
+5c. JOB DOCUMENTS: Every invoice or proposal sent via send_email is automatically saved to that project's document history (always pass "project" and "doc_type" on send_email). Walt can view a job's documents from the Job Docs button on the dashboard job panel. When Walt uploads a file and wants it kept with a job, use the file_document tool. If he asks "where can I see the invoice/proposal for [job]" point him to the 📁 Job Docs button on that project's dashboard panel (e-signed proposals also appear in the Proposals bar).
 6. OOS LINE ITEMS: When generating change order / OOS sections on invoices, always use the project's oosRate field automatically (fall back to regular rate if oosRate not set).
 
 EMAIL CAPABILITIES:
@@ -565,7 +590,9 @@ const TOOLS = [
         html_body: { type: "string", description: "Complete HTML content of the invoice or proposal exactly as generated — do not simplify or strip it." },
         client_name: { type: "string", description: "Client's first name for the email greeting." },
         email_body: { type: "string", description: "The body text of the email message. Write a professional, friendly 3-4 sentence message referencing the attached document, the job address, and the total amount due if it's an invoice. Mention payment options (check to Mullins Construction or Zelle)." },
-        pdf_filename: { type: "string", description: "Filename for the PDF attachment, e.g. 'Invoice-1006-Cooney.pdf' or 'Proposal-Cooney-Kitchen.pdf'" }
+        pdf_filename: { type: "string", description: "Filename for the PDF attachment, e.g. 'Invoice-1006-Cooney.pdf' or 'Proposal-Cooney-Kitchen.pdf'" },
+        project: { type: "string", description: "Project/job name this document belongs to — match to an existing project name. Always set this for invoices and proposals so the document is saved to that job's document history." },
+        doc_type: { type: "string", enum: ["invoice", "proposal", "other"], description: "What kind of document this is. Used to file it in the job's document history." }
       },
       required: ["to_email", "subject", "html_body"]
     }
@@ -585,6 +612,19 @@ const TOOLS = [
         email_body: { type: "string", description: "Short 2-3 sentence friendly email message inviting the client to review and accept the proposal online. Mention the job address. Do not mention a PDF attachment." }
       },
       required: ["project", "to_email", "subject", "html_body"]
+    }
+  },
+  {
+    name: "file_document",
+    description: `Save the file Walt uploaded with his CURRENT message into a project's document history ("job docs"). Use when Walt uploads a PDF, image, or other file and asks to save/file/keep it, or clearly indicates it belongs to a job — e.g. "save this to the Bob Good job", "file this with the Nguyen project", "keep this receipt with Cronce". Only works for a file attached to the current message. After saving, the document is viewable in that project's Job Docs on the dashboard. Match project to an existing project name. If Walt uploads a file that obviously belongs to a job (like "here's the signed permit for Cronce") but doesn't explicitly say to save it, answer his question first, then offer: "Want me to file this in the Cronce job docs?"`,
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project/job name to file this document under. Match to an existing project name." },
+        name: { type: "string", description: "Display name for the document, e.g. 'Signed permit', 'ADP payroll report June'. Default to the uploaded filename if Walt didn't name it." },
+        doc_type: { type: "string", enum: ["invoice", "proposal", "receipt", "permit", "contract", "file"], description: "Category, best guess from context. Default 'file'." }
+      },
+      required: ["project"]
     }
   },
   {
@@ -683,7 +723,8 @@ function checkMaterialDuplicate(date, project, description, amount, entries) {
 }
 
 // ── Tool executor ──
-async function executeTool(toolName, input, data) {
+async function executeTool(toolName, input, data, ctx) {
+  ctx = ctx || {};
   switch (toolName) {
     case "save_appointment": {
       if (!data.appointments) data.appointments = [];
@@ -917,7 +958,18 @@ async function executeTool(toolName, input, data) {
             contentType: 'application/pdf'
           }]
         });
-        return { success: true, message: `Email sent to ${input.to_email} with PDF attachment: ${input.pdf_filename || 'document.pdf'}` };
+        return { success: true, message: `Email sent to ${input.to_email} with PDF attachment: ${input.pdf_filename || 'document.pdf'}`, savedDoc: await (async () => {
+          try {
+            await saveJobDocument({
+              project: input.project || null,
+              name: input.pdf_filename || input.subject || "Document",
+              docType: input.doc_type || (/(invoice)/i.test(input.subject || "") ? "invoice" : /(proposal)/i.test(input.subject || "") ? "proposal" : "other"),
+              html: input.html_body,
+              source: "sent-email"
+            });
+            return true;
+          } catch (e) { console.error("saveJobDocument (send_email):", e.message); return false; }
+        })() };
       } catch (e) {
         console.error('Email send error:', e.message);
         return { success: false, error: e.message };
@@ -974,6 +1026,23 @@ async function executeTool(toolName, input, data) {
           message: `Proposal link sent to ${input.to_email}. Walt can track viewed/accepted status on the ${input.project} job panel.` };
       } catch (e) {
         console.error("send_proposal_link error:", e.message);
+        return { ok: false, error: e.message };
+      }
+    }
+    case "file_document": {
+      try {
+        if (!ctx.uploadedFile) return { ok: false, error: "No file was attached to this message. Ask Walt to upload the file again in the same message as the request to save it." };
+        const saved = await saveJobDocument({
+          project: input.project,
+          name: input.name || ctx.uploadedFile.name || "Uploaded file",
+          docType: input.doc_type || "file",
+          mimeType: ctx.uploadedFile.mimeType,
+          data: ctx.uploadedFile.data,
+          source: "chat-upload"
+        });
+        return { ok: true, action: "created", type: "document", message: `Saved "${saved.name}" to ${input.project}'s job documents.` };
+      } catch (e) {
+        console.error("file_document error:", e.message);
         return { ok: false, error: e.message };
       }
     }
@@ -1194,6 +1263,9 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history, imageData, imageType, documentData, documentName } = req.body;
     let data = await loadData();
+    const uploadedFile = documentData
+      ? { data: documentData, mimeType: "application/pdf", name: documentName || "Uploaded PDF" }
+      : (imageData ? { data: imageData, mimeType: imageType || "image/jpeg", name: "Uploaded image" } : null);
     const chatModel = data.chatModel === "claude-sonnet-4-6" ? "claude-sonnet-4-6" : "claude-opus-4-8";
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
@@ -1233,7 +1305,7 @@ app.post("/api/chat", async (req, res) => {
       const toolResultContents = [];
 
       for (const toolUse of toolUseBlocks) {
-        const result = await executeTool(toolUse.name, toolUse.input, data);
+        const result = await executeTool(toolUse.name, toolUse.input, data, { uploadedFile });
         if (result.ok) dataSaved = true;
         toolResultContents.push({
           type: "tool_result",
@@ -1584,6 +1656,60 @@ app.delete("/api/appointments/:id", async (req, res) => {
     if (idx < 0) return res.status(404).json({ error: "not found" });
     data.appointments[idx].status = "cancelled";
     await saveData(data);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Job documents API ──
+app.get("/api/docs", async (req, res) => {
+  try {
+    const col = await filesCol();
+    const query = req.query.project ? { project: req.query.project } : {};
+    const docs = await col.find(query, { projection: { data: 0, html: 0 } }).sort({ uploadedAt: -1 }).limit(200).toArray();
+    res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/docs/:id/view", async (req, res) => {
+  try {
+    const col = await filesCol();
+    const doc = await col.findOne({ _id: new ObjectId(req.params.id) });
+    if (!doc) return res.status(404).send("<h2 style='font-family:Arial'>Document not found.</h2>");
+    if (doc.kind === "generated" && doc.html) {
+      res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${(doc.name || "Document").replace(/</g, "&lt;")}</title><style>body{font-family:Arial,sans-serif;background:#eef1f5;margin:0;padding:24px 12px}.wrap{max-width:820px;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);padding:24px}</style></head><body><div class="wrap">${doc.html}</div></body></html>`);
+    } else if (doc.data) {
+      const buf = Buffer.from(doc.data, "base64");
+      res.setHeader("Content-Type", doc.mimeType || "application/octet-stream");
+      res.setHeader("Content-Disposition", `inline; filename="${(doc.name || "document").replace(/[^a-zA-Z0-9._ -]/g, "")}"`);
+      res.send(buf);
+    } else {
+      res.status(404).send("<h2 style='font-family:Arial'>Document has no content.</h2>");
+    }
+  } catch (err) {
+    res.status(500).send("<h2 style='font-family:Arial'>Error loading document.</h2>");
+  }
+});
+
+app.post("/api/docs", async (req, res) => {
+  try {
+    const { project, name, mimeType, data, docType } = req.body;
+    if (!data) return res.status(400).json({ error: "No file data." });
+    if (data.length > 13000000) return res.status(400).json({ error: "File too large — keep uploads under ~9 MB." });
+    const saved = await saveJobDocument({ project, name, docType: docType || "file", mimeType, data, source: "docs-modal" });
+    res.json({ ok: true, ...saved });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete("/api/docs/:id", async (req, res) => {
+  try {
+    const col = await filesCol();
+    await col.deleteOne({ _id: new ObjectId(req.params.id) });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
