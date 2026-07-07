@@ -281,6 +281,7 @@ When generating estimates, proposals, or answering pricing questions:
 5. AUTO-APPLY PROJECT RATES: When generating invoices/proposals, always pull the project's "rate", "oosRate", and "markup" from the project record automatically. Never require Walt to re-state them.
 5b. FIXED-PRICE JOBS: Projects with billingType "fixed" bill the client the contractAmount (typically via the payment schedule in the proposal — deposit / progress / final), NOT hourly. Hours and materials logged to a fixed-price job are internal job-costing only and never appear as line items on client invoices. Invoices for fixed-price jobs are for contract payments (e.g. "Progress payment per contract — $7,000"). Change orders on fixed-price jobs still work normally and bill separately per CO rules. When Walt says a job is "fixed price", "flat bid", or "contract price", set billingType "fixed" and contractAmount via save_project.
 5c. JOB DOCUMENTS: Every invoice or proposal sent via send_email is automatically saved to that project's document history (always pass "project" and "doc_type" on send_email). Walt can view a job's documents from the Job Docs button on the dashboard job panel. When Walt uploads a file and wants it kept with a job, use the file_document tool. If he asks "where can I see the invoice/proposal for [job]" point him to the 📁 Job Docs button on that project's dashboard panel (e-signed proposals also appear in the Proposals bar).
+5d. ARITHMETIC — NEVER ADD ENTRIES BY HAND: Whenever Walt asks for totals, sums, monthly hours, materials spend, labor dollars, or ANY figure that involves adding numbers across entries, you MUST call get_monthly_totals and report its numbers. Do not compute totals yourself from the entries log — manual addition across many entries produces wrong answers. This applies to hours AND dollars, per project or overall. If Walt's question needs a total the tool doesn't provide, call the tool for the closest breakdown and derive from its outputs, showing your work. Accuracy of these numbers is critical — Walt bills clients from them.
 6. OOS LINE ITEMS: When generating change order / OOS sections on invoices, always use the project's oosRate field automatically (fall back to regular rate if oosRate not set).
 
 EMAIL CAPABILITIES:
@@ -653,6 +654,18 @@ const TOOLS = [
       },
       required: ["id"]
     }
+  },
+  {
+    name: "get_monthly_totals",
+    description: "Compute EXACT totals from the entries log using real arithmetic: hours per worker per month, labor billed, materials cost and billed (with correct markup), and subs. ALWAYS call this tool instead of adding numbers yourself whenever Walt asks for totals, sums, monthly hours, materials spend, labor dollars, or any figure that requires adding more than two numbers from entries. Manual arithmetic across many entries is unreliable — this tool is the source of truth and matches the dashboard job panels exactly.",
+    input_schema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Exact project name from the PROJECTS list to filter to one job (a partial match also works). Omit for all projects." },
+        month: { type: "string", description: "Month as YYYY-MM (e.g. 2026-06) to filter to one month. Omit for all months." }
+      },
+      required: []
+    }
   }
 ];
 
@@ -723,9 +736,152 @@ function checkMaterialDuplicate(date, project, description, amount, entries) {
 }
 
 // ── Tool executor ──
+// ── Exact arithmetic for chat: mirrors the dashboard job-panel math ──
+function computeMonthlyTotals(data, input) {
+  const projFilterRaw = (input.project || "").trim().toLowerCase();
+  const monthFilter = (input.month || "").trim();
+  const projects = data.projects || [];
+  const findProj = n => projects.find(p => (p.name || "").toLowerCase() === (n || "").toLowerCase());
+  const rateFor = p => (p && p.rate ? parseFloat(p.rate) || 0 : 0);
+  const oosFor = p => (p && p.oosRate && String(p.oosRate).trim() !== "" ? parseFloat(p.oosRate) || rateFor(p) : rateFor(p));
+  const matPct = (m, p) => {
+    if (m && m.markupPct != null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    if (p && p.markup !== undefined && p.markup !== "" && !isNaN(parseFloat(p.markup))) return parseFloat(p.markup);
+    return 15;
+  };
+  const subPct = (m, p) => {
+    if (m && m.markupPct != null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+    if (p && p.subMarkup !== undefined && p.subMarkup !== "" && !isNaN(parseFloat(p.subMarkup))) return parseFloat(p.subMarkup);
+    return 0;
+  };
+  const payRateFor = name => {
+    const c = (data.crew || []).find(c => [c.name, c.nickname].filter(Boolean).some(x => String(x).toLowerCase() === (name || "").toLowerCase()));
+    if (!c) return null;
+    const v = parseFloat(c.payRate || c.hourlyRate || c.rate);
+    return isNaN(v) ? null : v;
+  };
+
+  // Resolve a project filter: exact match first, then partial
+  let projFilter = projFilterRaw;
+  if (projFilterRaw) {
+    const exact = projects.find(p => (p.name || "").toLowerCase() === projFilterRaw);
+    const partial = exact || projects.find(p => (p.name || "").toLowerCase().includes(projFilterRaw));
+    if (partial) projFilter = (partial.name || "").toLowerCase();
+    else return { ok: true, readOnly: true, type: "monthly_totals", error: "No project matches '" + input.project + "'", availableProjects: projects.map(p => p.name) };
+  }
+
+  const months = {};
+  for (const en of (data.entries || [])) {
+    if (!en || !en.date) continue;
+    const mKey = String(en.date).slice(0, 7);
+    if (monthFilter && mKey !== monthFilter) continue;
+    const pname = en.project || "(no project)";
+    if (projFilter && pname.toLowerCase() !== projFilter) continue;
+    const proj = findProj(pname);
+    if (!months[mKey]) months[mKey] = {};
+    if (!months[mKey][pname]) months[mKey][pname] = { hoursByWorker: {}, regularHours: 0, oosOrCoHours: 0, totalHours: 0, laborBilled: 0, laborCostAtPay: 0, payRateMissing: [], materialsCost: 0, materialsBilled: 0, subsCost: 0, subsBilled: 0, entryCount: 0 };
+    const agg = months[mKey][pname];
+    agg.entryCount++;
+    const rate = rateFor(proj), oos = oosFor(proj);
+    const fixed = !!(proj && proj.billingType === "fixed");
+
+    for (const c of (en.crew || [])) {
+      const h = parseFloat(c.hours || 0) || 0;
+      const oh = parseFloat(c.oosHours || 0) || 0;
+      if (h <= 0 && oh <= 0) continue;
+      const isCO = !!(c.coId || c.changeOrder);
+      const nm = c.name || "(unnamed)";
+      agg.hoursByWorker[nm] = (agg.hoursByWorker[nm] || 0) + h + oh;
+      agg.totalHours += h + oh;
+      if (isCO) {
+        agg.oosOrCoHours += h + oh;
+        if (!fixed) agg.laborBilled += (h + oh) * oos;
+      } else {
+        agg.regularHours += h;
+        agg.oosOrCoHours += oh;
+        if (!fixed) agg.laborBilled += h * rate + oh * oos;
+      }
+      const pr = payRateFor(nm);
+      if (pr == null) { if (!agg.payRateMissing.includes(nm)) agg.payRateMissing.push(nm); }
+      else agg.laborCostAtPay += (h + oh) * pr;
+    }
+
+    for (const m of (en.materials || [])) {
+      const cc = parseFloat(m.cost || 0) || 0;
+      if (!cc) continue;
+      if (m.kind === "sub") {
+        agg.subsCost += cc;
+        agg.subsBilled += cc * (1 + subPct(m, proj) / 100);
+      } else {
+        agg.materialsCost += cc;
+        agg.materialsBilled += cc * (1 + matPct(m, proj) / 100);
+      }
+    }
+  }
+
+  const r2 = x => Math.round(x * 100) / 100;
+  const out = { ok: true, readOnly: true, type: "monthly_totals", filters: { project: input.project || "all projects", month: monthFilter || "all months" }, months: [] };
+  const grand = { totalHours: 0, laborBilled: 0, materialsCost: 0, materialsBilled: 0, subsCost: 0, subsBilled: 0 };
+
+  for (const mKey of Object.keys(months).sort()) {
+    const projsOut = [];
+    const mt = { totalHours: 0, laborBilled: 0, materialsCost: 0, materialsBilled: 0, subsCost: 0, subsBilled: 0 };
+    for (const pname of Object.keys(months[mKey]).sort()) {
+      const a = months[mKey][pname];
+      const proj = findProj(pname);
+      const hbw = {};
+      for (const k of Object.keys(a.hoursByWorker)) hbw[k] = r2(a.hoursByWorker[k]);
+      const po = {
+        project: pname,
+        billingType: (proj && proj.billingType === "fixed") ? "fixed" : "tm",
+        entryCount: a.entryCount,
+        totalHours: r2(a.totalHours),
+        regularHours: r2(a.regularHours),
+        oosOrCoHours: r2(a.oosOrCoHours),
+        hoursByWorker: hbw,
+        materialsCost: r2(a.materialsCost),
+        materialsBilled: r2(a.materialsBilled)
+      };
+      if (a.subsCost) { po.subsCost = r2(a.subsCost); po.subsBilled = r2(a.subsBilled); }
+      if (po.billingType === "fixed") {
+        po.laborBilled = 0;
+        po.laborCostAtCrewPay = r2(a.laborCostAtPay);
+        po.note = "Fixed-price job: hours/materials are internal cost only; client is billed the contract amount, not these figures.";
+        if (a.payRateMissing.length) po.payRateMissing = a.payRateMissing;
+      } else {
+        po.laborBilled = r2(a.laborBilled);
+      }
+      projsOut.push(po);
+      mt.totalHours += a.totalHours;
+      mt.laborBilled += (po.billingType === "fixed" ? 0 : a.laborBilled);
+      mt.materialsCost += a.materialsCost;
+      mt.materialsBilled += a.materialsBilled;
+      mt.subsCost += a.subsCost;
+      mt.subsBilled += a.subsBilled;
+    }
+    out.months.push({
+      month: mKey,
+      projects: projsOut,
+      monthTotal: { totalHours: r2(mt.totalHours), laborBilled: r2(mt.laborBilled), materialsCost: r2(mt.materialsCost), materialsBilled: r2(mt.materialsBilled), subsCost: r2(mt.subsCost), subsBilled: r2(mt.subsBilled) }
+    });
+    grand.totalHours += mt.totalHours;
+    grand.laborBilled += mt.laborBilled;
+    grand.materialsCost += mt.materialsCost;
+    grand.materialsBilled += mt.materialsBilled;
+    grand.subsCost += mt.subsCost;
+    grand.subsBilled += mt.subsBilled;
+  }
+  out.grandTotal = { totalHours: r2(grand.totalHours), laborBilled: r2(grand.laborBilled), materialsCost: r2(grand.materialsCost), materialsBilled: r2(grand.materialsBilled), subsCost: r2(grand.subsCost), subsBilled: r2(grand.subsBilled) };
+  if (!out.months.length) out.note = "No entries matched these filters.";
+  return out;
+}
+
 async function executeTool(toolName, input, data, ctx) {
   ctx = ctx || {};
   switch (toolName) {
+    case "get_monthly_totals": {
+      return computeMonthlyTotals(data, input || {});
+    }
     case "save_appointment": {
       if (!data.appointments) data.appointments = [];
       const appt = {
@@ -1306,7 +1462,7 @@ app.post("/api/chat", async (req, res) => {
 
       for (const toolUse of toolUseBlocks) {
         const result = await executeTool(toolUse.name, toolUse.input, data, { uploadedFile });
-        if (result.ok) dataSaved = true;
+        if (result.ok && !result.readOnly) dataSaved = true;
         toolResultContents.push({
           type: "tool_result",
           tool_use_id: toolUse.id,
@@ -1939,5 +2095,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
 });
-
-
