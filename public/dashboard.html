@@ -4544,5 +4544,109 @@ function cwInitListeners(){
   }
 })();
 </script>
+<!-- ══ CHAT WIDGET FORMATTING v1 — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  if (typeof window.cwAddMsg !== 'function') return;
+
+  var css = ''
+    + '#cw-msgs .cw-msg.assistant{white-space:normal}'
+    + '#cw-msgs .cwm-tbl{border-collapse:collapse;margin:6px 0;font-size:12px;max-width:100%}'
+    + '#cw-msgs .cwm-tbl th{color:var(--accent,#e8a020);text-align:left;border-bottom:1px solid #3a4a6e;padding:3px 10px 3px 0;white-space:nowrap}'
+    + '#cw-msgs .cwm-tbl td{padding:3px 10px 3px 0;border-bottom:1px solid #22304e;vertical-align:top}'
+    + '#cw-msgs .cwm-ul,#cw-msgs .cwm-ol{margin:4px 0 4px 18px;padding:0}'
+    + '#cw-msgs .cwm-ul li,#cw-msgs .cwm-ol li{margin:2px 0}'
+    + '#cw-msgs .cwm-h{font-weight:bold;color:var(--accent,#e8a020);margin:6px 0 2px}'
+    + '#cw-msgs .cwm-hr{border:none;border-top:1px solid #2a3a5e;margin:6px 0}'
+    + '#cw-msgs .cw-msg code{background:rgba(0,0,0,.3);padding:0 4px;border-radius:3px;font-size:12px}';
+  var st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  function esc(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function inline(s){
+    return s
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<i>$2</i>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
+  function mdToHtml(text){
+    var lines = esc(String(text)).split('\n');
+    var out = [], i = 0;
+    while (i < lines.length) {
+      var ln = lines[i];
+
+      // Table block: consecutive |...| lines
+      if (/^\s*\|.*\|\s*$/.test(ln)) {
+        var rows = [];
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i].trim()); i++; }
+        var html = '<table class="cwm-tbl">', first = true;
+        for (var r = 0; r < rows.length; r++) {
+          if (/^\|[\s\-:|]+\|$/.test(rows[r])) continue; // |----|----| separator row
+          var cells = rows[r].slice(1, -1).split('|').map(function(c){ return inline(c.trim()); });
+          html += '<tr>' + cells.map(function(c){ return first ? '<th>'+c+'</th>' : '<td>'+c+'</td>'; }).join('') + '</tr>';
+          first = false;
+        }
+        out.push(html + '</table>');
+        continue;
+      }
+
+      // Bulleted list block
+      if (/^\s*[-•]\s+/.test(ln)) {
+        var items = [];
+        while (i < lines.length && /^\s*[-•]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-•]\s+/,'')); i++; }
+        out.push('<ul class="cwm-ul">' + items.map(function(x){ return '<li>'+inline(x)+'</li>'; }).join('') + '</ul>');
+        continue;
+      }
+
+      // Numbered list block
+      if (/^\s*\d+[.)]\s+/.test(ln)) {
+        var items2 = [];
+        while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) { items2.push(lines[i].replace(/^\s*\d+[.)]\s+/,'')); i++; }
+        out.push('<ol class="cwm-ol">' + items2.map(function(x){ return '<li>'+inline(x)+'</li>'; }).join('') + '</ol>');
+        continue;
+      }
+
+      // Header
+      var h = ln.match(/^(#{1,3})\s+(.*)/);
+      if (h) { out.push('<div class="cwm-h">' + inline(h[2]) + '</div>'); i++; continue; }
+
+      // Horizontal rule
+      if (/^\s*---+\s*$/.test(ln)) { out.push('<hr class="cwm-hr">'); i++; continue; }
+
+      out.push(inline(ln));
+      i++;
+    }
+
+    var htmlOut = '';
+    for (var k = 0; k < out.length; k++) {
+      var seg = out[k];
+      var isBlock = /^<(table|ul|ol|div|hr)/.test(seg);
+      htmlOut += seg;
+      if (!isBlock && k < out.length - 1) htmlOut += '<br>';
+    }
+    return htmlOut;
+  }
+
+  var _origAddMsg = window.cwAddMsg;
+  window.cwAddMsg = function(text, type){
+    // Only format plain-text assistant replies; HTML documents (invoices etc.) pass through untouched
+    if (type === 'assistant' && typeof text === 'string' && !/<[a-z][\s\S]*>/i.test(text)) {
+      var msgs = document.getElementById('cw-msgs');
+      if (!msgs) return _origAddMsg(text, type);
+      var div = document.createElement('div');
+      div.className = 'cw-msg assistant';
+      div.innerHTML = mdToHtml(text);
+      msgs.appendChild(div);
+      msgs.scrollTop = msgs.scrollHeight;
+      return div;
+    }
+    return _origAddMsg(text, type);
+  };
+})();
+</script>
 </body>
 </html>
