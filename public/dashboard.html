@@ -4760,47 +4760,50 @@ function cwInitListeners(){
   try { if (typeof renderFlags === 'function') renderFlags(); } catch (e) {}
 })();
 </script>
-<!-- ══ PROPOSAL DELETE v1 — paste above </body>, after all other snippets ══ -->
+<!-- ══ PROPOSAL DELETE v2 — replaces v1. Delete the old "PROPOSAL DELETE v1" block (from its comment line to the end of the file) and paste this in its place. ══ -->
 <script>
 (function(){
-  if (typeof window.renderProposalsBar !== 'function') return;
-
   const st = document.createElement('style');
-  st.textContent = '.prop-del{background:none;border:1px solid #553;color:#a77;border-radius:5px;font-size:10px;padding:1px 7px;cursor:pointer;flex:none}'
+  st.textContent = '.prop-del{background:none;border:1px solid #553;color:#a77;border-radius:5px;font-size:10px;padding:1px 7px;cursor:pointer;flex:none;margin-left:4px}'
     + '.prop-del:hover{border-color:#c55;color:#e88}';
   document.head.appendChild(st);
 
+  function sortedTop8(){
+    return ((window.data && data.proposals) || []).slice().sort((a, b) => {
+      const at = new Date(a.acceptedAt || (a.viewedDates||[])[ (a.viewedDates||[]).length-1 ] || a.sentDate);
+      const bt = new Date(b.acceptedAt || (b.viewedDates||[])[ (b.viewedDates||[]).length-1 ] || b.sentDate);
+      return bt - at;
+    }).slice(0, 8);
+  }
+
   window.deleteProposal = async function(id){
-    const p = (data.proposals || []).find(x => x.id === id);
+    const p = ((window.data && data.proposals) || []).find(x => x.id === id);
     if (!p) return;
     const label = (p.project || 'proposal') + ' — ' + (p.clientName || p.clientEmail || '');
-    if (!confirm('Delete this proposal record?\n\n' + label + '\n\nThis is permanent: the public link stops working and the ' +
-      (p.status === 'accepted' ? 'ACCEPTANCE RECORD (signature, date, IP) is deleted too. Only do this for tests.' : 'record is removed from the dashboard.'))) return;
+    const warn = (p.status === 'accepted')
+      ? 'ACCEPTANCE RECORD (signature, date, IP) is deleted too. Only do this for tests.'
+      : 'The record is removed from the dashboard.';
+    if (!confirm('Delete this proposal record?\n\n' + label + '\n\nThis is permanent: the public link stops working and the ' + warn)) return;
     data.proposals = (data.proposals || []).filter(x => x.id !== id);
     try {
       await saveAll();
-      renderProposalsBar();
+      if (typeof window.render === 'function') window.render();
     } catch (e) {
       alert('Could not save — try again.');
     }
   };
 
-  const _origRPB = window.renderProposalsBar;
-  window.renderProposalsBar = function(){
-    _origRPB();
-    // Append a ✕ to each row, matched to the same sorted top-8 list the bar renders
+  function decorate(){
     const wrapEl = document.getElementById('prop-card-wrap');
     if (!wrapEl) return;
-    const list = (data.proposals || []).slice().sort((a, b) => {
-      const at = new Date(a.acceptedAt || (a.viewedDates||[])[a.viewedDates.length-1] || a.sentDate);
-      const bt = new Date(b.acceptedAt || (b.viewedDates||[])[b.viewedDates.length-1] || b.sentDate);
-      return bt - at;
-    }).slice(0, 8);
     const rows = wrapEl.querySelectorAll('.prop-row');
+    if (!rows.length) return;
+    const list = sortedTop8();
     rows.forEach((row, i) => {
       const p = list[i];
       if (!p || row.querySelector('.prop-del')) return;
-      const right = row.querySelectorAll(':scope > span')[1] || row;
+      const spans = row.querySelectorAll(':scope > span');
+      const right = spans[spans.length - 1] || row;
       const btn = document.createElement('button');
       btn.className = 'prop-del';
       btn.textContent = '\u2715';
@@ -4808,8 +4811,12 @@ function cwInitListeners(){
       btn.onclick = function(){ deleteProposal(p.id); };
       right.appendChild(btn);
     });
-  };
-  try { window.renderProposalsBar(); } catch (e) {}
+  }
+
+  // Decorate now, and re-decorate every time the proposals bar re-renders
+  decorate();
+  const target = document.getElementById('prop-card-wrap') || document.body;
+  new MutationObserver(function(){ decorate(); }).observe(target, { childList: true, subtree: true });
 })();
 </script>
 </body>
