@@ -2577,6 +2577,103 @@ Type below or hit the mic and talk to me.</div>
 
 })();
 </script>
+<!-- ══ JOB PANEL REORDER v1 — paste above </body>, AFTER all other snippets ══ -->
+<script>
+(function(){
+  const LS_KEY = 'jpPanelOrder_v1';
+  let dragProj = null;
+
+  const css = ''
+    + '#panels-wrap .job-panel.jp-dragging{opacity:.45}'
+    + '#panels-wrap .job-panel.jp-dragtarget{outline:2px dashed var(--accent,#e8a020);outline-offset:3px}';
+  const st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  function getOrder(){
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch (e) { return []; }
+  }
+  function saveOrderFromDom(){
+    const names = [...document.querySelectorAll('#panels-wrap .job-panel')].map(p => p.dataset.proj).filter(Boolean);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(names)); } catch (e) {}
+  }
+
+  function clearMarks(){
+    document.querySelectorAll('#panels-wrap .job-panel.jp-dragging, #panels-wrap .job-panel.jp-dragtarget')
+      .forEach(p => p.classList.remove('jp-dragging', 'jp-dragtarget'));
+  }
+
+  function setupPanel(panel){
+    if (panel.dataset.jpDragWired) return;
+    panel.dataset.jpDragWired = '1';
+    const hdr = panel.querySelector('.jp-header');
+    if (!hdr) return;
+
+    // Only header-initiated drags — keeps table cells, inputs, and text selection safe
+    hdr.addEventListener('mousedown', () => { panel.draggable = true; });
+
+    panel.addEventListener('dragstart', (e) => {
+      dragProj = panel.dataset.proj;
+      panel.classList.add('jp-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+    });
+
+    panel.addEventListener('dragend', () => {
+      panel.draggable = false;
+      dragProj = null;
+      clearMarks();
+      saveOrderFromDom();
+    });
+
+    panel.addEventListener('dragover', (e) => {
+      if (!dragProj || panel.dataset.proj === dragProj) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const dragged = document.querySelector('#panels-wrap .job-panel.jp-dragging');
+      if (!dragged) return;
+      const rect = panel.getBoundingClientRect();
+      const before = e.clientX < rect.left + rect.width / 2;
+      if (before) panel.parentNode.insertBefore(dragged, panel);
+      else panel.parentNode.insertBefore(dragged, panel.nextSibling);
+    });
+
+    panel.addEventListener('drop', (e) => { e.preventDefault(); });
+  }
+
+  // Safety: if a header mousedown never became a drag, un-arm it
+  document.addEventListener('mouseup', () => {
+    document.querySelectorAll('#panels-wrap .job-panel[draggable="true"]').forEach(p => {
+      if (!p.classList.contains('jp-dragging')) p.draggable = false;
+    });
+  });
+
+  function applyOrderAndWire(){
+    const panels = [...document.querySelectorAll('#panels-wrap .job-panel')];
+    if (!panels.length) return;
+    const order = getOrder();
+    if (order.length && panels.length > 1) {
+      const byName = {};
+      panels.forEach(p => { if (p.dataset.proj) byName[p.dataset.proj] = p; });
+      const parent = panels[0].parentNode;
+      const seq = [
+        ...order.filter(n => byName[n]).map(n => byName[n]),
+        ...panels.filter(p => !order.includes(p.dataset.proj))
+      ];
+      for (const p of seq) parent.appendChild(p);
+    }
+    document.querySelectorAll('#panels-wrap .job-panel').forEach(setupPanel);
+  }
+
+  const _prevRenderJobPanels_ord = window.renderJobPanels;
+  if (typeof _prevRenderJobPanels_ord === 'function') {
+    window.renderJobPanels = function(){
+      _prevRenderJobPanels_ord();
+      applyOrderAndWire();
+    };
+    try { applyOrderAndWire(); } catch (e) {}
+  }
+})();
+</script>
 </body>
 </html>
-
