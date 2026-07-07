@@ -4648,5 +4648,118 @@ function cwInitListeners(){
   };
 })();
 </script>
+<!-- ══ FLAGS & ALERTS MATH FIX v1 — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  if (typeof window.computeAutoFlags !== 'function') return;
+
+  function balanceFor(proj){
+    var p = (data.projects || []).find(function(x){ return (x.name || '') === proj; });
+    var rate = billingRate(proj), oosR = oosRateFor(proj);
+    var fixed = !!(p && p.billingType === 'fixed');
+    function itemPct(m){
+      if (m && m.markupPct != null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+      if (p && p.markup !== undefined && p.markup !== '' && !isNaN(parseFloat(p.markup))) return parseFloat(p.markup);
+      return 15;
+    }
+    function subPctF(m){
+      if (m && m.markupPct != null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
+      if (p && p.subMarkup !== undefined && p.subMarkup !== '' && !isNaN(parseFloat(p.subMarkup))) return parseFloat(p.subMarkup);
+      return 0;
+    }
+    var cos = ((data.changeOrders || {})[proj] || []).filter(function(c){ return c.status === 'open'; });
+    var labor = 0, matB = 0, subB = 0, coGrand = 0;
+    var allEnt = entriesForProject(proj);
+
+    // Change orders first (same rules as the panels)
+    for (var ci = 0; ci < cos.length; ci++) {
+      var co = cos[ci];
+      var hrs = 0, coMatBilled = 0;
+      for (var e1 = 0; e1 < allEnt.length; e1++) {
+        var en1 = allEnt[e1];
+        var cr = en1.crew || [];
+        for (var k1 = 0; k1 < cr.length; k1++) if (cr[k1].coId === co.id) hrs += parseFloat(cr[k1].hours || 0) || 0;
+        var ms = en1.materials || [];
+        for (var k2 = 0; k2 < ms.length; k2++) if (ms[k2].coId === co.id) coMatBilled += (parseFloat(ms[k2].cost || 0) || 0) * (1 + itemPct(ms[k2]) / 100);
+      }
+      coGrand += (co.type === 'fixed') ? (parseFloat(co.fixedAmount || 0) || 0) : (hrs * oosR + coMatBilled);
+    }
+
+    // Base work (CO items excluded)
+    for (var e2 = 0; e2 < allEnt.length; e2++) {
+      var en = allEnt[e2];
+      var crew = en.crew || [];
+      for (var i = 0; i < crew.length; i++) {
+        var c = crew[i];
+        if (c.coId || c.changeOrder) continue;
+        var h = parseFloat(c.hours || 0) || 0;
+        var oh = parseFloat(c.oosHours || 0) || 0;
+        if (!fixed) {
+          if (c.outOfScope) labor += h * oosR;
+          else labor += h * rate + oh * oosR;
+        }
+      }
+      var mats = en.materials || [];
+      for (var j = 0; j < mats.length; j++) {
+        var m = mats[j];
+        if (m.coId) continue;
+        var cc = parseFloat(m.cost || 0) || 0;
+        if (!cc) continue;
+        if (m.kind === 'sub') subB += cc * (1 + subPctF(m) / 100);
+        else matB += cc * (1 + itemPct(m) / 100);
+      }
+    }
+
+    var revenue;
+    if (fixed) revenue = (parseFloat(p && p.contractAmount || 0) || 0) + coGrand;
+    else revenue = labor + matB + subB + coGrand;
+    var paid = ((data.payments || {})[proj] || []).reduce(function(s, pp){ return s + (parseFloat(pp.amount || 0) || 0); }, 0);
+    return revenue - paid;
+  }
+
+  window.computeAutoFlags = function(){
+    var flags = [];
+    // Weekdays with no work logged (unchanged from original)
+    var noWorkDays = [];
+    var today = new Date();
+    var dim = new Date(displayYear, displayMonth + 1, 0).getDate();
+    for (var d = 1; d <= dim; d++) {
+      var dt = new Date(displayYear, displayMonth, d);
+      if (dt > today) break;
+      var dow = dt.getDay();
+      if (dow >= 1 && dow <= 5) {
+        var iso = displayYear + '-' + String(displayMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        if (!entriesForDate(iso).length) noWorkDays.push(iso);
+      }
+    }
+    if (noWorkDays.length > 0) flags.push({ icon: '📅', text: noWorkDays.length + ' weekday' + (noWorkDays.length > 1 ? 's' : '') + ' with no work logged', cls: 'flag-warn' });
+
+    // Balance due — now full panel math: labor + materials w/ markup + subs + COs − payments
+    var projects = allProjectsInMonth(displayYear, displayMonth);
+    for (var pi = 0; pi < projects.length; pi++) {
+      var proj = projects[pi];
+      var bal = 0;
+      try { bal = balanceFor(proj); } catch (e) { continue; }
+      if (bal > 1000) flags.push({ icon: '💰', text: proj + ': ' + fmt$(bal) + ' balance due', cls: 'flag-alert' });
+    }
+
+    // Hours but no materials (unchanged from original)
+    for (var pj = 0; pj < projects.length; pj++) {
+      var proj2 = projects[pj];
+      var ent = entriesForProjectMonth(proj2, displayYear, displayMonth);
+      var hrs = 0;
+      for (var e3 = 0; e3 < ent.length; e3++) { var cw = ent[e3].crew || []; for (var q = 0; q < cw.length; q++) hrs += parseFloat(cw[q].hours || 0) || 0; }
+      if (hrs >= 40 && matsTotal(ent) === 0) flags.push({ icon: '🧱', text: proj2 + ': ' + hrs + 'hrs but no materials logged', cls: 'flag-warn' });
+    }
+
+    if (flags.length === 0) flags.push({ icon: '✅', text: 'All clear — no issues this month', cls: 'flag-good' });
+    return flags;
+  };
+
+  // Repaint with corrected math
+  try { if (typeof renderFlags === 'function') renderFlags(); } catch (e) {}
+})();
+</script>
 </body>
 </html>
+
