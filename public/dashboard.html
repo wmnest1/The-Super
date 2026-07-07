@@ -4503,5 +4503,46 @@ function cwInitListeners(){
   try { applyOrderAndWire(); } catch (e) {}
 })();
 </script>
+<!-- ══ CHAT WIDGET RESIZE FIX — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  var cw = document.getElementById('cw');
+  if (!cw) return;
+
+  // Bigger, higher-priority grab zones for the existing handles + a new top-edge handle
+  var css = ''
+    + '#cw-resize{width:24px !important;height:24px !important;z-index:6 !important}'
+    + '#cw-resize-r{width:9px !important;z-index:5 !important}'
+    + '#cw-resize-b{height:9px !important;z-index:5 !important}'
+    + '#cw-resize-t{position:absolute;top:0;left:44px;right:110px;height:8px;cursor:n-resize;z-index:5}';
+  var st = document.createElement('style');
+  st.textContent = css;
+  document.head.appendChild(st);
+
+  // Top-edge handle: drag UP to make the widget taller (natural for a bottom-anchored window)
+  var t = document.createElement('div');
+  t.id = 'cw-resize-t';
+  cw.appendChild(t);
+  t.addEventListener('mousedown', function(e){
+    try { cwResizeStart(e, 'n'); } catch (err) {}
+  });
+
+  // Teach the resize mover the new 'n' direction (height grows as you drag up)
+  if (typeof cwResizeMove === 'function') {
+    var _origMove = cwResizeMove;
+    cwResizeMove = function(e){
+      try {
+        if (cwResizing && cwResizeDir === 'n') {
+          var el = document.getElementById('cw');
+          var dy = e.clientY - cwResizeStartY;
+          el.style.height = Math.max(350, Math.min(Math.floor(window.innerHeight * 0.9), cwResizeStartH - dy)) + 'px';
+          return;
+        }
+      } catch (err) {}
+      _origMove(e);
+    };
+  }
+})();
+</script>
 </body>
 </html>
