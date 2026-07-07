@@ -237,6 +237,7 @@
   .modal-close:hover { color: #fff; }
   .tabs {
     display: flex;
+    flex-wrap: wrap;
     padding: 0 22px;
     border-bottom: 1px solid #2a3a5e;
     background: var(--panel);
@@ -292,6 +293,8 @@
   .add-new-btn:hover { background: #c8881a; }
   .record-card { background: #0f1a2e; border: 1px solid #2a3a5e; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
   .record-card:hover { border-color: var(--accent); }
+  .record-card.dragging { opacity: 0.45; }
+  .record-card.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
   .record-info { flex: 1; }
   .record-name { font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 3px; }
   .record-detail { font-size: 12px; color: #888; line-height: 1.6; }
@@ -1617,7 +1620,47 @@ Type below or hit the mic and talk to me.</div>
       ].filter(Boolean).join('<br>');
     }
     const docsBtn = tab === 'projects' ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>` : '';
-    return `<div class="record-card" onclick="showForm('${tab}', ${i})" title="Click to open"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
+    const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
+    const dragAttrs = canDrag
+      ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
+      : '';
+    const cardTitle = canDrag ? 'Click to open — drag to reorder' : 'Click to open';
+    return `<div class="record-card"${dragAttrs} onclick="showForm('${tab}', ${i})" title="${cardTitle}"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
+  }
+
+  // ── Drag-to-reorder cards (master lists only) ──
+  let dragCardState = null;
+  function cardDragStart(e, tab, i){
+    dragCardState = { tab: tab, i: i };
+    e.currentTarget.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', ''); } catch (err) {}
+  }
+  function cardDragOver(e, tab, i){
+    if (!dragCardState || dragCardState.tab !== tab) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.classList.add('drag-over');
+  }
+  function cardDragLeave(e){
+    e.currentTarget.classList.remove('drag-over');
+  }
+  async function cardDrop(e, tab, i){
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+    if (!dragCardState || dragCardState.tab !== tab || dragCardState.i === i) { dragCardState = null; return; }
+    const arr = appData[tab];
+    const moved = arr.splice(dragCardState.i, 1)[0];
+    arr.splice(i, 0, moved);
+    dragCardState = null;
+    renderList(tab);
+    try {
+      await fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appData) });
+    } catch (err) {}
+  }
+  function cardDragEnd(e){
+    document.querySelectorAll('.record-card.dragging, .record-card.drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+    dragCardState = null;
   }
 
   document.getElementById('data-modal').addEventListener('click', function(e) {
