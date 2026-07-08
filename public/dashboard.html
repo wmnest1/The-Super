@@ -5305,5 +5305,125 @@ function cwInitListeners(){
   new MutationObserver(function(){ decorateAll(); }).observe(document.body, { childList: true, subtree: true });
 })();
 </script>
+<!-- ══ DAY COPY v1 — "Copy last workday" — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  if (typeof window.openDayModal !== 'function') return;
+
+  const st = document.createElement('style');
+  st.textContent = ''
+    + '.dc-btn{background:#0f3460;border:1px solid #2a4a7e;color:#cdf;border-radius:6px;font-size:11px;padding:5px 10px;cursor:pointer;margin:0 0 8px 0}'
+    + '.dc-btn:hover{border-color:var(--accent,#e8a020);color:#fff}'
+    + '.dc-btn:disabled{opacity:.5;cursor:not-allowed}'
+    + '.dc-note{font-size:10px;color:#889;margin:0 0 8px 6px}'
+    + '.dc-copied{background:#3a3410 !important;border-color:#c8a020 !important}';
+  document.head.appendChild(st);
+
+  function findLastWorkday(proj, beforeIso){
+    if (!proj) return null;
+    let best = null;
+    for (const en of (data.entries || [])) {
+      if (!en || (en.project || '') !== proj || !en.date) continue;
+      if (en.date >= beforeIso) continue;
+      const hasWork = (en.crew || []).some(c =>
+        (parseFloat(c.hours || 0) || 0) > 0 || (parseFloat(c.oosHours || 0) || 0) > 0
+      );
+      if (!hasWork) continue;
+      if (!best || en.date > best.date) best = en;
+    }
+    return best;
+  }
+
+  function fmtDate(iso){
+    try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+    catch (e) { return iso; }
+  }
+
+  window.dcCopyLastWorkday = function(){
+    if (!dayModalState) return;
+    const { date, project, crewData } = dayModalState;
+    const src = findLastWorkday(project, date);
+    if (!src) { alert('No prior workday found for ' + project + '.'); return; }
+
+    const current = crewData[project] || [];
+    const hasWork = current.some(c => (parseFloat(c.reg || 0) || 0) > 0 || (parseFloat(c.oos || 0) || 0) > 0 || (c.note || '').trim());
+    if (hasWork && !confirm('This day already has hours logged for ' + project + '.\n\nCopy over anyway from ' + fmtDate(src.date) + '?')) return;
+
+    const copied = (src.crew || []).map(c => ({
+      name: (typeof normName === 'function') ? normName(c.name) : c.name,
+      reg: c.outOfScope ? '0' : (c.hours || ''),
+      oos: c.outOfScope ? (c.hours || '') : (c.oosHours || ''),
+      note: c.note || '',
+      color: c.color || '#884444'
+    }));
+    crewData[project] = copied;
+    populateDayModal();
+
+    // Tint the copied fields yellow until save — visual whisper that these came from elsewhere
+    setTimeout(function(){
+      for (const c of copied) {
+        const nm = c.name;
+        const reg = document.getElementById('dm-crew-' + nm);
+        const oos = document.getElementById('dm-oos-' + nm);
+        const nt  = document.getElementById('dm-note-' + nm);
+        if (reg && (parseFloat(c.reg || 0) || 0) > 0) reg.classList.add('dc-copied');
+        if (oos && (parseFloat(c.oos || 0) || 0) > 0) oos.classList.add('dc-copied');
+        if (nt && (c.note || '').trim()) nt.classList.add('dc-copied');
+      }
+      // Clear the tint on any manual edit
+      document.querySelectorAll('#dm-crew-section input').forEach(function(el){
+        el.addEventListener('input', function(){ el.classList.remove('dc-copied'); });
+      });
+    }, 30);
+
+    // Toast-style hint
+    const bar = document.getElementById('dm-proj-bar');
+    if (bar) {
+      const hint = document.createElement('div');
+      hint.className = 'dc-note';
+      hint.textContent = 'Copied from ' + fmtDate(src.date) + ' \u2014 review, tweak, save.';
+      hint.style.cssText = 'font-size:10px;color:#c8a020;margin:4px 0 0 0';
+      const existing = bar.parentNode.querySelector('.dc-hint');
+      if (existing) existing.remove();
+      hint.classList.add('dc-hint');
+      bar.parentNode.insertBefore(hint, bar.nextSibling);
+      setTimeout(function(){ hint.remove(); }, 4000);
+    }
+  };
+
+  // Inject the button once per modal open, right under the project chips
+  const _origPop = window.populateDayModal;
+  if (typeof _origPop === 'function') {
+    window.populateDayModal = function(){
+      _origPop();
+      if (!dayModalState) return;
+      const holder = document.getElementById('dm-crew-section');
+      if (!holder) return;
+      if (holder.previousElementSibling && holder.previousElementSibling.classList &&
+          holder.previousElementSibling.classList.contains('dc-btn-wrap')) {
+        holder.previousElementSibling.remove();
+      }
+      const { date, project } = dayModalState;
+      const src = findLastWorkday(project, date);
+      const btn = document.createElement('div');
+      btn.className = 'dc-btn-wrap';
+      const label = src
+        ? '\u{1F4CB} Copy from ' + fmtDate(src.date) + ' (last workday)'
+        : '\u{1F4CB} Copy last workday';
+      btn.innerHTML = '<button class="dc-btn" onclick="dcCopyLastWorkday()"' + (src ? '' : ' disabled title="No prior workday found for this project"') + '>' + label + '</button>';
+      holder.parentNode.insertBefore(btn, holder);
+    };
+  }
+
+  // Save clears the yellow tint (fields are now "real")
+  const _origSave = window.saveDayModal;
+  if (typeof _origSave === 'function') {
+    window.saveDayModal = async function(){
+      document.querySelectorAll('.dc-copied').forEach(function(el){ el.classList.remove('dc-copied'); });
+      return _origSave.apply(this, arguments);
+    };
+  }
+})();
+</script>
 </body>
 </html>
