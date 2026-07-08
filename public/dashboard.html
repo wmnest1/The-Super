@@ -5458,5 +5458,62 @@ function cwInitListeners(){
   };
 })();
 </script>
+<!-- ══ DAY PICKER FILTER v1 — hide Complete / On Hold projects unless day has entry — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  if (typeof window.populateDayModal !== 'function') return;
+
+  const st = document.createElement('style');
+  st.textContent = '.proj-chip .pc-badge{font-size:8px;background:rgba(0,0,0,.35);color:#fff;border-radius:3px;padding:1px 4px;margin-left:5px;font-weight:normal;vertical-align:middle}';
+  document.head.appendChild(st);
+
+  function projStatus(name){
+    const p = (data.projects || []).find(x => (x.name || '') === name);
+    return p ? (p.status || 'Active') : 'Active';
+  }
+  function shouldHide(name, date){
+    const s = projStatus(name);
+    if (s !== 'Complete' && s !== 'On Hold') return false;
+    // Never hide if this day already has an entry for that project
+    return !(data.entries || []).some(e => e && e.date === date && (e.project || '') === name);
+  }
+
+  const _origPop = window.populateDayModal;
+  window.populateDayModal = function(){
+    if (!dayModalState) return _origPop.apply(this, arguments);
+    const { date, projects } = dayModalState;
+
+    // Filter the picker list — but only for the picker; leave crewData intact
+    const filtered = projects.filter(name => !shouldHide(name, date));
+
+    // If the currently-selected project was filtered out (rare), snap to the first visible one
+    if (filtered.length && !filtered.includes(dayModalState.project)) {
+      dayModalState.project = filtered[0];
+    }
+
+    const orig = dayModalState.projects;
+    dayModalState.projects = filtered;
+    try { _origPop.apply(this, arguments); }
+    finally { dayModalState.projects = orig; }
+
+    // Post-decorate: tag any chip whose project is Complete or On Hold (only visible because it has an entry)
+    const bar = document.getElementById('dm-proj-bar');
+    if (!bar) return;
+    bar.querySelectorAll('.proj-chip').forEach(chip => {
+      const name = chip.textContent.replace(/\s*\u25CF\s*$/, '').trim();
+      const s = projStatus(name);
+      if ((s === 'Complete' || s === 'On Hold') && !chip.querySelector('.pc-badge')) {
+        const tag = document.createElement('span');
+        tag.className = 'pc-badge';
+        tag.textContent = s === 'Complete' ? 'DONE' : 'HOLD';
+        chip.appendChild(tag);
+      }
+    });
+  };
+
+  // Repaint whatever's on screen right now
+  try { if (document.getElementById('day-modal') && document.getElementById('day-modal').classList.contains('open')) populateDayModal(); } catch (e) {}
+})();
+</script>
 </body>
 </html>
