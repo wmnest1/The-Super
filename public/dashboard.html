@@ -4823,16 +4823,15 @@ function cwInitListeners(){
   new MutationObserver(function(){ decorate(); }).observe(target, { childList: true, subtree: true });
 })();
 </script>
-<!-- ══ MATERIALS HISTORY v1 — paste above </body>, after all other snippets ══ -->
+<!-- ══ MATERIALS + HOURS HISTORY v2 — replaces MATERIALS HISTORY v1. Delete the old "MATERIALS HISTORY v1" block (from its comment line to the end of the file) and paste this in its place. ══ -->
 <script>
 (function(){
-  // ─── Styles ───
   const st = document.createElement('style');
   st.textContent = ''
     + '.mat-hist-btn{float:right;background:#0f3460;border:1px solid #2a4a7e;color:#cdf;border-radius:5px;font-size:10px;padding:2px 8px;cursor:pointer;font-weight:normal;text-transform:none;letter-spacing:0}'
     + '.mat-hist-btn:hover{border-color:var(--accent,#e8a020);color:#fff}'
     + '#mh-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:8950}'
-    + '#mh-box{position:absolute;top:5%;left:50%;transform:translateX(-50%);width:min(780px,94vw);max-height:88vh;background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}'
+    + '#mh-box{position:absolute;top:5%;left:50%;transform:translateX(-50%);width:min(820px,94vw);max-height:88vh;background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;display:flex;flex-direction:column;overflow:hidden}'
     + '#mh-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0f3460;font-weight:bold}'
     + '#mh-close{background:none;border:none;color:#aab;font-size:16px;cursor:pointer}'
     + '#mh-close:hover{color:#fff}'
@@ -4849,24 +4848,29 @@ function cwInitListeners(){
     + '.mh-tag{flex:none;font-size:9px;border-radius:3px;padding:1px 5px;background:#3a2a10;color:#e8a020}'
     + '.mh-cost{flex:none;width:78px;text-align:right}'
     + '.mh-billed{flex:none;width:86px;text-align:right;color:#9c8}'
-    + '.mh-sub{display:flex;justify-content:flex-end;gap:18px;padding:4px 8px 10px;font-size:11px;color:#88a}'
+    + '.mh-sub{display:flex;justify-content:flex-end;gap:18px;padding:4px 8px 10px;font-size:11px;color:#88a;flex-wrap:wrap}'
     + '.mh-sub b{color:#ccd}'
-    + '.mh-tot{border-top:2px solid var(--accent,#e8a020);margin-top:8px;padding:10px 8px;display:flex;justify-content:flex-end;gap:22px;font-size:13px}'
+    + '.mh-tot{border-top:2px solid var(--accent,#e8a020);margin-top:8px;padding:10px 8px;display:flex;justify-content:flex-end;gap:22px;font-size:13px;flex-wrap:wrap}'
     + '.mh-tot b{color:var(--accent,#e8a020)}'
     + '#mh-add{border-top:1px solid #2a3a5e;padding:10px 16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:#0d1830}'
     + '#mh-add input[type=text],#mh-add input[type=number],#mh-add input[type=date]{background:#0f1a2e;border:1px solid #2a3a5e;color:#dde;border-radius:5px;padding:5px 7px;font-size:12px}'
     + '#mh-add label{font-size:11px;color:#88a;display:flex;align-items:center;gap:4px}'
-    + '#mh-add-btn{background:var(--accent,#e8a020);color:#111;border:none;border-radius:6px;padding:6px 14px;font-weight:bold;cursor:pointer}'
+    + '#mh-add-btn,#mh-log-btn{background:var(--accent,#e8a020);color:#111;border:none;border-radius:6px;padding:6px 14px;font-weight:bold;cursor:pointer}'
     + '.mh-icon{background:none;border:none;cursor:pointer;font-size:11px;color:#789;flex:none;padding:1px 3px}'
-    + '.mh-icon:hover{color:#fff}';
+    + '.mh-icon:hover{color:#fff}'
+    + '.mh-editrow{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:6px 8px;background:#101d38;border:1px solid var(--accent,#e8a020);border-radius:6px;margin:2px 0}'
+    + '.mh-editrow input{background:#0f1a2e;border:1px solid #2a3a5e;color:#dde;border-radius:5px;padding:4px 6px;font-size:12px}'
+    + '.mh-editrow label{font-size:10px;color:#88a;display:flex;align-items:center;gap:3px}'
+    + '.mh-editrow .mh-save{background:var(--accent,#e8a020);color:#111;border:none;border-radius:5px;padding:4px 10px;font-weight:bold;cursor:pointer}'
+    + '.mh-editrow .mh-cancel{background:none;border:1px solid #445;color:#aab;border-radius:5px;padding:4px 10px;cursor:pointer}';
   document.head.appendChild(st);
 
   const r2 = x => Math.round(x * 100) / 100;
   const fmtM = x => '$' + Number(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
   function getData(){ try { return (typeof data !== 'undefined' && data) ? data : null; } catch (e) { return null; } }
+  const jsq = s => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-  // ─── 1) Chronological order everywhere: sort entries and payments by their DATE, not entry order ───
+  // ─── Chronological order everywhere ───
   function sortChrono(){
     const d = getData();
     if (!d) return;
@@ -4876,18 +4880,18 @@ function cwInitListeners(){
     }
   }
 
-  // ─── 2) History button on every Materials & Subs section (panels + floaters) ───
+  // ─── History buttons on both section headers (panels + floaters) ───
   const _prevRJP_mh = window.renderJobPanel;
   if (typeof _prevRJP_mh === 'function') {
     window.renderJobPanel = function(proj){
       let html = _prevRJP_mh(proj);
-      const jsArg = String(proj).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-      html = html.replace('Materials &amp; Subs', 'Materials &amp; Subs <button class="mat-hist-btn" onclick="openMatHistory(\'' + jsArg + '\')">\u{1F4DC} History</button>');
+      const a = jsq(proj);
+      html = html.replace('Materials &amp; Subs', 'Materials &amp; Subs <button class="mat-hist-btn" onclick="openMatHistory(\'' + a + '\')">\u{1F4DC} History</button>');
+      html = html.replace('Weekly Hours', 'Weekly Hours <button class="mat-hist-btn" onclick="openHrsHistory(\'' + a + '\')">\u{1F4DC} History</button>');
       return html;
     };
   }
 
-  // ─── 3) The history popup ───
   function pctFor(m, p){
     if (m && m.markupPct != null && !isNaN(parseFloat(m.markupPct))) return parseFloat(m.markupPct);
     if (m && m.kind === 'sub') {
@@ -4916,15 +4920,34 @@ function cwInitListeners(){
     const ov = document.getElementById('mh-overlay');
     if (ov) ov.style.display = 'none';
     window.__mhProj = null;
+    window.__mhMode = null;
+    window.__mhEdit = null;
   };
 
   window.openMatHistory = function(proj){
     ensureOverlay();
     window.__mhProj = proj;
-    rebuildMatHistory();
+    window.__mhMode = 'mat';
+    window.__mhEdit = null;
+    rebuildHist();
     document.getElementById('mh-overlay').style.display = 'block';
   };
 
+  window.openHrsHistory = function(proj){
+    ensureOverlay();
+    window.__mhProj = proj;
+    window.__mhMode = 'hrs';
+    window.__mhEdit = null;
+    rebuildHist();
+    document.getElementById('mh-overlay').style.display = 'block';
+  };
+
+  function rebuildHist(){
+    if (window.__mhMode === 'hrs') rebuildHrsHistory();
+    else rebuildMatHistory();
+  }
+
+  // ═══ MATERIALS HISTORY ═══
   function rebuildMatHistory(){
     const proj = window.__mhProj;
     const d = getData();
@@ -4946,6 +4969,7 @@ function cwInitListeners(){
 
     document.getElementById('mh-title').textContent = '\u{1F4DC} ' + proj + ' — Materials & Subs History';
     const body = document.getElementById('mh-body');
+    const ed = window.__mhEdit;
 
     if (!rows.length) {
       body.innerHTML = '<div style="padding:20px;color:#889;font-size:13px">No materials or subs logged for this job yet — add the first one below.</div>';
@@ -4964,19 +4988,19 @@ function cwInitListeners(){
         const label = new Date(k + '-15').toLocaleString('en-US', { month: 'long', year: 'numeric' });
         html += '<div class="mh-month' + (k === curKey ? ' cur' : '') + '"><span>' + label + '</span><span class="mh-count">' + g.length + ' item' + (g.length > 1 ? 's' : '') + '</span></div>';
         for (const r of g) {
+          if (ed && ed.date === r.date && ed.mi === r.mi) { html += matEditRowHtml(r); continue; }
           const m = r.m;
           const tag = m.kind === 'sub' ? '<span class="mh-tag">SUB</span>' : (m.coId ? '<span class="mh-tag">CO</span>' : '');
           const inv = m.invoiceNum ? '<span class="mh-inv">#' + esc(m.invoiceNum) + '</span>' : '';
           const store = m.store ? '<span class="mh-store" title="' + esc(m.store) + '">' + esc(m.store) + '</span>' : '';
-          const jsProj = String(window.__mhProj).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
           html += '<div class="mh-row">'
             + '<span class="mh-date">' + esc(r.date.slice(5)) + '</span>'
             + store + tag
             + '<span class="mh-desc" title="' + esc(m.description || '') + '">' + (esc(m.description || '') || '<span style="color:#556">(no description)</span>') + inv + '</span>'
             + '<span class="mh-cost">' + fmtM(r.cost) + '</span>'
             + '<span class="mh-billed" title="billed at ' + r.pct + '% markup">' + fmtM(r.billed) + '</span>'
-            + '<button class="mh-icon" title="Edit (opens day editor)" onclick="openEditMat(\'' + jsProj + '\',\'' + r.date + '\')">\u270e</button>'
-            + '<button class="mh-icon" title="Delete" onclick="mhDelete(\'' + jsProj + '\',\'' + r.date + '\',' + r.mi + ')">\u2715</button>'
+            + '<button class="mh-icon" title="Edit this line" onclick="mhEditStart(\'' + r.date + '\',' + r.mi + ')">\u270e</button>'
+            + '<button class="mh-icon" title="Delete" onclick="mhDelete(\'' + jsq(proj) + '\',\'' + r.date + '\',' + r.mi + ')">\u2715</button>'
             + '</div>';
         }
         html += '<div class="mh-sub"><span>' + label + ' subtotal:</span><span>cost <b>' + fmtM(mCost) + '</b></span><span>billed <b>' + fmtM(mBilled) + '</b></span></div>';
@@ -4985,7 +5009,6 @@ function cwInitListeners(){
       body.innerHTML = html;
     }
 
-    // Add-purchase row
     const stores = [...new Set((d.entries || []).flatMap(e => (e.materials || []).map(m => (m.store || '').trim())).filter(Boolean))].sort();
     const todayIso = (typeof today !== 'undefined' && /^\d{4}-\d{2}-\d{2}$/.test(today)) ? today : new Date().toISOString().slice(0, 10);
     document.getElementById('mh-add').innerHTML = ''
@@ -5001,10 +5024,63 @@ function cwInitListeners(){
     document.getElementById('mh-add-btn').onclick = mhAdd;
   }
 
+  function matEditRowHtml(r){
+    const m = r.m;
+    return '<div class="mh-editrow">'
+      + '<input type="date" id="mh-e-date" value="' + r.date + '">'
+      + '<input type="text" id="mh-e-store" value="' + esc(m.store || '') + '" placeholder="Store" style="width:100px" list="mh-stores">'
+      + '<input type="text" id="mh-e-desc" value="' + esc(m.description || '') + '" placeholder="Description" style="flex:1;min-width:110px">'
+      + '<input type="number" id="mh-e-amt" value="' + (parseFloat(m.cost || 0) || 0) + '" step="0.01" style="width:80px">'
+      + '<input type="text" id="mh-e-inv" value="' + esc(m.invoiceNum || '') + '" placeholder="Inv#" style="width:76px">'
+      + '<label><input type="checkbox" id="mh-e-sub"' + (m.kind === 'sub' ? ' checked' : '') + '> Sub</label>'
+      + '<label>Mk% <input type="number" id="mh-e-pct" value="' + (m.markupPct != null ? m.markupPct : '') + '" placeholder="auto" step="0.5" style="width:58px"></label>'
+      + '<button class="mh-save" onclick="mhEditSave()">Save</button>'
+      + '<button class="mh-cancel" onclick="mhEditCancel()">Cancel</button>'
+      + '</div>';
+  }
+
+  window.mhEditStart = function(date, mi){
+    window.__mhEdit = { date: date, mi: mi };
+    rebuildMatHistory();
+  };
+  window.mhEditCancel = function(){
+    window.__mhEdit = null;
+    rebuildMatHistory();
+  };
+  window.mhEditSave = async function(){
+    const proj = window.__mhProj, ed = window.__mhEdit, d = getData();
+    if (!proj || !ed || !d) return;
+    const entry = (d.entries || []).find(e => e.date === ed.date && (e.project || '') === proj);
+    if (!entry || !entry.materials || !entry.materials[ed.mi]) { window.__mhEdit = null; rebuildMatHistory(); return; }
+    const m = entry.materials[ed.mi];
+    const newDate = document.getElementById('mh-e-date').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) { alert('Pick a valid date'); return; }
+    m.store = document.getElementById('mh-e-store').value.trim();
+    m.description = document.getElementById('mh-e-desc').value.trim();
+    m.cost = String(parseFloat(document.getElementById('mh-e-amt').value || 0) || 0);
+    m.invoiceNum = document.getElementById('mh-e-inv').value.trim();
+    if (document.getElementById('mh-e-sub').checked) m.kind = 'sub'; else delete m.kind;
+    const pctVal = document.getElementById('mh-e-pct').value;
+    if (pctVal !== '' && !isNaN(parseFloat(pctVal))) m.markupPct = parseFloat(pctVal); else delete m.markupPct;
+    if (newDate !== ed.date) {
+      entry.materials.splice(ed.mi, 1);
+      let dest = (d.entries || []).find(e => e.date === newDate && (e.project || '') === proj);
+      if (!dest) { dest = { date: newDate, project: proj, crew: [], materials: [], notes: '' }; d.entries.push(dest); }
+      if (!dest.materials) dest.materials = [];
+      dest.materials.push(m);
+    }
+    window.__mhEdit = null;
+    try {
+      await saveAll();
+      if (typeof window.render === 'function') window.render();
+    } catch (e) { alert('Save failed — try again.'); }
+    rebuildMatHistory();
+  };
+
   window.mhDelete = async function(proj, date, mi){
     try {
       await deleteMatInPanel(proj, date, mi);
-      rebuildMatHistory();
+      rebuildHist();
     } catch (e) {}
   };
 
@@ -5036,13 +5112,89 @@ function cwInitListeners(){
     }
   }
 
-  // ─── 4) Hook render: sort first, then let everything paint, then refresh the popup if open ───
+  // ═══ HOURS HISTORY ═══
+  function rebuildHrsHistory(){
+    const proj = window.__mhProj;
+    const d = getData();
+    if (!proj || !d) return;
+    const p = (d.projects || []).find(x => (x.name || '') === proj);
+    const fixed = !!(p && p.billingType === 'fixed');
+    const rate = (typeof billingRate === 'function') ? billingRate(proj) : 0;
+    const oosR = (typeof oosRateFor === 'function') ? oosRateFor(proj) : rate;
+
+    const rows = [];
+    for (const en of (d.entries || [])) {
+      if (!en || (en.project || '') !== proj || !en.date) continue;
+      const crew = en.crew || [];
+      for (const c of crew) {
+        const h = parseFloat(c.hours || 0) || 0;
+        const oh = parseFloat(c.oosHours || 0) || 0;
+        if (h <= 0 && oh <= 0) continue;
+        const isCO = !!(c.coId || c.changeOrder);
+        const isOOS = !!c.outOfScope;
+        let billed = null;
+        if (!fixed) {
+          if (isCO || isOOS) billed = r2((h + oh) * oosR);
+          else billed = r2(h * rate + oh * oosR);
+        }
+        rows.push({ date: String(en.date), worker: c.name || '(unnamed)', h, oh, isCO, isOOS, billed });
+      }
+    }
+    rows.sort((a, b) => a.date.localeCompare(b.date));
+
+    document.getElementById('mh-title').textContent = '\u{1F4DC} ' + proj + ' — Hours History' + (fixed ? ' (fixed-price: internal, not billed)' : '');
+    const body = document.getElementById('mh-body');
+
+    if (!rows.length) {
+      body.innerHTML = '<div style="padding:20px;color:#889;font-size:13px">No hours logged for this job yet.</div>';
+    } else {
+      const curKey = (typeof displayYear !== 'undefined') ? (displayYear + '-' + String(displayMonth + 1).padStart(2, '0')) : '';
+      const groups = {};
+      for (const r of rows) { const k = r.date.slice(0, 7); (groups[k] = groups[k] || []).push(r); }
+      let html = '';
+      let gHrs = 0, gBilled = 0;
+      for (const k of Object.keys(groups).sort()) {
+        const g = groups[k];
+        const mHrs = r2(g.reduce((s, r) => s + r.h + r.oh, 0));
+        const mBilled = fixed ? 0 : r2(g.reduce((s, r) => s + (r.billed || 0), 0));
+        gHrs = r2(gHrs + mHrs);
+        gBilled = r2(gBilled + mBilled);
+        const byWorker = {};
+        for (const r of g) byWorker[r.worker] = r2((byWorker[r.worker] || 0) + r.h + r.oh);
+        const label = new Date(k + '-15').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+        html += '<div class="mh-month' + (k === curKey ? ' cur' : '') + '"><span>' + label + '</span><span class="mh-count">' + g.length + ' entr' + (g.length > 1 ? 'ies' : 'y') + '</span></div>';
+        for (const r of g) {
+          const hrsTxt = r.h + r.oh + 'h' + (r.oh > 0 && r.h > 0 ? ' (' + r.oh + ' OOS)' : '');
+          const tag = r.isCO ? '<span class="mh-tag">CO</span>' : (r.isOOS || (r.oh > 0 && r.h === 0) ? '<span class="mh-tag">OOS</span>' : '');
+          html += '<div class="mh-row">'
+            + '<span class="mh-date">' + esc(r.date.slice(5)) + '</span>'
+            + '<span class="mh-desc">' + esc(r.worker) + '</span>'
+            + tag
+            + '<span class="mh-cost">' + hrsTxt + '</span>'
+            + (fixed ? '' : '<span class="mh-billed">' + fmtM(r.billed) + '</span>')
+            + '<button class="mh-icon" title="Edit this day (opens day editor)" onclick="openDayModal(\'' + r.date + '\')">\u270e</button>'
+            + '</div>';
+        }
+        const workerBits = Object.keys(byWorker).sort().map(w => esc(w) + ' <b>' + byWorker[w] + 'h</b>').join(' \u00b7 ');
+        html += '<div class="mh-sub"><span>' + workerBits + '</span><span>' + label + ': <b>' + mHrs + 'h</b></span>' + (fixed ? '' : '<span>billed <b>' + fmtM(mBilled) + '</b></span>') + '</div>';
+      }
+      html += '<div class="mh-tot"><span>All-time</span><span>Hours <b>' + gHrs + 'h</b></span>' + (fixed ? '' : '<span>Labor Billed <b>' + fmtM(gBilled) + '</b></span>') + '</div>';
+      body.innerHTML = html;
+    }
+
+    const todayIso = (typeof today !== 'undefined' && /^\d{4}-\d{2}-\d{2}$/.test(today)) ? today : new Date().toISOString().slice(0, 10);
+    document.getElementById('mh-add').innerHTML = ''
+      + '<span style="font-size:11px;color:#88a">Hours are edited in the day editor \u2014 click \u270e on any line, or</span>'
+      + '<button id="mh-log-btn" onclick="openDayModal(\'' + todayIso + '\')">+ Log hours today</button>';
+  }
+
+  // ─── Hook render: sort, paint, refresh popup if open ───
   const _prevRender_mh = window.render;
   if (typeof _prevRender_mh === 'function') {
     window.render = function(){
       sortChrono();
       _prevRender_mh();
-      if (window.__mhProj) { try { rebuildMatHistory(); } catch (e) {} }
+      if (window.__mhProj) { try { rebuildHist(); } catch (e) {} }
     };
   }
   try { sortChrono(); if (typeof renderJobPanels === 'function') renderJobPanels(); } catch (e) {}
