@@ -5200,5 +5200,110 @@ function cwInitListeners(){
   try { sortChrono(); if (typeof renderJobPanels === 'function') renderJobPanels(); } catch (e) {}
 })();
 </script>
+<!-- ══ PAYMENT EDIT/DELETE v1 — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  const st = document.createElement('style');
+  st.textContent = ''
+    + '.payx-btn{background:none;border:none;cursor:pointer;font-size:10px;color:#789;padding:0 2px;flex:none}'
+    + '.payx-btn:hover{color:#fff}'
+    + '.payx-edit{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:5px 6px;background:#101d38;border:1px solid var(--accent,#e8a020);border-radius:6px;margin:2px 0;font-size:11px}'
+    + '.payx-edit input{background:#0f1a2e;border:1px solid #2a3a5e;color:#dde;border-radius:4px;padding:3px 5px;font-size:11px}'
+    + '.payx-save{background:var(--accent,#e8a020);color:#111;border:none;border-radius:4px;padding:3px 9px;font-weight:bold;cursor:pointer;font-size:11px}'
+    + '.payx-cancel{background:none;border:1px solid #445;color:#aab;border-radius:4px;padding:3px 9px;cursor:pointer;font-size:11px}';
+  document.head.appendChild(st);
+
+  function getData(){ try { return (typeof data !== 'undefined' && data) ? data : null; } catch (e) { return null; } }
+  const fmtM = x => '$' + Number(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  let editState = null; // { proj, idx }
+
+  function payRowsIn(panel){
+    return [...panel.querySelectorAll('.pay-row')].filter(r => !r.classList.contains('hdr'));
+  }
+
+  window.payxDelete = async function(proj, idx){
+    const d = getData();
+    if (!d || !d.payments || !d.payments[proj] || !d.payments[proj][idx]) return;
+    const p = d.payments[proj][idx];
+    if (!confirm('Delete this payment?\n\n' + (p.date || 'no date') + '  ' + (p.check ? '#' + p.check + '  ' : '') + fmtM(parseFloat(p.amount || 0) || 0)
+      + '\n\nThis raises the balance due for ' + proj + '. This cannot be undone.')) return;
+    d.payments[proj].splice(idx, 1);
+    editState = null;
+    try { await saveAll(); if (typeof window.render === 'function') window.render(); }
+    catch (e) { alert('Could not save — try again.'); }
+  };
+
+  window.payxEditStart = function(proj, idx){
+    editState = { proj: proj, idx: idx };
+    decorateAll();
+  };
+  window.payxEditCancel = function(){
+    editState = null;
+    if (typeof window.render === 'function') window.render(); else decorateAll();
+  };
+  window.payxEditSave = async function(){
+    const d = getData();
+    if (!d || !editState) return;
+    const arr = (d.payments || {})[editState.proj];
+    const p = arr && arr[editState.idx];
+    if (!p) { editState = null; return; }
+    const nd = document.getElementById('payx-e-date').value;
+    if (nd && !/^\d{4}-\d{2}-\d{2}$/.test(nd)) { alert('Pick a valid date'); return; }
+    p.date = nd;
+    p.check = document.getElementById('payx-e-check').value.trim();
+    p.amount = String(parseFloat(document.getElementById('payx-e-amt').value || 0) || 0);
+    p.notes = document.getElementById('payx-e-notes').value.trim();
+    editState = null;
+    try { await saveAll(); if (typeof window.render === 'function') window.render(); }
+    catch (e) { alert('Could not save — try again.'); }
+  };
+
+  function decoratePanel(panel){
+    const proj = panel.dataset ? panel.dataset.proj : null;
+    if (!proj) return;
+    const d = getData();
+    if (!d) return;
+    const pays = (d.payments || {})[proj] || [];
+    const rows = payRowsIn(panel);
+    rows.forEach((row, i) => {
+      const p = pays[i];
+      if (!p) return;
+      // Editing this row? Swap in the edit strip
+      if (editState && editState.proj === proj && editState.idx === i) {
+        if (row.dataset.payxEditing) return;
+        row.dataset.payxEditing = '1';
+        row.innerHTML = '';
+        const strip = document.createElement('div');
+        strip.className = 'payx-edit';
+        strip.innerHTML = ''
+          + '<input type="date" id="payx-e-date" value="' + (p.date || '') + '" style="width:118px">'
+          + '<input type="text" id="payx-e-check" value="' + String(p.check || '').replace(/"/g, '&quot;') + '" placeholder="Check#" style="width:64px">'
+          + '<input type="number" id="payx-e-amt" value="' + (parseFloat(p.amount || 0) || 0) + '" step="0.01" style="width:84px">'
+          + '<input type="text" id="payx-e-notes" value="' + String(p.notes || '').replace(/"/g, '&quot;') + '" placeholder="Notes" style="flex:1;min-width:70px">'
+          + '<button class="payx-save" onclick="payxEditSave()">Save</button>'
+          + '<button class="payx-cancel" onclick="payxEditCancel()">Cancel</button>';
+        row.appendChild(strip);
+        return;
+      }
+      if (row.querySelector('.payx-btn') || row.dataset.payxEditing) return;
+      const jsProj = String(proj).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const wrap = document.createElement('span');
+      wrap.style.cssText = 'flex:none;white-space:nowrap';
+      wrap.innerHTML = '<button class="payx-btn" title="Edit payment" onclick="payxEditStart(\'' + jsProj + '\',' + i + ')">\u270e</button>'
+        + '<button class="payx-btn" title="Delete payment" onclick="payxDelete(\'' + jsProj + '\',' + i + ')">\u2715</button>';
+      row.appendChild(wrap);
+    });
+  }
+
+  function decorateAll(){
+    document.querySelectorAll('.job-panel[data-proj]').forEach(decoratePanel);
+  }
+
+  // Decorate now and after any re-render, panel or floater, via observer
+  decorateAll();
+  new MutationObserver(function(){ decorateAll(); }).observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 </body>
 </html>
