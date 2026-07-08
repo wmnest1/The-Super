@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Super — Mullins Construction</title>
+<link rel="icon" type="image/png" href="/mullins-favicon.png">
 <script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
 <style>
   :root { --accent: #e8a020; --bg: #1a1a2e; --panel: #16213e; --text: #eeeeee; }
@@ -351,6 +352,7 @@
   .theme-hint { font-size: 11px; color: #666; }
 
   /* ── Light mode ── */
+  .mc-dark { display: block; } .mc-light { display: none; } html.light .mc-dark { display: none; } html.light .mc-light { display: block; }
   html.light body { background: #f0f2f5; color: #1a1a2e; }
   html.light header { background: #fff; }
   html.light header span { color: #666; }
@@ -434,7 +436,7 @@
 </head>
 <body>
 <header>
-  <div style="font-size:32px">🏗️</div>
+  <div style="display:inline-flex;align-items:center"><img src="/mullins-logo.png" alt="Mullins Construction" class="mc-logo mc-light" style="height:42px;width:auto;display:block"><img src="/mullins-logo-dark.png" alt="Mullins Construction" class="mc-logo mc-dark" style="height:42px;width:auto;display:block"></div>
   <div>
     <h1>The Super</h1>
     <span>Mullins Construction Inc. — Business Manager</span>
