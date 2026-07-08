@@ -5425,7 +5425,7 @@ function cwInitListeners(){
   }
 })();
 </script>
-<!-- ══ NO-WORK LABEL v1 — change default note text from "NO WORK" to "X" — paste above </body>, after all other snippets ══ -->
+<!-- ══ NO-WORK TOGGLE v2 — replaces NO-WORK LABEL v1. Find and delete the old "NO-WORK LABEL v1" block, then paste this in its place. ══ -->
 <script>
 (function(){
   if (typeof window.noWorkCrew !== 'function') return;
@@ -5435,6 +5435,19 @@ function cwInitListeners(){
     const nEl = document.getElementById('dm-note-' + worker);
     const cEl = document.getElementById('dm-color-' + worker);
     const btn = document.getElementById('dm-nw-' + worker);
+
+    // Toggle: if the note is already X (or the legacy NO WORK), clear it
+    const cur = nEl ? (nEl.value || '').trim() : '';
+    const isOn = (cur === 'X' || cur === 'NO WORK');
+
+    if (isOn) {
+      if (nEl) { nEl.value = ''; nEl.style.color = ''; nEl.style.fontWeight = ''; }
+      if (cEl) cEl.value = '#884444';
+      if (btn) { btn.style.background = '#2a1515'; btn.style.borderColor = '#cc3333'; btn.style.color = '#cc8888'; }
+      return;
+    }
+
+    // Turn on: mark as no-work with X
     if (hEl) hEl.value = '0';
     if (oEl) oEl.value = '0';
     if (nEl) { nEl.value = 'X'; nEl.style.color = '#cc3333'; nEl.style.fontWeight = 'bold'; }
