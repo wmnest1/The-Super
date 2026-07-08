@@ -5425,5 +5425,25 @@ function cwInitListeners(){
   }
 })();
 </script>
+<!-- ══ NO-WORK LABEL v1 — change default note text from "NO WORK" to "X" — paste above </body>, after all other snippets ══ -->
+<script>
+(function(){
+  if (typeof window.noWorkCrew !== 'function') return;
+  window.noWorkCrew = function(worker){
+    const hEl = document.getElementById('dm-crew-' + worker);
+    const oEl = document.getElementById('dm-oos-' + worker);
+    const nEl = document.getElementById('dm-note-' + worker);
+    const cEl = document.getElementById('dm-color-' + worker);
+    const btn = document.getElementById('dm-nw-' + worker);
+    if (hEl) hEl.value = '0';
+    if (oEl) oEl.value = '0';
+    if (nEl) { nEl.value = 'X'; nEl.style.color = '#cc3333'; nEl.style.fontWeight = 'bold'; }
+    if (cEl) cEl.value = '#cc3333';
+    if (btn) { btn.style.background = '#5a1515'; btn.style.borderColor = '#ff4444'; btn.style.color = '#ff6666'; }
+    const strip = btn && btn.nextElementSibling;
+    if (strip) [...strip.children].forEach(function(s){ s.style.outline = 'none'; });
+  };
+})();
+</script>
 </body>
 </html>
