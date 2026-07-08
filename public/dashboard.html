@@ -5600,5 +5600,31 @@ function cwInitListeners(){
   window.dpmBringBack = bringBack;
 })();
 </script>
+<!-- ══ ADD-MATERIAL REDIRECT v1 — "+ Add Material" now opens Materials History for the right project, focus on the add row. Paste above </body>, after all other snippets. ══ -->
+<script>
+(function(){
+  if (typeof window.openMatHistory !== 'function') return;
+
+  // Intercept clicks on any "+ Add Material" button, panels or floaters
+  document.addEventListener('click', function(e){
+    const btn = e.target && e.target.closest ? e.target.closest('.mat-add-btn') : null;
+    if (!btn) return;
+    const label = (btn.textContent || '').trim();
+    if (!/Add Material/i.test(label)) return;
+    // Find the job panel this button belongs to and pull the project name off it
+    const panel = btn.closest('.job-panel');
+    const proj = panel && panel.dataset ? panel.dataset.proj : null;
+    if (!proj) return;
+    e.preventDefault();
+    e.stopPropagation();
+    openMatHistory(proj);
+    // Focus the description field so they're ready to type
+    setTimeout(function(){
+      const desc = document.getElementById('mh-a-desc');
+      if (desc) desc.focus();
+    }, 60);
+  }, true);
+})();
+</script>
 </body>
 </html>
