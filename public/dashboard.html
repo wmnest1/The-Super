@@ -6059,4 +6059,38 @@ function cwInitListeners(){
   if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
+<!-- ══ STATEMENT PDF BUTTON v1 — adds a "Download PDF" button to the statement options box; posts the statement HTML to the server and downloads a real PDF. Requires STATEMENT PDF v1 route in server.js. ══ -->
+<script>
+(function(){
+  var box=document.getElementById('stmt-box');
+  if(!box||document.getElementById('stmt-pdf'))return;
+  var go=document.getElementById('stmt-go');
+  var b=document.createElement('button');
+  b.id='stmt-pdf';
+  b.textContent='\u2B07 Download PDF';
+  b.style.cssText='background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%';
+  go.parentNode.insertBefore(b,go.nextSibling);
+
+  b.addEventListener('click',async function(){
+    var proj=document.getElementById('stmt-proj-label').textContent;
+    var from=document.getElementById('stmt-from').value;
+    var to=document.getElementById('stmt-to').value;
+    var detail=document.getElementById('stmt-detail').value;
+    b.textContent='Generating\u2026';b.disabled=true;
+    try{
+      var html=window.buildStatementHTML(proj,from,to,detail);
+      var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({html:html,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement'})});
+      if(!r.ok)throw new Error('server error');
+      var blob=await r.blob();
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement.pdf';
+      document.body.appendChild(a);a.click();a.remove();
+      document.getElementById('stmt-overlay').style.display='none';
+    }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
+    b.textContent='\u2B07 Download PDF';b.disabled=false;
+  });
+})();
+</script>
 </body></html>
