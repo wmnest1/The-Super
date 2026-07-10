@@ -5711,4 +5711,13 @@ function cwInitListeners(){
   if (cwt) cwt.textContent = cwt.textContent.replace(/🏗️?\s*/, '');
 })();
 </script>
+<!-- ══ HIDE PANEL-FACE MATERIAL BUTTONS v1 — removes the ✎/✕ on material rows inside job panels (they routed into the wrong day editor / deleted silently). Editing now happens in the 📜 History popup only. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<style>
+  /* Hide the edit/delete icons on material rows on the job-panel face.
+     History popup (.mh-icon), payments (.payx-btn), and the Materials
+     window (.mat-edit-btn/.mat-del-btn) are untouched. */
+  .job-panel .mat-row-wrap .mat-icon-btn { display: none !important; }
+  /* Let the description use the freed-up space */
+  .job-panel .mat-row-wrap .mat-row-desc { flex: 1 1 auto; }
+</style>
 </body></html>
