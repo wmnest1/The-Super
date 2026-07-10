@@ -5720,4 +5720,141 @@ function cwInitListeners(){
   /* Let the description use the freed-up space */
   .job-panel .mat-row-wrap .mat-row-desc { flex: 1 1 auto; }
 </style>
+<!-- ══ SAFE DAY EDITOR v1 — materials can no longer be wiped by the day editor. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html, after all other snippets. ══ -->
+<script>
+(function(){
+  // Hide panel-face material edit/delete buttons (harmless if already hidden)
+  var st=document.createElement('style');
+  st.textContent='.job-panel .mat-row-wrap .mat-icon-btn{display:none!important}'
+    +'.job-panel .mat-row-wrap .mat-row-desc{flex:1 1 auto}';
+  document.head.appendChild(st);
+
+  function crewIsZero(c){
+    return parseFloat(c.hours||0)===0&&parseFloat(c.oosHours||0)===0&&!(c.note||'').trim();
+  }
+
+  // ── SAFE OPEN: only clean entries with no hours AND no materials AND no notes ──
+  window.openDayModal=function(iso){
+    var all=entriesForDate(iso);
+    var dead=all.filter(function(e){
+      var crew=e.crew||[], mats=e.materials||[];
+      var noCrew=crew.length===0||crew.every(crewIsZero);
+      return noCrew&&mats.length===0&&!(e.notes||'').trim();
+    });
+    for(var i=0;i<dead.length;i++)removeEntry(dead[i].date,dead[i].project);
+    if(dead.length>0)saveAll();
+
+    var existing=entriesForDate(iso);
+    var monthProjects=allProjectsInMonth(displayYear,displayMonth);
+    var dpSet=new Set(existing.map(function(e){return e.project;}).concat(monthProjects));
+    (data.projects||[]).forEach(function(p){dpSet.add(p.name);});
+    var projects=[].concat.apply([],[Array.from(dpSet)]).filter(Boolean);
+    var dt=new Date(iso+'T12:00:00');
+    var dateLabel=dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+    var crewData={};
+    for(var p=0;p<projects.length;p++){
+      var proj=projects[p];
+      var entry=findEntry(iso,proj)||{crew:[]};
+      crewData[proj]=(entry.crew||[]).map(function(c){
+        return {name:normName(c.name),
+          reg:c.outOfScope?'0':(c.hours||''),
+          oos:c.outOfScope?(c.hours||''):(c.oosHours||''),
+          note:c.note||'',color:c.color||'#884444'};
+      });
+    }
+    var firstEntry=existing[0];
+    dayModalState={date:iso,project:(firstEntry&&firstEntry.project)||projects[0]||'',
+      projects:projects,crewData:crewData,mats:[]}; // mats ALWAYS starts empty — add-only
+    document.getElementById('dm-title').textContent='\uD83D\uDCC5 '+dateLabel;
+    document.getElementById('dm-notes').value=(firstEntry&&firstEntry.notes)||'';
+    populateDayModal();
+    document.getElementById('day-modal').classList.add('open');
+  };
+
+  // ── Hint in the materials section ──
+  var _rdm=window.renderDayModalMats;
+  window.renderDayModalMats=function(){
+    _rdm();
+    var sec=document.getElementById('dm-mats-section');
+    if(sec&&!sec.querySelector('.sde-hint')){
+      var h=document.createElement('div');
+      h.className='sde-hint';
+      h.style.cssText='font-size:10px;color:#8a94a8;margin:4px 0 0';
+      h.textContent='New purchases are added to the selected project. To edit or delete existing materials, use \uD83D\uDCDC History on the job panel.';
+      sec.appendChild(h);
+    }
+  };
+
+  // ── SAFE SAVE: never touches existing materials or notes ──
+  window.saveDayModal=async function(){
+    flushCrewToState();
+    var date=dayModalState.date,projects=dayModalState.projects,crewData=dayModalState.crewData;
+    if(!projects.length){closeDayModal();return;}
+    var firstProjWithData=null;
+
+    for(var p=0;p<projects.length;p++){
+      var proj=projects[p];
+      var rawCrew=crewData[proj]||[];
+      var crew=[];
+      for(var i=0;i<rawCrew.length;i++){
+        var cd=rawCrew[i];
+        var hrs=parseFloat(cd.reg||0),oosHrs=parseFloat(cd.oos||0);
+        var note=(cd.note||'').trim(),color=cd.color||'';
+        if(hrs>0||oosHrs>0||note){
+          var item={name:cd.name,hours:hrs,oosHours:oosHrs};
+          if(note){item.note=note;if(color)item.color=color;}
+          crew.push(item);
+        }
+      }
+      var existing=findEntry(date,proj);
+      if(crew.length>0){
+        if(!firstProjWithData)firstProjWithData=proj;
+        var entry=findOrCreateEntry(date,proj);
+        entry.crew=crew;
+        if(!entry.materials)entry.materials=[];   // preserve, never wipe
+      }else if(existing){
+        if((existing.materials||[]).length>0||(existing.notes||'').trim()){
+          existing.crew=[];                        // keep entry alive for its materials/notes
+        }else{
+          removeEntry(date,proj);
+        }
+      }
+    }
+
+    // NEW materials typed in the modal → ADDED to the selected project
+    var newMats=(dayModalState.mats||[]).filter(function(m){
+      return (m.description&&m.description.trim())||parseFloat(m.cost||0)>0;
+    });
+    var notes=(document.getElementById('dm-notes')?document.getElementById('dm-notes').value:'').trim();
+    var target=dayModalState.project||firstProjWithData||projects[0];
+    if(target&&newMats.length>0){
+      var tEntry=findOrCreateEntry(date,target);
+      if(!tEntry.materials)tEntry.materials=[];
+      for(var m=0;m<newMats.length;m++){
+        tEntry.materials.push({description:(newMats[m].description||'').trim(),cost:parseFloat(newMats[m].cost||0)||0});
+      }
+    }
+    if(target&&notes){
+      var nEntry=findEntry(date,target)||findOrCreateEntry(date,target);
+      nEntry.notes=notes;
+    }
+
+    document.querySelectorAll('.dc-copied').forEach(function(el){el.classList.remove('dc-copied');});
+    await saveAll();closeDayModal();render();
+  };
+
+  // ── Delete-day warns about materials riding along ──
+  window.deleteDayEntry=async function(){
+    var date=dayModalState.date,project=dayModalState.project;
+    var entry=findEntry(date,project);
+    var mats=(entry&&entry.materials)||[];
+    var extra=mats.length?'\n\n\u26A0 This will ALSO delete '+mats.length+' material line(s) totaling $'
+      +mats.reduce(function(s,m){return s+parseFloat(m.cost||0);},0).toFixed(2)+' on this date.':'';
+    if(!confirm('Delete '+project+' entry for '+date+'?'+extra))return;
+    removeEntry(date,project);
+    await saveAll();closeDayModal();render();
+  };
+})();
+</script>
 </body></html>
