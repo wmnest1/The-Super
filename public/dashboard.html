@@ -5902,6 +5902,7 @@ function cwInitListeners(){
   function r2(x){return Math.round(x*100)/100;}
   function fmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
 
+  window.buildStatementHTML=function(proj,from,to,detail){window.__stmtWantHtml=true;var d=genStatement(proj,from,to,detail);window.__stmtWantHtml=false;return d;};
   function genStatement(proj,from,to,detail){
     var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     var fixed=p.billingType==='fixed';
