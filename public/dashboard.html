@@ -6044,6 +6044,7 @@ function cwInitListeners(){
       +'</div></body></html>';
 
     // Blob URL — the browser treats this like a real file, so viewport is honored on first paint on mobile Chrome
+    if(window.__stmtWantHtml){return doc;}
     var blob=new Blob([doc],{type:'text/html'});
     var url=URL.createObjectURL(blob);
     var w=window.open(url,'_blank');
