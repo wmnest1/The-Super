@@ -6072,6 +6072,33 @@ function cwInitListeners(){
   b.textContent='\u2B07 Download PDF';
   b.style.cssText='background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%';
   go.parentNode.insertBefore(b,go.nextSibling);
+  var b2=document.createElement('button');
+    b2.id='stmt-pdf-dark';
+    b2.textContent='\uD83C\uDF19 Download PDF (Dark)';
+    b2.style.cssText='background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:6px;width:100%';
+    b.parentNode.insertBefore(b2,b.nextSibling);
+    b2.addEventListener('click',async function(){
+      var proj=document.getElementById('stmt-proj-label').textContent;
+      var from=document.getElementById('stmt-from').value;
+      var to=document.getElementById('stmt-to').value;
+      var detail=document.getElementById('stmt-detail').value;
+      b2.textContent='Generating\u2026';b2.disabled=true;
+      try{
+        var html=window.buildStatementHTML(proj,from,to,detail);
+        // inject dark class into the <html> tag so Puppeteer renders dark
+        html=html.replace('<html lang="en">','<html lang="en" class="dark">');
+        var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({html:html,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement-Dark'})});
+        if(!r.ok)throw new Error('server error');
+        var blob=await r.blob();
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement-Dark.pdf';
+        document.body.appendChild(a);a.click();a.remove();
+        document.getElementById('stmt-overlay').style.display='none';
+      }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
+      b2.textContent='\uD83C\uDF19 Download PDF (Dark)';b2.disabled=false;
+    });
 
   b.addEventListener('click',async function(){
     var proj=document.getElementById('stmt-proj-label').textContent;
