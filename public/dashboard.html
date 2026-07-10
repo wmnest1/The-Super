@@ -6039,7 +6039,7 @@ function cwInitListeners(){
       +'<div class="meta"><div><b>'+esc2(proj)+'</b>'+(p.client?'<br>'+esc2(p.client):'')+(p.address?'<br>'+esc2(p.address):'')+'</div>'
       +'<div style="text-align:right">Period: <b>'+rangeLabel+'</b><br>Statement date: '+today+'</div></div>'
       +bodyHtml
-      +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+money(Math.max(balance,0))+(balance<=0?' \u2014 PAID IN FULL':'')+'</span></div>'
+      +'<div class="grand"><span class="l">ACCOUNT BALANCE</span><span class="v">'+money(Math.max(balance,0))+''+'</span></div>'
       +'<div class="foot">Statement reflects account activity through the date shown. Please contact us with any questions. Thank you for your business.</div>'
       +'</div></body></html>';
 
