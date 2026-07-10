@@ -5857,7 +5857,7 @@ function cwInitListeners(){
   };
 })();
 </script>
-<!-- ══ STATEMENT v2 — adds mobile-responsive layout + light/dark theme toggle. REPLACES STATEMENT v1 (delete that block first). Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<!-- ══ STATEMENT v3 — fixes the mobile "small in the corner then snaps big" first-paint quirk. REPLACES STATEMENT v2 (delete that block first). Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
 <script>
 (function(){
   var st=document.createElement('style');
@@ -5992,13 +5992,19 @@ function cwInitListeners(){
 
     var rangeLabel=(from?fmtD(from):'Job start')+' \u2014 '+(to?fmtD(to):'Present');
     var today=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-    var win=window.open('','_blank');
-    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
-      +'<meta name="viewport" content="width=device-width, initial-scale=1.0">'
-      +'<title>Statement \u2014 '+esc2(proj)+'</title><style>'
+
+    // ── first-paint mobile fix: viewport meta is the FIRST thing in head, plus html/body full-fill rules ──
+    var head=''
+      +'<meta charset="UTF-8">'
+      +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
+      +'<title>Statement \u2014 '+esc2(proj)+'</title>'
+      +'<style>'
+      +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
       +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
+      +'html.dark,html.dark body{background:#0a1a2f}'
       +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
-      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0 auto;padding:24px;max-width:816px;background:var(--paper)}'
+      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);padding:24px;box-sizing:border-box;background:var(--paper)}'
+      +'.wrap{max-width:816px;margin:0 auto}'
       +'.lh{border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
       +'html.dark .lh{border-color:var(--gold)}'
       +'.lh h1{font-size:21px;margin:0;color:var(--ink);letter-spacing:.02em}'
@@ -6021,9 +6027,12 @@ function cwInitListeners(){
       +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
       +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
       +'.noprint button.thm{background:#333c4e}'
-      +'@media(max-width:640px){body{padding:14px}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
+      +'@media(max-width:640px){body{padding:14px}.wrap{max-width:100%}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
       +'@media print{.noprint{display:none}body{padding:14px}}'
-      +'</style></head><body>'
+      +'</style>';
+
+    var body=''
+      +'<div class="wrap">'
       +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
       +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
       +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
@@ -6034,7 +6043,12 @@ function cwInitListeners(){
       +bodyHtml
       +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+money(Math.max(balance,0))+(balance<=0?' \u2014 PAID IN FULL':'')+'</span></div>'
       +'<div class="foot">Statement reflects account activity through the date shown. Please contact us with any questions. Thank you for your business.</div>'
-      +'</body></html>');
+      +'</div>';
+
+    // open blank, then write both meta+body in ONE go so viewport is in effect before first paint
+    var win=window.open('about:blank','_blank');
+    win.document.open();
+    win.document.write('<!DOCTYPE html><html><head>'+head+'</head><body>'+body+'</body></html>');
     win.document.close();
   }
 
@@ -6047,10 +6061,4 @@ function cwInitListeners(){
   if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
-<!-- ══ MOBILE HEADER SCROLL v1 — releases the sticky dash header on phones so the calendar and panels get full screen. Desktop keeps sticky. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
-<style>
-  @media (max-width: 700px) {
-    #dash-header { position: static !important; }
-  }
-</style>
 </body></html>
