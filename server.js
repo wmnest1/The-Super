@@ -2292,6 +2292,24 @@ app.post("/api/tts", async (req, res) => {
   }
 });
 
+// ══ STATEMENT PDF v1 — renders posted HTML through the existing generatePDF() and returns a downloadable PDF. Self-contained; touches nothing else. ══
+app.post('/api/statement/pdf', async (req, res) => {
+  try {
+    const { html, filename } = req.body || {};
+    if (!html || typeof html !== 'string' || html.length > 2000000) {
+      return res.status(400).json({ error: 'Missing or oversized html' });
+    }
+    const pdf = await generatePDF(html);
+    const safeName = String(filename || 'statement').replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 80) || 'statement';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeName + '.pdf"');
+    res.send(Buffer.from(pdf));
+  } catch (err) {
+    console.error('statement pdf error:', err.message);
+    res.status(500).json({ error: 'PDF generation failed' });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`The Super is running on port ${PORT}`);
