@@ -6061,4 +6061,10 @@ function cwInitListeners(){
   if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
+<!-- ══ MOBILE HEADER SCROLL v1 — releases the sticky dash header on phones so the calendar and panels get full screen. Desktop keeps sticky. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<style>
+  @media (max-width: 700px) {
+    #dash-header { position: static !important; }
+  }
+</style>
 </body></html>
