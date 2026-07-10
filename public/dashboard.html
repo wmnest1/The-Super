@@ -5626,5 +5626,42 @@ function cwInitListeners(){
   }, true);
 })();
 </script>
-</body>
-</html>
+<!-- ══ DASHBOARD LOGO v1 — swaps the 🏗️ emoji for the Mullins logo + adds favicon + light/dark swap. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<script>
+(function(){
+  // 1) Favicon (dashboard had none)
+  if (!document.querySelector('link[rel="icon"]')) {
+    var fav = document.createElement('link');
+    fav.rel = 'icon'; fav.type = 'image/png'; fav.href = '/mullins-favicon.png';
+    document.head.appendChild(fav);
+  }
+
+  // 2) Light/dark logo swap — clean class rules, no inline display (so it can't double up)
+  var st = document.createElement('style');
+  st.textContent = '.mc-dark{display:block}.mc-light{display:none}'
+    + 'html.light .mc-dark{display:none}html.light .mc-light{display:block}';
+  document.head.appendChild(st);
+
+  // 3) Swap the 🏗️ emoji in the header for the wordmark
+  var hdr = document.getElementById('dash-header');
+  if (hdr) {
+    var kids = hdr.children;
+    for (var i = 0; i < kids.length; i++) {
+      if (kids[i].tagName === 'DIV' && /🏗/.test(kids[i].textContent)) {
+        var wrap = document.createElement('div');
+        wrap.style.cssText = 'display:inline-flex;align-items:center';
+        wrap.innerHTML =
+            '<img src="/mullins-logo.png" alt="Mullins Construction" class="mc-logo mc-light" style="height:36px;width:auto">'
+          + '<img src="/mullins-logo-dark.png" alt="Mullins Construction" class="mc-logo mc-dark" style="height:36px;width:auto">';
+        kids[i].replaceWith(wrap);
+        break;
+      }
+    }
+  }
+
+  // 4) Drop the 🏗️ from the chat-widget title
+  var cwt = document.getElementById('cw-title');
+  if (cwt) cwt.textContent = cwt.textContent.replace(/🏗️?\s*/, '');
+})();
+</script>
+</body></html>
