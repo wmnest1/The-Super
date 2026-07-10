@@ -5857,7 +5857,7 @@ function cwInitListeners(){
   };
 })();
 </script>
-<!-- ══ STATEMENT v1 — client-safe date-range statement from each job panel. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html, after all other snippets. ══ -->
+<!-- ══ STATEMENT v2 — adds mobile-responsive layout + light/dark theme toggle. REPLACES STATEMENT v1 (delete that block first). Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
 <script>
 (function(){
   var st=document.createElement('style');
@@ -5913,10 +5913,9 @@ function cwInitListeners(){
     }).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
     var cos=((data.changeOrders||{})[proj]||[]).filter(function(c){return c.status==='open';});
 
-    // ── labor ──
     var byWorker={},regHrs=0,oosHrs=0,laborBilled=0,dayLines=[];
     ents.forEach(function(e){(e.crew||[]).forEach(function(c){
-      if(c.coId)return; // CO labor handled in CO section
+      if(c.coId)return;
       var h=parseFloat(c.hours||0),oh=parseFloat(c.oosHours||0);
       if(c.outOfScope){oh=h;h=0;}
       if(h<=0&&oh<=0)return;
@@ -5928,7 +5927,6 @@ function cwInitListeners(){
       dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:r2(h*rate+oh*oosR)});
     });});
 
-    // ── materials & subs at BILLED (markup folded in, never shown) ──
     var matLines=[],matBilled=0;
     ents.forEach(function(e){(e.materials||[]).forEach(function(m){
       if(m.coId)return;
@@ -5938,7 +5936,6 @@ function cwInitListeners(){
       matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
     });});
 
-    // ── change orders (all-time tagged items) ──
     var allEnts=entriesForProject(proj);
     var coRows='',coTotal=0;
     cos.forEach(function(co){
@@ -5952,7 +5949,6 @@ function cwInitListeners(){
       coRows+='<tr><td>CO #'+esc2(co.num)+' \u2014 '+esc2(co.name)+(co.type==='fixed'?' (fixed price)':' ('+hrs+'hr @ '+money(oosR)+'/hr'+(mB>0?' + materials':'')+')')+'</td><td class="amt">'+money(billed)+'</td></tr>';
     });
 
-    // ── payments (all-time, for a true account balance) ──
     var pays=((data.payments||{})[proj]||[]).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
     var paid=pays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
     var payRows=pays.map(function(x){
@@ -5971,7 +5967,6 @@ function cwInitListeners(){
         +(coRows?coRows:'')+'</table>';
     }else{
       grand=r2(laborBilled+matBilled+coTotal);balance=r2(grand-paid);
-      // labor
       var laborRows='';
       if(detail==='full'){
         laborRows=dayLines.map(function(l){return '<tr><td>'+fmtD(l.date)+' \u2014 '+esc2(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+money(l.amt)+'</td></tr>';}).join('');
@@ -5983,7 +5978,6 @@ function cwInitListeners(){
       }
       bodyHtml+='<table class="sec"><tr class="hd"><td>Labor</td><td class="amt">Amount</td></tr>'+laborRows
         +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+money(laborBilled)+'</td></tr></table>';
-      // materials
       var matRows='';
       if(detail!=='summary'){
         matRows=matLines.map(function(m){return '<tr><td>'+fmtD(m.date)+' \u2014 '+esc2(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+money(m.amt)+'</td></tr>';}).join('');
@@ -5999,27 +5993,39 @@ function cwInitListeners(){
     var rangeLabel=(from?fmtD(from):'Job start')+' \u2014 '+(to?fmtD(to):'Present');
     var today=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
     var win=window.open('','_blank');
-    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement \u2014 '+esc2(proj)+'</title><style>'
-      +'body{font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;margin:0;padding:44px;max-width:816px;margin:0 auto;background:#fff}'
-      +'.lh{border-bottom:3px solid #0a1a2f;padding-bottom:14px;margin-bottom:6px}'
-      +'.lh h1{font-size:21px;margin:0;color:#0a1a2f;letter-spacing:.02em}'
-      +'.lh .sub{font-size:10.5px;color:#556;margin-top:4px}'
-      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:#333}'
-      +'.meta b{color:#0a1a2f}'
-      +'h2.doc{font-size:13px;color:#0f3d6e;letter-spacing:.14em;margin:18px 0 4px}'
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8">'
+      +'<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+      +'<title>Statement \u2014 '+esc2(proj)+'</title><style>'
+      +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
+      +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
+      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);margin:0 auto;padding:24px;max-width:816px;background:var(--paper)}'
+      +'.lh{border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
+      +'html.dark .lh{border-color:var(--gold)}'
+      +'.lh h1{font-size:21px;margin:0;color:var(--ink);letter-spacing:.02em}'
+      +'.lh .sub{font-size:10.5px;color:var(--muted);margin-top:4px}'
+      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:var(--ink);gap:10px;flex-wrap:wrap}'
+      +'.meta b{color:var(--ink)}'
+      +'h2.doc{font-size:13px;color:var(--gold);letter-spacing:.14em;margin:18px 0 4px}'
+      +'html:not(.dark) h2.doc{color:#0f3d6e}'
       +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
-      +'table.sec td{padding:6px 8px;border-bottom:1px solid #e4e8ee;vertical-align:top}'
-      +'table.sec .amt{text-align:right;white-space:nowrap;width:120px}'
-      +'table.sec tr.hd td{background:#0f3d6e;color:#fff;font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
-      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid #0a1a2f;border-bottom:none;background:#f5f7fa}'
-      +'.grand{display:flex;justify-content:space-between;align-items:center;background:#0a1a2f;color:#fff;border-radius:6px;padding:12px 16px;margin-top:18px}'
+      +'table.sec td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}'
+      +'table.sec .amt{text-align:right;white-space:nowrap;width:110px}'
+      +'table.sec tr.hd td{background:var(--bar);color:var(--barink);font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
+      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid var(--navy);border-bottom:none;background:var(--totbg)}'
+      +'html.dark table.sec tr.tot td{border-top-color:var(--gold)}'
+      +'.grand{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:6px;padding:12px 16px;margin-top:18px;gap:8px;flex-wrap:wrap}'
+      +'html.dark .grand{border:1px solid var(--gold)}'
       +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
-      +'.grand .v{font-size:20px;font-weight:bold;color:#e8a020}'
-      +'.foot{margin-top:26px;font-size:10px;color:#889;border-top:1px solid #dde;padding-top:10px}'
-      +'.noprint{margin:18px 0}.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:13px;cursor:pointer;margin-right:8px}'
+      +'.grand .v{font-size:20px;font-weight:bold;color:var(--gold)}'
+      +'.foot{margin-top:26px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}'
+      +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
+      +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
+      +'.noprint button.thm{background:#333c4e}'
+      +'@media(max-width:640px){body{padding:14px}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
       +'@media print{.noprint{display:none}body{padding:14px}}'
       +'</style></head><body>'
-      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button></div>'
+      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
+      +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
       +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
       +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
       +'<h2 class="doc">ACCOUNT STATEMENT</h2>'
@@ -6032,7 +6038,6 @@ function cwInitListeners(){
     win.document.close();
   }
 
-  // ── Add the button to every panel ──
   var _rjp=window.renderJobPanel;
   window.renderJobPanel=function(proj){
     var html=_rjp(proj);
