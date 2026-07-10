@@ -5857,4 +5857,189 @@ function cwInitListeners(){
   };
 })();
 </script>
+<!-- ══ STATEMENT v1 — client-safe date-range statement from each job panel. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html, after all other snippets. ══ -->
+<script>
+(function(){
+  var st=document.createElement('style');
+  st.textContent='.jp-stmt-btn{background:#0f3460;border:none;border-radius:6px;color:var(--text,#eee);padding:7px 12px;font-size:12px;cursor:pointer;margin:6px 0 2px;width:100%}'
+    +'.jp-stmt-btn:hover{background:#1a4a8a}'
+    +'#stmt-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9300;align-items:center;justify-content:center}'
+    +'#stmt-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(420px,94vw)}'
+    +'#stmt-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 12px}'
+    +'#stmt-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
+    +'#stmt-box input,#stmt-box select{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px}'
+    +'#stmt-go{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:14px;width:100%}';
+  document.head.appendChild(st);
+
+  var ov=document.createElement('div');
+  ov.id='stmt-overlay';
+  ov.innerHTML='<div id="stmt-box"><h3>\uD83D\uDCC4 Statement</h3>'
+    +'<div id="stmt-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
+    +'<label>From (blank = job start)</label><input type="date" id="stmt-from">'
+    +'<label>To</label><input type="date" id="stmt-to">'
+    +'<label>Detail</label><select id="stmt-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option></select>'
+    +'<button id="stmt-go">Generate Statement</button>'
+    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'stmt-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
+
+  var curProj=null;
+  window.openStatement=function(proj){
+    curProj=proj;
+    document.getElementById('stmt-proj-label').textContent=proj;
+    document.getElementById('stmt-from').value='';
+    var d=new Date();
+    document.getElementById('stmt-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    ov.style.display='flex';
+  };
+  document.getElementById('stmt-go').addEventListener('click',function(){
+    genStatement(curProj,document.getElementById('stmt-from').value,document.getElementById('stmt-to').value,document.getElementById('stmt-detail').value);
+    ov.style.display='none';
+  });
+
+  function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function money(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function r2(x){return Math.round(x*100)/100;}
+  function fmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
+
+  function genStatement(proj,from,to,detail){
+    var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
+    var fixed=p.billingType==='fixed';
+    var rate=billingRate(proj),oosR=oosRateFor(proj);
+    var ents=entriesForProject(proj).filter(function(e){
+      if(from&&e.date<from)return false;
+      if(to&&e.date>to)return false;
+      return true;
+    }).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+    var cos=((data.changeOrders||{})[proj]||[]).filter(function(c){return c.status==='open';});
+
+    // ── labor ──
+    var byWorker={},regHrs=0,oosHrs=0,laborBilled=0,dayLines=[];
+    ents.forEach(function(e){(e.crew||[]).forEach(function(c){
+      if(c.coId)return; // CO labor handled in CO section
+      var h=parseFloat(c.hours||0),oh=parseFloat(c.oosHours||0);
+      if(c.outOfScope){oh=h;h=0;}
+      if(h<=0&&oh<=0)return;
+      var nm=normName(c.name);
+      if(!byWorker[nm])byWorker[nm]={reg:0,oos:0};
+      byWorker[nm].reg+=h;byWorker[nm].oos+=oh;
+      regHrs+=h;oosHrs+=oh;
+      laborBilled=r2(laborBilled+h*rate+oh*oosR);
+      dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:r2(h*rate+oh*oosR)});
+    });});
+
+    // ── materials & subs at BILLED (markup folded in, never shown) ──
+    var matLines=[],matBilled=0;
+    ents.forEach(function(e){(e.materials||[]).forEach(function(m){
+      if(m.coId)return;
+      var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
+      var billed=r2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+      matBilled=r2(matBilled+billed);
+      matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
+    });});
+
+    // ── change orders (all-time tagged items) ──
+    var allEnts=entriesForProject(proj);
+    var coRows='',coTotal=0;
+    cos.forEach(function(co){
+      var hrs=0,mB=0;
+      allEnts.forEach(function(e){
+        (e.crew||[]).forEach(function(c){if(c.coId===co.id)hrs+=parseFloat(c.hours||0);});
+        (e.materials||[]).forEach(function(m){if(m.coId===co.id)mB=r2(mB+parseFloat(m.cost||0)*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));});
+      });
+      var billed=co.type==='fixed'?parseFloat(co.fixedAmount||0):r2(hrs*oosR+mB);
+      coTotal=r2(coTotal+billed);
+      coRows+='<tr><td>CO #'+esc2(co.num)+' \u2014 '+esc2(co.name)+(co.type==='fixed'?' (fixed price)':' ('+hrs+'hr @ '+money(oosR)+'/hr'+(mB>0?' + materials':'')+')')+'</td><td class="amt">'+money(billed)+'</td></tr>';
+    });
+
+    // ── payments (all-time, for a true account balance) ──
+    var pays=((data.payments||{})[proj]||[]).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
+    var paid=pays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
+    var payRows=pays.map(function(x){
+      var a=parseFloat(x.amount||0);
+      var label=a<0?'Balance forward':'Payment received'+(x.check?' \u2014 check #'+esc2(x.check):'');
+      if(a<0)return '<tr><td>'+esc2(x.date||'')+' \u2014 '+label+'</td><td class="amt">'+money(Math.abs(a))+' due</td></tr>';
+      return '<tr><td>'+esc2(x.date||'')+' \u2014 '+label+'</td><td class="amt">('+money(a)+')</td></tr>';
+    }).join('');
+
+    var grand,balance,bodyHtml='';
+    if(fixed){
+      var contract=parseFloat(p.contractAmount||0);
+      grand=r2(contract+coTotal);balance=r2(grand-paid);
+      bodyHtml+='<table class="sec"><tr class="hd"><td>Contract</td><td class="amt">Amount</td></tr>'
+        +'<tr><td>Contract price \u2014 '+esc2(proj)+'</td><td class="amt">'+money(contract)+'</td></tr>'
+        +(coRows?coRows:'')+'</table>';
+    }else{
+      grand=r2(laborBilled+matBilled+coTotal);balance=r2(grand-paid);
+      // labor
+      var laborRows='';
+      if(detail==='full'){
+        laborRows=dayLines.map(function(l){return '<tr><td>'+fmtD(l.date)+' \u2014 '+esc2(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+money(l.amt)+'</td></tr>';}).join('');
+      }else if(detail==='standard'){
+        laborRows=Object.keys(byWorker).sort().map(function(w){
+          var d=byWorker[w];var amt=r2(d.reg*rate+d.oos*oosR);
+          return '<tr><td>'+esc2(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+money(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+money(oosR)+'/hr':'')+'</td><td class="amt">'+money(amt)+'</td></tr>';
+        }).join('');
+      }
+      bodyHtml+='<table class="sec"><tr class="hd"><td>Labor</td><td class="amt">Amount</td></tr>'+laborRows
+        +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+money(laborBilled)+'</td></tr></table>';
+      // materials
+      var matRows='';
+      if(detail!=='summary'){
+        matRows=matLines.map(function(m){return '<tr><td>'+fmtD(m.date)+' \u2014 '+esc2(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+money(m.amt)+'</td></tr>';}).join('');
+      }
+      bodyHtml+='<table class="sec"><tr class="hd"><td>Materials &amp; Subcontractors</td><td class="amt">Amount</td></tr>'+matRows
+        +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+money(matBilled)+'</td></tr></table>';
+      if(coRows)bodyHtml+='<table class="sec"><tr class="hd"><td>Change Orders</td><td class="amt">Amount</td></tr>'+coRows
+        +'<tr class="tot"><td>Change orders total</td><td class="amt">'+money(coTotal)+'</td></tr></table>';
+    }
+    if(payRows)bodyHtml+='<table class="sec"><tr class="hd"><td>Payments</td><td class="amt"></td></tr>'+payRows
+      +'<tr class="tot"><td>Total payments received</td><td class="amt">('+money(Math.max(paid,0))+')</td></tr></table>';
+
+    var rangeLabel=(from?fmtD(from):'Job start')+' \u2014 '+(to?fmtD(to):'Present');
+    var today=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+    var win=window.open('','_blank');
+    win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement \u2014 '+esc2(proj)+'</title><style>'
+      +'body{font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;margin:0;padding:44px;max-width:816px;margin:0 auto;background:#fff}'
+      +'.lh{border-bottom:3px solid #0a1a2f;padding-bottom:14px;margin-bottom:6px}'
+      +'.lh h1{font-size:21px;margin:0;color:#0a1a2f;letter-spacing:.02em}'
+      +'.lh .sub{font-size:10.5px;color:#556;margin-top:4px}'
+      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:#333}'
+      +'.meta b{color:#0a1a2f}'
+      +'h2.doc{font-size:13px;color:#0f3d6e;letter-spacing:.14em;margin:18px 0 4px}'
+      +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
+      +'table.sec td{padding:6px 8px;border-bottom:1px solid #e4e8ee;vertical-align:top}'
+      +'table.sec .amt{text-align:right;white-space:nowrap;width:120px}'
+      +'table.sec tr.hd td{background:#0f3d6e;color:#fff;font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
+      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid #0a1a2f;border-bottom:none;background:#f5f7fa}'
+      +'.grand{display:flex;justify-content:space-between;align-items:center;background:#0a1a2f;color:#fff;border-radius:6px;padding:12px 16px;margin-top:18px}'
+      +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
+      +'.grand .v{font-size:20px;font-weight:bold;color:#e8a020}'
+      +'.foot{margin-top:26px;font-size:10px;color:#889;border-top:1px solid #dde;padding-top:10px}'
+      +'.noprint{margin:18px 0}.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 18px;font-size:13px;cursor:pointer;margin-right:8px}'
+      +'@media print{.noprint{display:none}body{padding:14px}}'
+      +'</style></head><body>'
+      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button></div>'
+      +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
+      +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
+      +'<h2 class="doc">ACCOUNT STATEMENT</h2>'
+      +'<div class="meta"><div><b>'+esc2(proj)+'</b>'+(p.client?'<br>'+esc2(p.client):'')+(p.address?'<br>'+esc2(p.address):'')+'</div>'
+      +'<div style="text-align:right">Period: <b>'+rangeLabel+'</b><br>Statement date: '+today+'</div></div>'
+      +bodyHtml
+      +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+money(Math.max(balance,0))+(balance<=0?' \u2014 PAID IN FULL':'')+'</span></div>'
+      +'<div class="foot">Statement reflects account activity through the date shown. Please contact us with any questions. Thank you for your business.</div>'
+      +'</body></html>');
+    win.document.close();
+  }
+
+  // ── Add the button to every panel ──
+  var _rjp=window.renderJobPanel;
+  window.renderJobPanel=function(proj){
+    var html=_rjp(proj);
+    var btn='<button class="jp-stmt-btn" onclick="openStatement(\''+proj.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">\uD83D\uDCC4 Statement</button>';
+    return html.replace('<div class="pay-section">',btn+'<div class="pay-section">');
+  };
+  if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
+})();
+</script>
 </body></html>
