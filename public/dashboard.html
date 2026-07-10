@@ -5938,6 +5938,20 @@ function cwInitListeners(){
     });});
 
     var allEnts=entriesForProject(proj);
+    var allLaborBilled=0,allMatBilled=0;
+    allEnts.forEach(function(e){
+      (e.crew||[]).forEach(function(c){
+        if(c.coId)return;
+        var h=parseFloat(c.hours||0),oh=parseFloat(c.oosHours||0);
+        if(c.outOfScope){oh=h;h=0;}
+        allLaborBilled=r2(allLaborBilled+h*rate+oh*oosR);
+      });
+      (e.materials||[]).forEach(function(m){
+        if(m.coId)return;
+        var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
+        allMatBilled=r2(allMatBilled+c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+      });
+    });
     var coRows='',coTotal=0;
     cos.forEach(function(co){
       var hrs=0,mB=0;
@@ -5967,7 +5981,7 @@ function cwInitListeners(){
         +'<tr><td>Contract price \u2014 '+esc2(proj)+'</td><td class="amt">'+money(contract)+'</td></tr>'
         +(coRows?coRows:'')+'</table>';
     }else{
-      grand=r2(laborBilled+matBilled+coTotal);balance=r2(grand-paid);
+      grand=r2(allLaborBilled+allMatBilled+coTotal);balance=r2(grand-paid);
       var laborRows='';
       if(detail==='full'){
         laborRows=dayLines.map(function(l){return '<tr><td>'+fmtD(l.date)+' \u2014 '+esc2(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+money(l.amt)+'</td></tr>';}).join('');
