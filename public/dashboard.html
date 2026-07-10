@@ -5964,7 +5964,8 @@ function cwInitListeners(){
       coRows+='<tr><td>CO #'+esc2(co.num)+' \u2014 '+esc2(co.name)+(co.type==='fixed'?' (fixed price)':' ('+hrs+'hr @ '+money(oosR)+'/hr'+(mB>0?' + materials':'')+')')+'</td><td class="amt">'+money(billed)+'</td></tr>';
     });
 
-    var pays=((data.payments||{})[proj]||[]).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
+   var allPaid=((data.payments||{})[proj]||[]).reduce(function(s,x){return s+parseFloat(x.amount||0);},0); 
+    var pays=((data.payments||{})[proj]||[]).filter(function(x){var d=String(x.date||'');if(from&&d<from)return false;if(to&&d>to)return false;return true;}).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
     var paid=pays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
     var payRows=pays.map(function(x){
       var a=parseFloat(x.amount||0);
@@ -5976,12 +5977,12 @@ function cwInitListeners(){
     var grand,balance,bodyHtml='';
     if(fixed){
       var contract=parseFloat(p.contractAmount||0);
-      grand=r2(contract+coTotal);balance=r2(grand-paid);
+      grand=r2(contract+coTotal);balance=r2(grand-allPaid);
       bodyHtml+='<table class="sec"><tr class="hd"><td>Contract</td><td class="amt">Amount</td></tr>'
         +'<tr><td>Contract price \u2014 '+esc2(proj)+'</td><td class="amt">'+money(contract)+'</td></tr>'
         +(coRows?coRows:'')+'</table>';
     }else{
-      grand=r2(allLaborBilled+allMatBilled+coTotal);balance=r2(grand-paid);
+      grand=r2(allLaborBilled+allMatBilled+coTotal);balance=r2(grand-allPaid);
       var laborRows='';
       if(detail==='full'){
         laborRows=dayLines.map(function(l){return '<tr><td>'+fmtD(l.date)+' \u2014 '+esc2(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+money(l.amt)+'</td></tr>';}).join('');
