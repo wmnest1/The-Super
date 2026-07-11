@@ -6137,7 +6137,7 @@ function cwInitListeners(){
   });
 })();
 </script>
-<!-- ══ INVOICE v1 (Progress) — panel button + options + client-safe invoice doc + server PDF light/dark. BALANCE DUE label per doc-language rules. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
+<!-- ══ INVOICE v2 — adds Progress/Final type dropdown (smart default by job status). Final bills the whole job: all charges − all payments = BALANCE DUE. REPLACES INVOICE v1 (delete that block first). Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
 <script>
 (function(){
   var st=document.createElement('style');
@@ -6157,10 +6157,11 @@ function cwInitListeners(){
   ov.id='inv-overlay';
   ov.innerHTML='<div id="inv-box"><h3>\uD83E\uDDFE Invoice</h3>'
     +'<div id="inv-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
+    +'<label>Invoice type</label><select id="inv-type"><option value="progress">Progress \u2014 bill work for a period</option><option value="final">Final \u2014 bill everything owed on the job</option></select>'
     +'<div class="inv-row"><div><label>Invoice #</label><input type="text" id="inv-num"></div>'
     +'<div><label>Due</label><select id="inv-due"><option value="30">Net 30</option><option value="15">Net 15</option><option value="0">Due on receipt</option><option value="45">Net 45</option></select></div></div>'
-    +'<label>Work period \u2014 From (blank = job start)</label><input type="date" id="inv-from">'
-    +'<label>Work period \u2014 To</label><input type="date" id="inv-to">'
+    +'<div id="inv-period-wrap"><label>Work period \u2014 From (blank = job start)</label><input type="date" id="inv-from">'
+    +'<label>Work period \u2014 To</label><input type="date" id="inv-to"></div>'
     +'<label>Detail</label><select id="inv-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option></select>'
     +'<button id="inv-go">Generate Invoice</button>'
     +'<button class="inv-pdf-btn" id="inv-pdf">\u2B07 Download PDF</button>'
@@ -6169,20 +6170,31 @@ function cwInitListeners(){
   document.body.appendChild(ov);
   ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
 
+  // hide the period fields when type = final (final always bills the whole job)
+  document.getElementById('inv-type').addEventListener('change',function(){
+    document.getElementById('inv-period-wrap').style.display=this.value==='final'?'none':'block';
+  });
+
   function nextInvNum(){
     var n=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10)+1;
     return 'INV-'+n;
   }
   function bumpInvNum(numStr){
     var m=/(\d+)$/.exec(numStr||'');
-    if(m){var v=parseInt(m[1],10);var cur=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10);if(v>cur)localStorage.setItem('mc_inv_counter',String(v));else localStorage.setItem('mc_inv_counter',String(cur));}
+    if(m){var v=parseInt(m[1],10);var cur=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10);if(v>cur)localStorage.setItem('mc_inv_counter',String(v));}
   }
 
   var curProj=null;
   window.openInvoice=function(proj){
     curProj=proj;
+    var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     document.getElementById('inv-proj-label').textContent=proj;
     document.getElementById('inv-num').value=nextInvNum();
+    // smart default: Complete jobs -> Final, otherwise Progress
+    var status=String(p.status||'').toLowerCase();
+    var t=(status==='complete'||status==='completed')?'final':'progress';
+    document.getElementById('inv-type').value=t;
+    document.getElementById('inv-period-wrap').style.display=t==='final'?'none':'block';
     document.getElementById('inv-from').value='';
     var d=new Date();
     document.getElementById('inv-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -6194,9 +6206,11 @@ function cwInitListeners(){
   function invR2(x){return Math.round(x*100)/100;}
   function invFmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
 
-  function buildInvoiceHTML(proj,from,to,detail,invNum,dueDays){
+  function buildInvoiceHTML(proj,from,to,detail,invNum,dueDays,invType){
     var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     var fixed=p.billingType==='fixed';
+    var isFinal=invType==='final';
+    if(isFinal){from='';to='';} // final bills the whole job
     var rate=billingRate(proj),oosR=oosRateFor(proj);
     var ents=entriesForProject(proj).filter(function(e){
       if(from&&e.date<from)return false;
@@ -6227,18 +6241,18 @@ function cwInitListeners(){
       matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
     });});
 
+    var allPays=((data.payments||{})[proj]||[]);
+    var paidSoFar=allPays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
+
     var invoiceTotal,bodyHtml='';
     if(fixed){
       var contract=parseFloat(p.contractAmount||0);
-      var allPays=((data.payments||{})[proj]||[]);
-      var paidSoFar=allPays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
       invoiceTotal=invR2(contract-Math.max(paidSoFar,0));
       bodyHtml+='<table class="sec"><tr class="hd"><td>Description</td><td class="amt">Amount</td></tr>'
         +'<tr><td>Contract price \u2014 '+invEsc(proj)+(p.scopeNotes?'<br><span style="font-size:10.5px;color:var(--muted)">'+invEsc(p.scopeNotes)+'</span>':'')+'</td><td class="amt">'+invMoney(contract)+'</td></tr>'
         +(paidSoFar>0?'<tr><td>Less payments received to date</td><td class="amt">('+invMoney(paidSoFar)+')</td></tr>':'')
         +'</table>';
     }else{
-      invoiceTotal=invR2(laborBilled+matBilled);
       var laborRows='';
       if(detail==='full'){
         laborRows=dayLines.map(function(l){return '<tr><td>'+invFmtD(l.date)+' \u2014 '+invEsc(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+invMoney(l.amt)+'</td></tr>';}).join('');
@@ -6258,17 +6272,29 @@ function cwInitListeners(){
         bodyHtml+='<table class="sec"><tr class="hd"><td>Materials &amp; Subcontractors</td><td class="amt">Amount</td></tr>'+matRows
           +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+invMoney(matBilled)+'</td></tr></table>';
       }
+      if(isFinal){
+        // final T&M: whole job charges − all payments
+        var charges=invR2(laborBilled+matBilled);
+        invoiceTotal=invR2(charges-Math.max(paidSoFar,0));
+        if(paidSoFar>0){
+          bodyHtml+='<table class="sec"><tr><td>Total charges \u2014 full job</td><td class="amt">'+invMoney(charges)+'</td></tr>'
+            +'<tr><td>Less payments received to date</td><td class="amt">('+invMoney(paidSoFar)+')</td></tr></table>';
+        }
+      }else{
+        invoiceTotal=invR2(laborBilled+matBilled);
+      }
     }
 
     var issueD=new Date();
     var dueD=new Date();dueD.setDate(dueD.getDate()+parseInt(dueDays||'30',10));
     var fmt=function(d){return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});};
-    var periodLabel=fixed?'':((from?invFmtD(from):'Job start')+' \u2014 '+(to?invFmtD(to):'Present'));
+    var periodLabel=(fixed||isFinal)?'':((from?invFmtD(from):'Job start')+' \u2014 '+(to?invFmtD(to):'Present'));
+    var docLabel=isFinal?'FINAL INVOICE':'INVOICE';
 
     var doc='<!DOCTYPE html><html lang="en"><head>'
       +'<meta charset="UTF-8">'
       +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
-      +'<title>Invoice '+invEsc(invNum)+' \u2014 '+invEsc(proj)+'</title>'
+      +'<title>'+docLabel+' '+invEsc(invNum)+' \u2014 '+invEsc(proj)+'</title>'
       +'<style>'
       +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
       +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
@@ -6308,14 +6334,14 @@ function cwInitListeners(){
       +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
       +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
       +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
-      +'<h2 class="doc">INVOICE</h2>'
+      +'<h2 class="doc">'+docLabel+'</h2>'
       +'<div class="inv-meta"><span>Invoice #: <b>'+invEsc(invNum)+'</b></span><span>Issue date: <b>'+fmt(issueD)+'</b></span><span>Due date: <b>'+(dueDays==='0'?'Due on receipt':fmt(dueD))+'</b></span></div>'
       +'<div class="meta"><div><b>Bill to:</b><br><b>'+invEsc(p.client||proj)+'</b>'+(p.address?'<br>'+invEsc(p.address):'')+'</div>'
-      +'<div style="text-align:right"><b>Project:</b> '+invEsc(proj)+(periodLabel?'<br>Work period: <b>'+periodLabel+'</b>':'')+'</div></div>'
+      +'<div style="text-align:right"><b>Project:</b> '+invEsc(proj)+(periodLabel?'<br>Work period: <b>'+periodLabel+'</b>':'')+(isFinal?'<br><b>Final billing \u2014 project complete</b>':'')+'</div></div>'
       +bodyHtml
       +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+invMoney(Math.max(invoiceTotal,0))+'</span></div>'
       +'<div class="terms">Please make checks payable to Mullins Construction Inc. Payment due '+(dueDays==='0'?'upon receipt':'within '+dueDays+' days')+'. Thank you for your business.</div>'
-      +'<div class="foot">Invoice reflects '+(fixed?'the contract amount less payments received to date':'work performed during the period shown')+'. Questions? Call 408.569.3434.</div>'
+      +'<div class="foot">'+(isFinal?'Final invoice \u2014 reflects all charges for the project less payments received.':(fixed?'Invoice reflects the contract amount less payments received to date.':'Invoice reflects work performed during the period shown.'))+' Questions? Call 408.569.3434.</div>'
       +'</div></body></html>';
     return doc;
   }
@@ -6327,14 +6353,15 @@ function cwInitListeners(){
       to:document.getElementById('inv-to').value,
       detail:document.getElementById('inv-detail').value,
       num:document.getElementById('inv-num').value||nextInvNum(),
-      due:document.getElementById('inv-due').value
+      due:document.getElementById('inv-due').value,
+      type:document.getElementById('inv-type').value
     };
   }
 
   document.getElementById('inv-go').addEventListener('click',function(){
     var o=invGetOpts();
     bumpInvNum(o.num);
-    var doc=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due);
+    var doc=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type);
     var blob=new Blob([doc],{type:'text/html'});
     var url=URL.createObjectURL(blob);
     window.open(url,'_blank');
@@ -6349,7 +6376,7 @@ function cwInitListeners(){
       var orig=btn.textContent;
       btn.textContent='Generating\u2026';btn.disabled=true;
       try{
-        var html=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due);
+        var html=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type);
         if(dark)html=html.replace('<html lang="en">','<html lang="en" class="dark">');
         var fname='Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,'')+(dark?'-Dark':'');
         var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -6369,7 +6396,6 @@ function cwInitListeners(){
   pb.addEventListener('click',invPdf(false,pb));
   pbd.addEventListener('click',invPdf(true,pbd));
 
-  // ── Add the button to every panel, right above the Statement button ──
   var _rjp2=window.renderJobPanel;
   window.renderJobPanel=function(proj){
     var html=_rjp2(proj);
