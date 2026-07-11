@@ -6222,6 +6222,7 @@ function cwInitListeners(){
   function invR2(x){return Math.round(x*100)/100;}
   function invFmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
 
+  window.__buildInvoiceForEmail=function(a,b,c,d,e,f,g,h,i){return buildInvoiceHTML(a,b,c,d,e,f,g,h,i);};
   function buildInvoiceHTML(proj,from,to,detail,invNum,dueDays,invType,fpDesc,fpAmount){
     var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     var isFinal=invType==='final';
