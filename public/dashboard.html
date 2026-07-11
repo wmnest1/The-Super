@@ -6428,4 +6428,14 @@ function cwInitListeners(){
   if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
+<!-- ══ CHAT WIDGET LIGHT-MODE FIX v1 — chat widget input text was invisible in light theme. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<style>
+  html.light #cw-input,
+  html.light #cw-input::placeholder {
+    color: #1a1a2e !important;
+  }
+  html.light #cw-body {
+    color: #1a1a2e;
+  }
+</style>
 </body></html>
