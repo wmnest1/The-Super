@@ -6204,7 +6204,7 @@ function cwInitListeners(){
     var t=(status==='complete'||status==='completed')?'final':'progress';
     document.getElementById('inv-type').value=t;
     // pre-fill fixed-price fields from project data
-    document.getElementById('inv-desc').value=p.scopeNotes||'';
+    document.getElementById('inv-desc').value=p.scopeNotes||p.scope||p.notes||p.scopeText||'';
     document.getElementById('inv-amount').value=p.contractAmount||'';
     // if the project has a contract amount, default detail to fixed-price
     var hasContract=parseFloat(p.contractAmount||0)>0;
