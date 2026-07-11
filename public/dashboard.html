@@ -6458,4 +6458,127 @@ function cwInitListeners(){
     opacity: 1;
   }
 </style>
+<!-- ══ DOC EMAIL v1 — adds "📧 Email" to Invoice and Statement option boxes. Free-type recipient (pre-filled from client record when present), sends panel-built PDF via /api/send-email, files to Job Docs. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
+<script>
+(function(){
+  var st=document.createElement('style');
+  st.textContent='#de-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9400;align-items:center;justify-content:center}'
+    +'#de-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(440px,94vw)}'
+    +'#de-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 10px}'
+    +'#de-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
+    +'#de-box input,#de-box textarea{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px;box-sizing:border-box;font-family:inherit}'
+    +'#de-box textarea{min-height:70px;resize:vertical}'
+    +'#de-send{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:12px;width:100%}'
+    +'.de-email-btn{background:#1a5f2a;color:#dfe;border:1px solid #2a7a3a;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}';
+  document.head.appendChild(st);
+
+  var ov=document.createElement('div');
+  ov.id='de-overlay';
+  ov.innerHTML='<div id="de-box"><h3>\uD83D\uDCE7 Email Document</h3>'
+    +'<div id="de-doc-label" style="font-size:12px;color:#8a94a8"></div>'
+    +'<label>To (email address)</label><input type="email" id="de-to" placeholder="client@example.com">'
+    +'<label>Subject</label><input type="text" id="de-subject">'
+    +'<label>Message (appears in the email body)</label><textarea id="de-msg">Please find your document attached. Let me know if you have any questions.</textarea>'
+    +'<button id="de-send">Send Email</button>'
+    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'de-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
+
+  var pending=null; // {proj, docHtml, filename, docType, subject}
+
+  window.openDocEmail=function(cfg){
+    pending=cfg;
+    var p=(data.projects||[]).find(function(x){return (x.name||'')===cfg.proj;})||{};
+    // find client email: project record, then clients list by client name
+    var em=p.clientEmail||'';
+    if(!em&&p.client&&data.clients){
+      var cl=(data.clients||[]).find(function(c){return (c.name||'')===p.client;});
+      if(cl)em=cl.email||'';
+    }
+    document.getElementById('de-to').value=em;
+    document.getElementById('de-subject').value=cfg.subject;
+    document.getElementById('de-doc-label').textContent=cfg.filename+' \u2014 '+cfg.proj;
+    ov.style.display='flex';
+  };
+
+  document.getElementById('de-send').addEventListener('click',async function(){
+    if(!pending)return;
+    var to=document.getElementById('de-to').value.trim();
+    if(!to||to.indexOf('@')<0){alert('Enter a valid email address.');return;}
+    var btn=this;btn.textContent='Sending\u2026';btn.disabled=true;
+    try{
+      var p=(data.projects||[]).find(function(x){return (x.name||'')===pending.proj;})||{};
+      var r=await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          to:to,
+          subject:document.getElementById('de-subject').value||pending.subject,
+          html:'<div style="padding:10px 30px;font-family:Arial,sans-serif;font-size:14px;color:#333">'+pending.filename+' is attached.</div>',
+          rawPdfHtml:pending.docHtml,
+          pdfFilename:pending.filename,
+          clientName:(p.client||'').split(' ')[0]||'',
+          emailBody:document.getElementById('de-msg').value,
+          project:pending.proj,
+          docType:pending.docType
+        })});
+      var j=await r.json();
+      if(!r.ok||!j.success)throw new Error(j.error||'send failed');
+      alert('\u2705 Sent to '+to+(j.filed?' and filed to Job Docs.':'.'));
+      ov.style.display='none';
+    }catch(e){alert('Email failed \u2014 '+(e.message||'server error'));}
+    btn.textContent='Send Email';btn.disabled=false;
+  });
+
+  // ── Add "📧 Email" to the INVOICE options box ──
+  function addInvoiceEmailBtn(){
+    var box=document.getElementById('inv-box');
+    if(!box||document.getElementById('inv-email'))return;
+    var anchor=document.getElementById('inv-pdf-dark');
+    var b=document.createElement('button');
+    b.id='inv-email';b.className='de-email-btn';
+    b.textContent='\uD83D\uDCE7 Email to Client';
+    anchor.parentNode.insertBefore(b,anchor.nextSibling);
+    b.addEventListener('click',function(){
+      var proj=document.getElementById('inv-proj-label').textContent;
+      var num=document.getElementById('inv-num').value||'Invoice';
+      var html=window.buildInvoiceHTML? null : null;
+      // build the doc using the invoice builder via the same opts the buttons use
+      var from=document.getElementById('inv-from').value;
+      var to2=document.getElementById('inv-to').value;
+      var detail=document.getElementById('inv-detail').value;
+      var due=document.getElementById('inv-due').value;
+      var type=document.getElementById('inv-type').value;
+      var desc=document.getElementById('inv-desc')?document.getElementById('inv-desc').value:'';
+      var amount=document.getElementById('inv-amount')?document.getElementById('inv-amount').value:'';
+      // buildInvoiceHTML lives inside the INVOICE v3 closure; expose check:
+      if(typeof window.__buildInvoiceForEmail!=='function'){alert('Invoice builder not exposed \u2014 needs the one-line insert (see instructions).');return;}
+      var docHtml=window.__buildInvoiceForEmail(proj,from,to2,detail,num,due,type,desc,amount);
+      document.getElementById('inv-overlay').style.display='none';
+      openDocEmail({proj:proj,docHtml:docHtml,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+num.replace(/[^a-zA-Z0-9-]/g,'')+'.pdf',docType:'invoice',subject:'Invoice '+num+' from Mullins Construction'});
+    });
+  }
+
+  // ── Add "📧 Email" to the STATEMENT options box ──
+  function addStatementEmailBtn(){
+    var box=document.getElementById('stmt-box');
+    if(!box||document.getElementById('stmt-email'))return;
+    var anchor=document.getElementById('stmt-pdf-dark');
+    var b=document.createElement('button');
+    b.id='stmt-email';b.className='de-email-btn';
+    b.textContent='\uD83D\uDCE7 Email to Client';
+    anchor.parentNode.insertBefore(b,anchor.nextSibling);
+    b.addEventListener('click',function(){
+      var proj=document.getElementById('stmt-proj-label').textContent;
+      var from=document.getElementById('stmt-from').value;
+      var to2=document.getElementById('stmt-to').value;
+      var detail=document.getElementById('stmt-detail').value;
+      if(typeof window.buildStatementHTML!=='function'){alert('Statement builder not found.');return;}
+      var docHtml=window.buildStatementHTML(proj,from,to2,detail);
+      document.getElementById('stmt-overlay').style.display='none';
+      openDocEmail({proj:proj,docHtml:docHtml,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement.pdf',docType:'statement',subject:'Account Statement from Mullins Construction'});
+    });
+  }
+  addInvoiceEmailBtn();
+  addStatementEmailBtn();
+})();
+</script>
 </body></html>
