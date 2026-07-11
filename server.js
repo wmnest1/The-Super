@@ -1408,10 +1408,10 @@ async function executeTool(toolName, input, data, ctx) {
   }
 }
 
-// ── Email route ──
+// ── Email route ── (v2: optionally files the sent doc to Job Docs when project is provided)
 app.post('/api/send-email', async (req, res) => {
   try {
-    const { to, subject, html, text, attachPdf, pdfFilename, clientName, emailBody } = req.body;
+    const { to, subject, html, text, attachPdf, pdfFilename, clientName, emailBody, project, docType, rawPdfHtml } = req.body;
     if (!to || !subject || !html) return res.status(400).json({ error: 'Missing required fields' });
     const firstName = clientName || 'there';
     const bodyHtml = emailWrapper(`
@@ -1433,7 +1433,10 @@ app.post('/api/send-email', async (req, res) => {
       attachments: []
     };
     if (attachPdf !== false) {
-      const pdfBuffer = await generatePDF(emailWrapper(html));
+      // rawPdfHtml = complete standalone document (panel invoices/statements) — render as-is.
+      // html without rawPdfHtml = fragment — wrap it (voice/legacy behavior).
+      const pdfSource = rawPdfHtml ? rawPdfHtml : emailWrapper(html);
+      const pdfBuffer = await generatePDF(pdfSource);
       mailOptions.attachments.push({
         filename: pdfFilename || 'Mullins-Construction-Document.pdf',
         content: pdfBuffer,
@@ -1441,7 +1444,21 @@ app.post('/api/send-email', async (req, res) => {
       });
     }
     await emailTransporter.sendMail(mailOptions);
-    res.json({ success: true, sentTo: to });
+    // file to Job Docs when a project is specified (mirrors the send_email tool's behavior)
+    let filed = false;
+    if (project) {
+      try {
+        await saveJobDocument({
+          project: project,
+          name: pdfFilename || subject || 'Document',
+          docType: docType || (/(invoice)/i.test(subject || '') ? 'invoice' : /(statement)/i.test(subject || '') ? 'statement' : /(proposal)/i.test(subject || '') ? 'proposal' : 'other'),
+          html: rawPdfHtml || html,
+          source: 'sent-email'
+        });
+        filed = true;
+      } catch (e) { console.error('saveJobDocument (/api/send-email):', e.message); }
+    }
+    res.json({ success: true, sentTo: to, filed: filed });
   } catch (e) {
     console.error('Email error:', e);
     res.status(500).json({ error: e.message });
