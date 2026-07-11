@@ -6137,4 +6137,246 @@ function cwInitListeners(){
   });
 })();
 </script>
+<!-- ══ INVOICE v1 (Progress) — panel button + options + client-safe invoice doc + server PDF light/dark. BALANCE DUE label per doc-language rules. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
+<script>
+(function(){
+  var st=document.createElement('style');
+  st.textContent='.jp-inv-btn{background:#3d2f0a;border:1px solid #6b5416;border-radius:6px;color:var(--accent,#e8a020);padding:7px 12px;font-size:12px;cursor:pointer;margin:4px 0 2px;width:100%;font-weight:bold}'
+    +'.jp-inv-btn:hover{background:#54430f}'
+    +'#inv-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9300;align-items:center;justify-content:center}'
+    +'#inv-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(440px,94vw);max-height:92vh;overflow:auto}'
+    +'#inv-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 12px}'
+    +'#inv-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
+    +'#inv-box input,#inv-box select{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px;box-sizing:border-box}'
+    +'.inv-row{display:flex;gap:8px}.inv-row>div{flex:1}'
+    +'#inv-go{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:14px;width:100%}'
+    +'.inv-pdf-btn{background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}';
+  document.head.appendChild(st);
+
+  var ov=document.createElement('div');
+  ov.id='inv-overlay';
+  ov.innerHTML='<div id="inv-box"><h3>\uD83E\uDDFE Invoice</h3>'
+    +'<div id="inv-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
+    +'<div class="inv-row"><div><label>Invoice #</label><input type="text" id="inv-num"></div>'
+    +'<div><label>Due</label><select id="inv-due"><option value="30">Net 30</option><option value="15">Net 15</option><option value="0">Due on receipt</option><option value="45">Net 45</option></select></div></div>'
+    +'<label>Work period \u2014 From (blank = job start)</label><input type="date" id="inv-from">'
+    +'<label>Work period \u2014 To</label><input type="date" id="inv-to">'
+    +'<label>Detail</label><select id="inv-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option></select>'
+    +'<button id="inv-go">Generate Invoice</button>'
+    +'<button class="inv-pdf-btn" id="inv-pdf">\u2B07 Download PDF</button>'
+    +'<button class="inv-pdf-btn" id="inv-pdf-dark">\uD83C\uDF19 Download PDF (Dark)</button>'
+    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'inv-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
+
+  function nextInvNum(){
+    var n=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10)+1;
+    return 'INV-'+n;
+  }
+  function bumpInvNum(numStr){
+    var m=/(\d+)$/.exec(numStr||'');
+    if(m){var v=parseInt(m[1],10);var cur=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10);if(v>cur)localStorage.setItem('mc_inv_counter',String(v));else localStorage.setItem('mc_inv_counter',String(cur));}
+  }
+
+  var curProj=null;
+  window.openInvoice=function(proj){
+    curProj=proj;
+    document.getElementById('inv-proj-label').textContent=proj;
+    document.getElementById('inv-num').value=nextInvNum();
+    document.getElementById('inv-from').value='';
+    var d=new Date();
+    document.getElementById('inv-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    ov.style.display='flex';
+  };
+
+  function invEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function invMoney(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function invR2(x){return Math.round(x*100)/100;}
+  function invFmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
+
+  function buildInvoiceHTML(proj,from,to,detail,invNum,dueDays){
+    var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
+    var fixed=p.billingType==='fixed';
+    var rate=billingRate(proj),oosR=oosRateFor(proj);
+    var ents=entriesForProject(proj).filter(function(e){
+      if(from&&e.date<from)return false;
+      if(to&&e.date>to)return false;
+      return true;
+    }).slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+
+    var byWorker={},regHrs=0,oosHrs=0,laborBilled=0,dayLines=[];
+    ents.forEach(function(e){(e.crew||[]).forEach(function(c){
+      if(c.coId)return;
+      var h=parseFloat(c.hours||0),oh=parseFloat(c.oosHours||0);
+      if(c.outOfScope){oh=h;h=0;}
+      if(h<=0&&oh<=0)return;
+      var nm=normName(c.name);
+      if(!byWorker[nm])byWorker[nm]={reg:0,oos:0};
+      byWorker[nm].reg+=h;byWorker[nm].oos+=oh;
+      regHrs+=h;oosHrs+=oh;
+      laborBilled=invR2(laborBilled+h*rate+oh*oosR);
+      dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:invR2(h*rate+oh*oosR)});
+    });});
+
+    var matLines=[],matBilled=0;
+    ents.forEach(function(e){(e.materials||[]).forEach(function(m){
+      if(m.coId)return;
+      var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
+      var billed=invR2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+      matBilled=invR2(matBilled+billed);
+      matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
+    });});
+
+    var invoiceTotal,bodyHtml='';
+    if(fixed){
+      var contract=parseFloat(p.contractAmount||0);
+      var allPays=((data.payments||{})[proj]||[]);
+      var paidSoFar=allPays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
+      invoiceTotal=invR2(contract-Math.max(paidSoFar,0));
+      bodyHtml+='<table class="sec"><tr class="hd"><td>Description</td><td class="amt">Amount</td></tr>'
+        +'<tr><td>Contract price \u2014 '+invEsc(proj)+(p.scopeNotes?'<br><span style="font-size:10.5px;color:var(--muted)">'+invEsc(p.scopeNotes)+'</span>':'')+'</td><td class="amt">'+invMoney(contract)+'</td></tr>'
+        +(paidSoFar>0?'<tr><td>Less payments received to date</td><td class="amt">('+invMoney(paidSoFar)+')</td></tr>':'')
+        +'</table>';
+    }else{
+      invoiceTotal=invR2(laborBilled+matBilled);
+      var laborRows='';
+      if(detail==='full'){
+        laborRows=dayLines.map(function(l){return '<tr><td>'+invFmtD(l.date)+' \u2014 '+invEsc(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+invMoney(l.amt)+'</td></tr>';}).join('');
+      }else if(detail==='standard'){
+        laborRows=Object.keys(byWorker).sort().map(function(w){
+          var d=byWorker[w];var amt=invR2(d.reg*rate+d.oos*oosR);
+          return '<tr><td>'+invEsc(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+invMoney(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+invMoney(oosR)+'/hr':'')+'</td><td class="amt">'+invMoney(amt)+'</td></tr>';
+        }).join('');
+      }
+      bodyHtml+='<table class="sec"><tr class="hd"><td>Labor \u2014 work performed</td><td class="amt">Amount</td></tr>'+laborRows
+        +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+invMoney(laborBilled)+'</td></tr></table>';
+      var matRows='';
+      if(detail!=='summary'){
+        matRows=matLines.map(function(m){return '<tr><td>'+invFmtD(m.date)+' \u2014 '+invEsc(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+invMoney(m.amt)+'</td></tr>';}).join('');
+      }
+      if(matLines.length>0){
+        bodyHtml+='<table class="sec"><tr class="hd"><td>Materials &amp; Subcontractors</td><td class="amt">Amount</td></tr>'+matRows
+          +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+invMoney(matBilled)+'</td></tr></table>';
+      }
+    }
+
+    var issueD=new Date();
+    var dueD=new Date();dueD.setDate(dueD.getDate()+parseInt(dueDays||'30',10));
+    var fmt=function(d){return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});};
+    var periodLabel=fixed?'':((from?invFmtD(from):'Job start')+' \u2014 '+(to?invFmtD(to):'Present'));
+
+    var doc='<!DOCTYPE html><html lang="en"><head>'
+      +'<meta charset="UTF-8">'
+      +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
+      +'<title>Invoice '+invEsc(invNum)+' \u2014 '+invEsc(proj)+'</title>'
+      +'<style>'
+      +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
+      +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
+      +'html.dark,html.dark body{background:#0a1a2f}'
+      +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
+      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);padding:24px;box-sizing:border-box;background:var(--paper)}'
+      +'.wrap{max-width:816px;margin:0 auto}'
+      +'.lh{border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
+      +'html.dark .lh{border-color:var(--gold)}'
+      +'.lh h1{font-size:21px;margin:0;color:var(--ink);letter-spacing:.02em}'
+      +'.lh .sub{font-size:10.5px;color:var(--muted);margin-top:4px}'
+      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:var(--ink);gap:10px;flex-wrap:wrap}'
+      +'h2.doc{font-size:13px;color:var(--gold);letter-spacing:.14em;margin:18px 0 4px}'
+      +'html:not(.dark) h2.doc{color:#0f3d6e}'
+      +'.inv-meta{background:var(--totbg);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-size:12px;display:flex;gap:24px;flex-wrap:wrap;margin:10px 0}'
+      +'.inv-meta b{color:var(--ink)}'
+      +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
+      +'table.sec td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}'
+      +'table.sec .amt{text-align:right;white-space:nowrap;width:110px}'
+      +'table.sec tr.hd td{background:var(--bar);color:var(--barink);font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
+      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid var(--navy);border-bottom:none;background:var(--totbg)}'
+      +'html.dark table.sec tr.tot td{border-top-color:var(--gold)}'
+      +'.grand{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:6px;padding:12px 16px;margin-top:18px;gap:8px;flex-wrap:wrap}'
+      +'html.dark .grand{border:1px solid var(--gold)}'
+      +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
+      +'.grand .v{font-size:20px;font-weight:bold;color:var(--gold)}'
+      +'.terms{margin-top:14px;font-size:11px;color:var(--muted)}'
+      +'.foot{margin-top:26px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}'
+      +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
+      +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
+      +'.noprint button.thm{background:#333c4e}'
+      +'@media(max-width:640px){body{padding:14px}.wrap{max-width:100%}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
+      +'@media print{.noprint{display:none}body{padding:14px}}'
+      +'</style></head><body>'
+      +'<div class="wrap">'
+      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
+      +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
+      +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
+      +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
+      +'<h2 class="doc">INVOICE</h2>'
+      +'<div class="inv-meta"><span>Invoice #: <b>'+invEsc(invNum)+'</b></span><span>Issue date: <b>'+fmt(issueD)+'</b></span><span>Due date: <b>'+(dueDays==='0'?'Due on receipt':fmt(dueD))+'</b></span></div>'
+      +'<div class="meta"><div><b>Bill to:</b><br><b>'+invEsc(p.client||proj)+'</b>'+(p.address?'<br>'+invEsc(p.address):'')+'</div>'
+      +'<div style="text-align:right"><b>Project:</b> '+invEsc(proj)+(periodLabel?'<br>Work period: <b>'+periodLabel+'</b>':'')+'</div></div>'
+      +bodyHtml
+      +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+invMoney(Math.max(invoiceTotal,0))+'</span></div>'
+      +'<div class="terms">Please make checks payable to Mullins Construction Inc. Payment due '+(dueDays==='0'?'upon receipt':'within '+dueDays+' days')+'. Thank you for your business.</div>'
+      +'<div class="foot">Invoice reflects '+(fixed?'the contract amount less payments received to date':'work performed during the period shown')+'. Questions? Call 408.569.3434.</div>'
+      +'</div></body></html>';
+    return doc;
+  }
+
+  function invGetOpts(){
+    return {
+      proj:document.getElementById('inv-proj-label').textContent,
+      from:document.getElementById('inv-from').value,
+      to:document.getElementById('inv-to').value,
+      detail:document.getElementById('inv-detail').value,
+      num:document.getElementById('inv-num').value||nextInvNum(),
+      due:document.getElementById('inv-due').value
+    };
+  }
+
+  document.getElementById('inv-go').addEventListener('click',function(){
+    var o=invGetOpts();
+    bumpInvNum(o.num);
+    var doc=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due);
+    var blob=new Blob([doc],{type:'text/html'});
+    var url=URL.createObjectURL(blob);
+    window.open(url,'_blank');
+    setTimeout(function(){try{URL.revokeObjectURL(url);}catch(e){}},60000);
+    ov.style.display='none';
+  });
+
+  function invPdf(dark,btn){
+    return async function(){
+      var o=invGetOpts();
+      bumpInvNum(o.num);
+      var orig=btn.textContent;
+      btn.textContent='Generating\u2026';btn.disabled=true;
+      try{
+        var html=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due);
+        if(dark)html=html.replace('<html lang="en">','<html lang="en" class="dark">');
+        var fname='Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,'')+(dark?'-Dark':'');
+        var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({html:html,filename:fname})});
+        if(!r.ok)throw new Error('server error');
+        var blob=await r.blob();
+        var a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download=fname+'.pdf';
+        document.body.appendChild(a);a.click();a.remove();
+        ov.style.display='none';
+      }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
+      btn.textContent=orig;btn.disabled=false;
+    };
+  }
+  var pb=document.getElementById('inv-pdf'),pbd=document.getElementById('inv-pdf-dark');
+  pb.addEventListener('click',invPdf(false,pb));
+  pbd.addEventListener('click',invPdf(true,pbd));
+
+  // ── Add the button to every panel, right above the Statement button ──
+  var _rjp2=window.renderJobPanel;
+  window.renderJobPanel=function(proj){
+    var html=_rjp2(proj);
+    var btn='<button class="jp-inv-btn" onclick="openInvoice(\''+proj.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">\uD83E\uDDFE Invoice</button>';
+    return html.replace('<button class="jp-stmt-btn"',btn+'<button class="jp-stmt-btn"');
+  };
+  if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
+})();
+</script>
 </body></html>
