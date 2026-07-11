@@ -6428,14 +6428,34 @@ function cwInitListeners(){
   if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
-<!-- ══ CHAT WIDGET LIGHT-MODE FIX v1 — chat widget input text was invisible in light theme. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<!-- ══ CHAT WIDGET LIGHT-MODE FIX v2 — forces readable text in the floating chat widget when the dashboard is in light theme. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
 <style>
-  html.light #cw-input,
-  html.light #cw-input::placeholder {
+  html.light .cw,
+  html.light .cw *,
+  html.light [class*="cw-"],
+  html.light [class*="cw-"] *,
+  html.light [id*="cw-"],
+  html.light [id*="cw-"] * {
     color: #1a1a2e !important;
   }
-  html.light #cw-body {
-    color: #1a1a2e;
+  html.light .cw input,
+  html.light .cw textarea,
+  html.light [class*="cw-"] input,
+  html.light [class*="cw-"] textarea,
+  html.light [id*="cw-"] input,
+  html.light [id*="cw-"] textarea {
+    color: #1a1a2e !important;
+    background: #ffffff !important;
+    border: 1px solid #ccd0d8 !important;
+  }
+  html.light .cw input::placeholder,
+  html.light .cw textarea::placeholder,
+  html.light [class*="cw-"] input::placeholder,
+  html.light [class*="cw-"] textarea::placeholder,
+  html.light [id*="cw-"] input::placeholder,
+  html.light [id*="cw-"] textarea::placeholder {
+    color: #667 !important;
+    opacity: 1;
   }
 </style>
 </body></html>
