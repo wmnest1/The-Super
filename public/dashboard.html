@@ -5857,53 +5857,103 @@ function cwInitListeners(){
   };
 })();
 </script>
-<!-- ══ STATEMENT v4 — mobile-Chrome fix. Uses a Blob URL instead of window.open+write so viewport applies on first paint. REPLACES STATEMENT v3 (delete that block first). Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
+<!-- ══ DOC ENGINE v1 (consolidated) — Statement + Invoice + letterhead/logo + PDF light/dark + Email + Job Docs auto-file. Replaces STATEMENT v4, STATEMENT PDF BUTTON v1, INVOICE v3, DOC EMAIL v1. Lives at the VERY BOTTOM of public/dashboard.html. ══ -->
 <script>
 (function(){
-  var st=document.createElement('style');
-  st.textContent='.jp-stmt-btn{background:#0f3460;border:none;border-radius:6px;color:var(--text,#eee);padding:7px 12px;font-size:12px;cursor:pointer;margin:6px 0 2px;width:100%}'
-    +'.jp-stmt-btn:hover{background:#1a4a8a}'
-    +'#stmt-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9300;align-items:center;justify-content:center}'
-    +'#stmt-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(420px,94vw)}'
-    +'#stmt-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 12px}'
-    +'#stmt-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
-    +'#stmt-box input,#stmt-box select{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px}'
-    +'#stmt-go{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:14px;width:100%}';
-  document.head.appendChild(st);
+  // ───────── shared helpers ─────────
+  function dEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function dEscBr(s){return dEsc(s).replace(/\n/g,'<br>');}
+  function dMoney(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  function dR2(x){return Math.round(x*100)/100;}
+  function dFmtD(iso){var p=String(iso||'').split('-');return p.length===3?(p[1]+'/'+p[2]+'/'+p[0]):iso;}
 
-  var ov=document.createElement('div');
-  ov.id='stmt-overlay';
-  ov.innerHTML='<div id="stmt-box"><h3>\uD83D\uDCC4 Statement</h3>'
-    +'<div id="stmt-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
-    +'<label>From (blank = job start)</label><input type="date" id="stmt-from">'
-    +'<label>To</label><input type="date" id="stmt-to">'
-    +'<label>Detail</label><select id="stmt-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option></select>'
-    +'<button id="stmt-go">Generate Statement</button>'
-    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'stmt-overlay\').style.display=\'none\'">Cancel</span></div></div>';
-  document.body.appendChild(ov);
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
+  var LETTERHEAD=''
+    +'<div class="lh">'
+    +'<img class="logo light" src="https://the-super-1.onrender.com/mullins-logo.png" alt="Mullins Construction">'
+    +'<img class="logo dark" src="https://the-super-1.onrender.com/mullins-logo-dark.png" alt="Mullins Construction">'
+    +'<div class="co"><div class="name">Mullins Construction Inc.</div>License #855578<br>1702-L Meridian Ave #164<br>San Jose, CA 95125<br>408.569.3434<br>mullinsconstruction@yahoo.com</div>'
+    +'</div>';
 
-  var curProj=null;
-  window.openStatement=function(proj){
-    curProj=proj;
-    document.getElementById('stmt-proj-label').textContent=proj;
-    document.getElementById('stmt-from').value='';
-    var d=new Date();
-    document.getElementById('stmt-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    ov.style.display='flex';
-  };
-  document.getElementById('stmt-go').addEventListener('click',function(){
-    genStatement(curProj,document.getElementById('stmt-from').value,document.getElementById('stmt-to').value,document.getElementById('stmt-detail').value);
-    ov.style.display='none';
-  });
+  var DOC_CSS=''
+    +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
+    +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
+    +'html.dark,html.dark body{background:#0a1a2f}'
+    +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
+    +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);padding:24px;box-sizing:border-box;background:var(--paper)}'
+    +'.wrap{max-width:816px;margin:0 auto}'
+    +'.lh{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
+    +'html.dark .lh{border-color:var(--gold)}'
+    +'.lh .logo{height:58px;width:auto;flex-shrink:0}'
+    +'.lh .logo.dark{display:none}'
+    +'html.dark .lh .logo.light{display:none}'
+    +'html.dark .lh .logo.dark{display:block}'
+    +'.lh .co{text-align:right;font-size:11px;color:var(--muted);line-height:1.5}'
+    +'.lh .co .name{font-size:14px;font-weight:bold;color:var(--ink);margin-bottom:2px}'
+    +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:var(--ink);gap:10px;flex-wrap:wrap}'
+    +'.meta b{color:var(--ink)}'
+    +'h2.doc{font-size:13px;color:var(--gold);letter-spacing:.14em;margin:18px 0 4px}'
+    +'html:not(.dark) h2.doc{color:#0f3d6e}'
+    +'.inv-meta{background:var(--totbg);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-size:12px;display:flex;gap:24px;flex-wrap:wrap;margin:10px 0}'
+    +'.inv-meta b{color:var(--ink)}'
+    +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
+    +'table.sec td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}'
+    +'table.sec .amt{text-align:right;white-space:nowrap;width:110px}'
+    +'table.sec tr.hd td{background:var(--bar);color:var(--barink);font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
+    +'table.sec tr.tot td{font-weight:bold;border-top:2px solid var(--navy);border-bottom:none;background:var(--totbg)}'
+    +'html.dark table.sec tr.tot td{border-top-color:var(--gold)}'
+    +'.grand{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:6px;padding:8px 16px;margin-top:18px;gap:8px;flex-wrap:wrap}'
+    +'html.dark .grand{border:1px solid var(--gold)}'
+    +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
+    +'.grand .v{font-size:20px;font-weight:bold;color:var(--gold)}'
+    +'.terms{margin-top:14px;font-size:11px;color:var(--muted)}'
+    +'.foot{margin-top:26px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}'
+    +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
+    +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
+    +'.noprint button.thm{background:#333c4e}'
+    +'@media(max-width:640px){body{padding:14px}.wrap{max-width:100%}.lh .logo{height:44px}.lh .co{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
+    +'@media print{.noprint{display:none}body{padding:14px}}';
 
-  function esc2(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
-  function money(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-  function r2(x){return Math.round(x*100)/100;}
-  function fmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
+  function docShell(title,inner){
+    return '<!DOCTYPE html><html lang="en"><head>'
+      +'<meta charset="UTF-8">'
+      +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
+      +'<title>'+title+'</title>'
+      +'<style>'+DOC_CSS+'</style></head><body>'
+      +'<div class="wrap">'
+      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
+      +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
+      +LETTERHEAD
+      +inner
+      +'</div></body></html>';
+  }
 
-  window.buildStatementHTML=function(proj,from,to,detail){window.__stmtWantHtml=true;var d=genStatement(proj,from,to,detail);window.__stmtWantHtml=false;return d;};
-  function genStatement(proj,from,to,detail){
+  function openBlob(doc){
+    var blob=new Blob([doc],{type:'text/html'});
+    var url=URL.createObjectURL(blob);
+    window.open(url,'_blank');
+    setTimeout(function(){try{URL.revokeObjectURL(url);}catch(e){}},60000);
+  }
+
+  async function downloadPdf(doc,fname,dark,btn){
+    var orig=btn.textContent;
+    btn.textContent='Generating\u2026';btn.disabled=true;
+    try{
+      var html=dark?doc.replace('<html lang="en">','<html lang="en" class="dark">'):doc;
+      var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({html:html,filename:fname})});
+      if(!r.ok)throw new Error('server error');
+      var blob=await r.blob();
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=fname+'.pdf';
+      document.body.appendChild(a);a.click();a.remove();
+      return true;
+    }catch(e){alert('PDF generation failed \u2014 is the server updated?');return false;}
+    finally{btn.textContent=orig;btn.disabled=false;}
+  }
+
+  // ───────── STATEMENT builder ─────────
+  function buildStatementHTML(proj,from,to,detail){
     var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     var fixed=p.billingType==='fixed';
     var rate=billingRate(proj),oosR=oosRateFor(proj);
@@ -5924,16 +5974,16 @@ function cwInitListeners(){
       if(!byWorker[nm])byWorker[nm]={reg:0,oos:0};
       byWorker[nm].reg+=h;byWorker[nm].oos+=oh;
       regHrs+=h;oosHrs+=oh;
-      laborBilled=r2(laborBilled+h*rate+oh*oosR);
-      dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:r2(h*rate+oh*oosR)});
+      laborBilled=dR2(laborBilled+h*rate+oh*oosR);
+      dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:dR2(h*rate+oh*oosR)});
     });});
 
     var matLines=[],matBilled=0;
     ents.forEach(function(e){(e.materials||[]).forEach(function(m){
       if(m.coId)return;
       var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
-      var billed=r2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
-      matBilled=r2(matBilled+billed);
+      var billed=dR2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+      matBilled=dR2(matBilled+billed);
       matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
     });});
 
@@ -5944,247 +5994,84 @@ function cwInitListeners(){
         if(c.coId)return;
         var h=parseFloat(c.hours||0),oh=parseFloat(c.oosHours||0);
         if(c.outOfScope){oh=h;h=0;}
-        allLaborBilled=r2(allLaborBilled+h*rate+oh*oosR);
+        allLaborBilled=dR2(allLaborBilled+h*rate+oh*oosR);
       });
       (e.materials||[]).forEach(function(m){
         if(m.coId)return;
         var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
-        allMatBilled=r2(allMatBilled+c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+        allMatBilled=dR2(allMatBilled+c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
       });
     });
+
     var coRows='',coTotal=0;
     cos.forEach(function(co){
       var hrs=0,mB=0;
       allEnts.forEach(function(e){
         (e.crew||[]).forEach(function(c){if(c.coId===co.id)hrs+=parseFloat(c.hours||0);});
-        (e.materials||[]).forEach(function(m){if(m.coId===co.id)mB=r2(mB+parseFloat(m.cost||0)*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));});
+        (e.materials||[]).forEach(function(m){if(m.coId===co.id)mB=dR2(mB+parseFloat(m.cost||0)*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));});
       });
-      var billed=co.type==='fixed'?parseFloat(co.fixedAmount||0):r2(hrs*oosR+mB);
-      coTotal=r2(coTotal+billed);
-      coRows+='<tr><td>CO #'+esc2(co.num)+' \u2014 '+esc2(co.name)+(co.type==='fixed'?' (fixed price)':' ('+hrs+'hr @ '+money(oosR)+'/hr'+(mB>0?' + materials':'')+')')+'</td><td class="amt">'+money(billed)+'</td></tr>';
+      var billed=co.type==='fixed'?parseFloat(co.fixedAmount||0):dR2(hrs*oosR+mB);
+      coTotal=dR2(coTotal+billed);
+      coRows+='<tr><td>CO #'+dEsc(co.num)+' \u2014 '+dEsc(co.name)+(co.type==='fixed'?' (fixed price)':' ('+hrs+'hr @ '+dMoney(oosR)+'/hr'+(mB>0?' + materials':'')+')')+'</td><td class="amt">'+dMoney(billed)+'</td></tr>';
     });
 
-   var allPaid=((data.payments||{})[proj]||[]).reduce(function(s,x){return s+parseFloat(x.amount||0);},0); 
+    var allPaid=((data.payments||{})[proj]||[]).reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
     var pays=((data.payments||{})[proj]||[]).filter(function(x){var d=String(x.date||'');if(from&&d<from)return false;if(to&&d>to)return false;return true;}).slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
     var paid=pays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
     var payRows=pays.map(function(x){
       var a=parseFloat(x.amount||0);
-      var label=a<0?'Balance forward':'Payment received'+(x.check?' \u2014 check #'+esc2(x.check):'');
-      if(a<0)return '<tr><td>'+esc2(x.date||'')+' \u2014 '+label+'</td><td class="amt">'+money(Math.abs(a))+' due</td></tr>';
-      return '<tr><td>'+esc2(x.date||'')+' \u2014 '+label+'</td><td class="amt">('+money(a)+')</td></tr>';
+      var label=a<0?'Balance forward':'Payment received'+(x.check?' \u2014 check #'+dEsc(x.check):'');
+      if(a<0)return '<tr><td>'+dEsc(x.date||'')+' \u2014 '+label+'</td><td class="amt">'+dMoney(Math.abs(a))+' due</td></tr>';
+      return '<tr><td>'+dEsc(x.date||'')+' \u2014 '+label+'</td><td class="amt">('+dMoney(a)+')</td></tr>';
     }).join('');
 
     var grand,balance,bodyHtml='';
     if(fixed){
       var contract=parseFloat(p.contractAmount||0);
-      grand=r2(contract+coTotal);balance=r2(grand-allPaid);
+      grand=dR2(contract+coTotal);balance=dR2(grand-allPaid);
       bodyHtml+='<table class="sec"><tr class="hd"><td>Contract</td><td class="amt">Amount</td></tr>'
-        +'<tr><td>Contract price \u2014 '+esc2(proj)+'</td><td class="amt">'+money(contract)+'</td></tr>'
+        +'<tr><td>Contract price \u2014 '+dEsc(proj)+'</td><td class="amt">'+dMoney(contract)+'</td></tr>'
         +(coRows?coRows:'')+'</table>';
     }else{
-      grand=r2(allLaborBilled+allMatBilled+coTotal);balance=r2(grand-allPaid);
+      grand=dR2(allLaborBilled+allMatBilled+coTotal);balance=dR2(grand-allPaid);
       var laborRows='';
       if(detail==='full'){
-        laborRows=dayLines.map(function(l){return '<tr><td>'+fmtD(l.date)+' \u2014 '+esc2(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+money(l.amt)+'</td></tr>';}).join('');
+        laborRows=dayLines.map(function(l){return '<tr><td>'+dFmtD(l.date)+' \u2014 '+dEsc(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+dMoney(l.amt)+'</td></tr>';}).join('');
       }else if(detail==='standard'){
         laborRows=Object.keys(byWorker).sort().map(function(w){
-          var d=byWorker[w];var amt=r2(d.reg*rate+d.oos*oosR);
-          return '<tr><td>'+esc2(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+money(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+money(oosR)+'/hr':'')+'</td><td class="amt">'+money(amt)+'</td></tr>';
+          var d=byWorker[w];var amt=dR2(d.reg*rate+d.oos*oosR);
+          return '<tr><td>'+dEsc(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+dMoney(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+dMoney(oosR)+'/hr':'')+'</td><td class="amt">'+dMoney(amt)+'</td></tr>';
         }).join('');
       }
       bodyHtml+='<table class="sec"><tr class="hd"><td>Labor</td><td class="amt">Amount</td></tr>'+laborRows
-        +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+money(laborBilled)+'</td></tr></table>';
+        +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+dMoney(laborBilled)+'</td></tr></table>';
       var matRows='';
       if(detail!=='summary'){
-        matRows=matLines.map(function(m){return '<tr><td>'+fmtD(m.date)+' \u2014 '+esc2(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+money(m.amt)+'</td></tr>';}).join('');
+        matRows=matLines.map(function(m){return '<tr><td>'+dFmtD(m.date)+' \u2014 '+dEsc(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+dMoney(m.amt)+'</td></tr>';}).join('');
       }
       bodyHtml+='<table class="sec"><tr class="hd"><td>Materials &amp; Subcontractors</td><td class="amt">Amount</td></tr>'+matRows
-        +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+money(matBilled)+'</td></tr></table>';
+        +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+dMoney(matBilled)+'</td></tr></table>';
       if(coRows)bodyHtml+='<table class="sec"><tr class="hd"><td>Change Orders</td><td class="amt">Amount</td></tr>'+coRows
-        +'<tr class="tot"><td>Change orders total</td><td class="amt">'+money(coTotal)+'</td></tr></table>';
+        +'<tr class="tot"><td>Change orders total</td><td class="amt">'+dMoney(coTotal)+'</td></tr></table>';
     }
     if(payRows)bodyHtml+='<table class="sec"><tr class="hd"><td>Payments</td><td class="amt"></td></tr>'+payRows
-      +'<tr class="tot"><td>Total payments received</td><td class="amt">('+money(Math.max(paid,0))+')</td></tr></table>';
+      +'<tr class="tot"><td>Total payments received</td><td class="amt">('+dMoney(Math.max(paid,0))+')</td></tr></table>';
 
-    var rangeLabel=(from?fmtD(from):'Job start')+' \u2014 '+(to?fmtD(to):'Present');
+    var rangeLabel=(from?dFmtD(from):'Job start')+' \u2014 '+(to?dFmtD(to):'Present');
     var today=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
 
-    var doc='<!DOCTYPE html><html lang="en"><head>'
-      +'<meta charset="UTF-8">'
-      +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
-      +'<title>Statement \u2014 '+esc2(proj)+'</title>'
-      +'<style>'
-      +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
-      +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
-      +'html.dark,html.dark body{background:#0a1a2f}'
-      +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
-      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);padding:24px;box-sizing:border-box;background:var(--paper)}'
-      +'.wrap{max-width:816px;margin:0 auto}'
-      +'.lh{border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
-      +'html.dark .lh{border-color:var(--gold)}'
-      +'.lh h1{font-size:21px;margin:0;color:var(--ink);letter-spacing:.02em}'
-      +'.lh .sub{font-size:10.5px;color:var(--muted);margin-top:4px}'
-      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:var(--ink);gap:10px;flex-wrap:wrap}'
-      +'.meta b{color:var(--ink)}'
-      +'h2.doc{font-size:13px;color:var(--gold);letter-spacing:.14em;margin:18px 0 4px}'
-      +'html:not(.dark) h2.doc{color:#0f3d6e}'
-      +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
-      +'table.sec td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}'
-      +'table.sec .amt{text-align:right;white-space:nowrap;width:110px}'
-      +'table.sec tr.hd td{background:var(--bar);color:var(--barink);font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
-      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid var(--navy);border-bottom:none;background:var(--totbg)}'
-      +'html.dark table.sec tr.tot td{border-top-color:var(--gold)}'
-      +'.grand{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:6px;padding:8px 16px;margin-top:18px;gap:8px;flex-wrap:wrap}'
-      +'html.dark .grand{border:1px solid var(--gold)}'
-      +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
-      +'.grand .v{font-size:20px;font-weight:bold;color:var(--gold)}'
-      +'.foot{margin-top:26px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}'
-      +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
-      +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
-      +'.noprint button.thm{background:#333c4e}'
-      +'@media(max-width:640px){body{padding:14px}.wrap{max-width:100%}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
-      +'@media print{.noprint{display:none}body{padding:14px}}'
-      +'</style></head><body>'
-      +'<div class="wrap">'
-      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
-      +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
-      +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
-      +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
+    var inner=''
       +'<h2 class="doc">ACCOUNT STATEMENT</h2>'
-      +'<div class="meta"><div><b>'+esc2(proj)+'</b>'+(p.client?'<br>'+esc2(p.client):'')+(p.address?'<br>'+esc2(p.address):'')+'</div>'
+      +'<div class="meta"><div><b>'+dEsc(proj)+'</b>'+(p.client?'<br>'+dEsc(p.client):'')+(p.address?'<br>'+dEsc(p.address):'')+'</div>'
       +'<div style="text-align:right">Period: <b>'+rangeLabel+'</b><br>Statement date: '+today+'</div></div>'
       +bodyHtml
-      +'<div class="grand"><span class="l">ACCOUNT BALANCE</span><span class="v">'+money(Math.max(balance,0))+''+'</span></div>'
-      +'<div class="foot">Statement reflects account activity through the date shown. Please contact us with any questions. Thank you for your business.</div>'
-      +'</div></body></html>';
-
-    // Blob URL — the browser treats this like a real file, so viewport is honored on first paint on mobile Chrome
-    if(window.__stmtWantHtml){return doc;}
-    var blob=new Blob([doc],{type:'text/html'});
-    var url=URL.createObjectURL(blob);
-    var w=window.open(url,'_blank');
-    // free the URL after a bit to avoid leaks
-    setTimeout(function(){try{URL.revokeObjectURL(url);}catch(e){}},60000);
+      +'<div class="grand"><span class="l">ACCOUNT BALANCE</span><span class="v">'+dMoney(Math.max(balance,0))+'</span></div>'
+      +'<div class="foot">Statement reflects account activity through the date shown. Please contact us with any questions. Thank you for your business.</div>';
+    return docShell('Statement \u2014 '+dEsc(proj),inner);
   }
+  window.buildStatementHTML=buildStatementHTML;
 
-  var _rjp=window.renderJobPanel;
-  window.renderJobPanel=function(proj){
-    var html=_rjp(proj);
-    var btn='<button class="jp-stmt-btn" onclick="openStatement(\''+proj.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">\uD83D\uDCC4 Statement</button>';
-    return html.replace('<div class="pay-section">',btn+'<div class="pay-section">');
-  };
-  if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
-})();
-</script>
-<!-- ══ STATEMENT PDF BUTTON v1 — adds a "Download PDF" button to the statement options box; posts the statement HTML to the server and downloads a real PDF. Requires STATEMENT PDF v1 route in server.js. ══ -->
-<script>
-(function(){
-  var box=document.getElementById('stmt-box');
-  if(!box||document.getElementById('stmt-pdf'))return;
-  var go=document.getElementById('stmt-go');
-  var b=document.createElement('button');
-  b.id='stmt-pdf';
-  b.textContent='\u2B07 Download PDF';
-  b.style.cssText='background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%';
-  go.parentNode.insertBefore(b,go.nextSibling);
-  var b2=document.createElement('button');
-    b2.id='stmt-pdf-dark';
-    b2.textContent='\uD83C\uDF19 Download PDF (Dark)';
-    b2.style.cssText='background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:6px;width:100%';
-    b.parentNode.insertBefore(b2,b.nextSibling);
-    b2.addEventListener('click',async function(){
-      var proj=document.getElementById('stmt-proj-label').textContent;
-      var from=document.getElementById('stmt-from').value;
-      var to=document.getElementById('stmt-to').value;
-      var detail=document.getElementById('stmt-detail').value;
-      b2.textContent='Generating\u2026';b2.disabled=true;
-      try{
-        var html=window.buildStatementHTML(proj,from,to,detail);
-        // inject dark class into the <html> tag so Puppeteer renders dark
-        html=html.replace('<html lang="en">','<html lang="en" class="dark">');
-        var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({html:html,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement-Dark'})});
-        if(!r.ok)throw new Error('server error');
-        var blob=await r.blob();
-        var a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);
-        a.download='Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement-Dark.pdf';
-        document.body.appendChild(a);a.click();a.remove();
-        document.getElementById('stmt-overlay').style.display='none';
-      }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
-      b2.textContent='\uD83C\uDF19 Download PDF (Dark)';b2.disabled=false;
-    });
-
-  b.addEventListener('click',async function(){
-    var proj=document.getElementById('stmt-proj-label').textContent;
-    var from=document.getElementById('stmt-from').value;
-    var to=document.getElementById('stmt-to').value;
-    var detail=document.getElementById('stmt-detail').value;
-    b.textContent='Generating\u2026';b.disabled=true;
-    try{
-      var html=window.buildStatementHTML(proj,from,to,detail);
-      var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({html:html,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement'})});
-      if(!r.ok)throw new Error('server error');
-      var blob=await r.blob();
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download='Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement.pdf';
-      document.body.appendChild(a);a.click();a.remove();
-      document.getElementById('stmt-overlay').style.display='none';
-    }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
-    b.textContent='\u2B07 Download PDF';b.disabled=false;
-  });
-})();
-</script>
-<!-- ══ INVOICE v3 — adds "Fixed price — description + amount" detail option: type/edit a description + amount, renders as a clean one-line invoice. REPLACES INVOICE v2 (delete that block first). Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
-<script>
-(function(){
-  var st=document.createElement('style');
-  st.textContent='.jp-inv-btn{background:#3d2f0a;border:1px solid #6b5416;border-radius:6px;color:var(--accent,#e8a020);padding:7px 12px;font-size:12px;cursor:pointer;margin:4px 0 2px;width:100%;font-weight:bold}'
-    +'.jp-inv-btn:hover{background:#54430f}'
-    +'#inv-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9300;align-items:center;justify-content:center}'
-    +'#inv-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(440px,94vw);max-height:92vh;overflow:auto}'
-    +'#inv-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 12px}'
-    +'#inv-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
-    +'#inv-box input,#inv-box select,#inv-box textarea{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px;box-sizing:border-box;font-family:inherit}'
-    +'#inv-box textarea{min-height:80px;resize:vertical}'
-    +'.inv-row{display:flex;gap:8px}.inv-row>div{flex:1}'
-    +'#inv-go{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:14px;width:100%}'
-    +'.inv-pdf-btn{background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}';
-  document.head.appendChild(st);
-
-  var ov=document.createElement('div');
-  ov.id='inv-overlay';
-  ov.innerHTML='<div id="inv-box"><h3>\uD83E\uDDFE Invoice</h3>'
-    +'<div id="inv-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
-    +'<label>Invoice type</label><select id="inv-type"><option value="progress">Progress \u2014 bill work for a period</option><option value="final">Final \u2014 bill everything owed on the job</option></select>'
-    +'<div class="inv-row"><div><label>Invoice #</label><input type="text" id="inv-num"></div>'
-    +'<div><label>Due</label><select id="inv-due"><option value="30">Net 30</option><option value="15">Net 15</option><option value="0">Due on receipt</option><option value="45">Net 45</option></select></div></div>'
-    +'<label>Detail</label><select id="inv-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option><option value="fixedprice">Fixed price \u2014 description + amount</option></select>'
-    +'<div id="inv-fixed-wrap" style="display:none">'
-    +'<label>Description of work</label><textarea id="inv-desc" placeholder="Describe the work performed\u2026"></textarea>'
-    +'<label>Amount ($)</label><input type="number" step="0.01" id="inv-amount">'
-    +'</div>'
-    +'<div id="inv-period-wrap"><label>Work period \u2014 From (blank = job start)</label><input type="date" id="inv-from">'
-    +'<label>Work period \u2014 To</label><input type="date" id="inv-to"></div>'
-    +'<button id="inv-go">Generate Invoice</button>'
-    +'<button class="inv-pdf-btn" id="inv-pdf">\u2B07 Download PDF</button>'
-    +'<button class="inv-pdf-btn" id="inv-pdf-dark">\uD83C\uDF19 Download PDF (Dark)</button>'
-    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'inv-overlay\').style.display=\'none\'">Cancel</span></div></div>';
-  document.body.appendChild(ov);
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
-
-  function syncInvFields(){
-    var t=document.getElementById('inv-type').value;
-    var d=document.getElementById('inv-detail').value;
-    var isFixed=d==='fixedprice';
-    document.getElementById('inv-fixed-wrap').style.display=isFixed?'block':'none';
-    document.getElementById('inv-period-wrap').style.display=(t==='final'||isFixed)?'none':'block';
-  }
-  document.getElementById('inv-type').addEventListener('change',syncInvFields);
-  document.getElementById('inv-detail').addEventListener('change',syncInvFields);
-
+  // ───────── INVOICE builder ─────────
   function nextInvNum(){
     var n=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10)+1;
     return 'INV-'+n;
@@ -6194,57 +6081,24 @@ function cwInitListeners(){
     if(m){var v=parseInt(m[1],10);var cur=parseInt(localStorage.getItem('mc_inv_counter')||'1000',10);if(v>cur)localStorage.setItem('mc_inv_counter',String(v));}
   }
 
-  var curProj=null;
-  window.openInvoice=function(proj){
-    curProj=proj;
-    var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
-    document.getElementById('inv-proj-label').textContent=proj;
-    document.getElementById('inv-num').value=nextInvNum();
-    var status=String(p.status||'').toLowerCase();
-    var t=(status==='complete'||status==='completed')?'final':'progress';
-    document.getElementById('inv-type').value=t;
-    // pre-fill fixed-price fields from project data
-    document.getElementById('inv-desc').value=p.scopeNotes||p.scope||p.notes||p.scopeText||'';
-    document.getElementById('inv-amount').value=p.contractAmount||'';
-    // if the project has a contract amount, default detail to fixed-price
-    var hasContract=parseFloat(p.contractAmount||0)>0;
-    document.getElementById('inv-detail').value=hasContract?'fixedprice':'standard';
-    document.getElementById('inv-from').value='';
-    var d=new Date();
-    document.getElementById('inv-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-    syncInvFields();
-    ov.style.display='flex';
-  };
-
-  function invEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
-  function invEscBr(s){return invEsc(s).replace(/\n/g,'<br>');}
-  function invMoney(n){return '$'+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-  function invR2(x){return Math.round(x*100)/100;}
-  function invFmtD(iso){var p=iso.split('-');return p[1]+'/'+p[2]+'/'+p[0];}
-
-  window.__buildInvoiceForEmail=function(a,b,c,d,e,f,g,h,i){return buildInvoiceHTML(a,b,c,d,e,f,g,h,i);};
   function buildInvoiceHTML(proj,from,to,detail,invNum,dueDays,invType,fpDesc,fpAmount){
     var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
     var isFinal=invType==='final';
     var isFP=detail==='fixedprice';
     if(isFinal||isFP){from='';to='';}
     var rate=billingRate(proj),oosR=oosRateFor(proj);
-
     var allPays=((data.payments||{})[proj]||[]);
     var paidSoFar=allPays.reduce(function(s,x){return s+parseFloat(x.amount||0);},0);
 
     var invoiceTotal,bodyHtml='';
-
     if(isFP){
-      // ── Fixed price: description + amount, done ──
-      var amt=invR2(parseFloat(fpAmount||0));
+      var amt=dR2(parseFloat(fpAmount||0));
       bodyHtml+='<table class="sec"><tr class="hd"><td>Description of work</td><td class="amt">Amount</td></tr>'
-        +'<tr><td>'+(fpDesc?invEscBr(fpDesc):invEsc(proj))+'</td><td class="amt">'+invMoney(amt)+'</td></tr>'
-        +(isFinal&&paidSoFar>0?'<tr><td>Less payments received to date</td><td class="amt">('+invMoney(paidSoFar)+')</td></tr>':'')
+        +'<tr><td>'+(fpDesc?dEscBr(fpDesc):dEsc(proj))+'</td><td class="amt">'+dMoney(amt)+'</td></tr>'
+        +(isFinal&&paidSoFar>0?'<tr><td>Less payments received to date</td><td class="amt">('+dMoney(paidSoFar)+')</td></tr>':'')
         +'</table>';
-      invoiceTotal=isFinal?invR2(amt-Math.max(paidSoFar,0)):amt;
+      invoiceTotal=isFinal?dR2(amt-Math.max(paidSoFar,0)):amt;
     }else{
-      // ── T&M paths (progress or final) ──
       var ents=entriesForProject(proj).filter(function(e){
         if(from&&e.date<from)return false;
         if(to&&e.date>to)return false;
@@ -6261,116 +6115,188 @@ function cwInitListeners(){
         if(!byWorker[nm])byWorker[nm]={reg:0,oos:0};
         byWorker[nm].reg+=h;byWorker[nm].oos+=oh;
         regHrs+=h;oosHrs+=oh;
-        laborBilled=invR2(laborBilled+h*rate+oh*oosR);
-        dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:invR2(h*rate+oh*oosR)});
+        laborBilled=dR2(laborBilled+h*rate+oh*oosR);
+        dayLines.push({date:e.date,who:nm,h:h,oh:oh,amt:dR2(h*rate+oh*oosR)});
       });});
 
       var matLines=[],matBilled=0;
       ents.forEach(function(e){(e.materials||[]).forEach(function(m){
         if(m.coId)return;
         var c=parseFloat(m.cost||0);if(!c&&!(m.description||'').trim())return;
-        var billed=invR2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
-        matBilled=invR2(matBilled+billed);
+        var billed=dR2(c*(1+(window.__itemPct?window.__itemPct(m,proj):15)/100));
+        matBilled=dR2(matBilled+billed);
         matLines.push({date:e.date,desc:m.description||'Materials',amt:billed,sub:m.kind==='sub'});
       });});
 
       if(laborBilled>0||regHrs>0||oosHrs>0){
         var laborRows='';
         if(detail==='full'){
-          laborRows=dayLines.map(function(l){return '<tr><td>'+invFmtD(l.date)+' \u2014 '+invEsc(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+invMoney(l.amt)+'</td></tr>';}).join('');
+          laborRows=dayLines.map(function(l){return '<tr><td>'+dFmtD(l.date)+' \u2014 '+dEsc(l.who)+' \u2014 '+(l.h>0?l.h+'h':'')+(l.h>0&&l.oh>0?' + ':'')+(l.oh>0?l.oh+'h out-of-scope':'')+'</td><td class="amt">'+dMoney(l.amt)+'</td></tr>';}).join('');
         }else if(detail==='standard'){
           laborRows=Object.keys(byWorker).sort().map(function(w){
-            var d=byWorker[w];var amt=invR2(d.reg*rate+d.oos*oosR);
-            return '<tr><td>'+invEsc(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+invMoney(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+invMoney(oosR)+'/hr':'')+'</td><td class="amt">'+invMoney(amt)+'</td></tr>';
+            var d=byWorker[w];var amt=dR2(d.reg*rate+d.oos*oosR);
+            return '<tr><td>'+dEsc(w)+' \u2014 '+(d.reg>0?d.reg+'h @ '+dMoney(rate)+'/hr':'')+(d.reg>0&&d.oos>0?' + ':'')+(d.oos>0?d.oos+'h out-of-scope @ '+dMoney(oosR)+'/hr':'')+'</td><td class="amt">'+dMoney(amt)+'</td></tr>';
           }).join('');
         }
         bodyHtml+='<table class="sec"><tr class="hd"><td>Labor \u2014 work performed</td><td class="amt">Amount</td></tr>'+laborRows
-          +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+invMoney(laborBilled)+'</td></tr></table>';
+          +'<tr class="tot"><td>Labor total \u2014 '+regHrs+'h regular'+(oosHrs>0?' + '+oosHrs+'h out-of-scope':'')+'</td><td class="amt">'+dMoney(laborBilled)+'</td></tr></table>';
       }
       var matRows='';
       if(detail!=='summary'){
-        matRows=matLines.map(function(m){return '<tr><td>'+invFmtD(m.date)+' \u2014 '+invEsc(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+invMoney(m.amt)+'</td></tr>';}).join('');
+        matRows=matLines.map(function(m){return '<tr><td>'+dFmtD(m.date)+' \u2014 '+dEsc(m.desc)+(m.sub?' (subcontractor)':'')+'</td><td class="amt">'+dMoney(m.amt)+'</td></tr>';}).join('');
       }
       if(matLines.length>0){
         bodyHtml+='<table class="sec"><tr class="hd"><td>Materials &amp; Subcontractors</td><td class="amt">Amount</td></tr>'+matRows
-          +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+invMoney(matBilled)+'</td></tr></table>';
+          +'<tr class="tot"><td>Materials &amp; subs total</td><td class="amt">'+dMoney(matBilled)+'</td></tr></table>';
       }
       if(isFinal){
-        var charges=invR2(laborBilled+matBilled);
-        invoiceTotal=invR2(charges-Math.max(paidSoFar,0));
+        var charges=dR2(laborBilled+matBilled);
+        invoiceTotal=dR2(charges-Math.max(paidSoFar,0));
         if(paidSoFar>0){
-          bodyHtml+='<table class="sec"><tr><td>Total charges \u2014 full job</td><td class="amt">'+invMoney(charges)+'</td></tr>'
-            +'<tr><td>Less payments received to date</td><td class="amt">('+invMoney(paidSoFar)+')</td></tr></table>';
+          bodyHtml+='<table class="sec"><tr><td>Total charges \u2014 full job</td><td class="amt">'+dMoney(charges)+'</td></tr>'
+            +'<tr><td>Less payments received to date</td><td class="amt">('+dMoney(paidSoFar)+')</td></tr></table>';
         }
       }else{
-        invoiceTotal=invR2(laborBilled+matBilled);
+        invoiceTotal=dR2(laborBilled+matBilled);
       }
     }
 
     var issueD=new Date();
     var dueD=new Date();dueD.setDate(dueD.getDate()+parseInt(dueDays||'30',10));
     var fmt=function(d){return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});};
-    var periodLabel=(isFinal||isFP)?'':((from?invFmtD(from):'Job start')+' \u2014 '+(to?invFmtD(to):'Present'));
+    var periodLabel=(isFinal||isFP)?'':((from?dFmtD(from):'Job start')+' \u2014 '+(to?dFmtD(to):'Present'));
     var docLabel=isFinal?'FINAL INVOICE':'INVOICE';
 
-    var doc='<!DOCTYPE html><html lang="en"><head>'
-      +'<meta charset="UTF-8">'
-      +'<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">'
-      +'<title>'+docLabel+' '+invEsc(invNum)+' \u2014 '+invEsc(proj)+'</title>'
-      +'<style>'
-      +'html,body{margin:0;padding:0;width:100%;min-height:100%;background:#fff}'
-      +':root{--ink:#1a1a2e;--paper:#fff;--muted:#556;--line:#e4e8ee;--bar:#0f3d6e;--barink:#fff;--totbg:#f5f7fa;--navy:#0a1a2f;--gold:#e8a020}'
-      +'html.dark,html.dark body{background:#0a1a2f}'
-      +'html.dark{--ink:#e8ecf4;--paper:#0a1a2f;--muted:#8a94a8;--line:#1e2e4e;--bar:#0f3d6e;--barink:#fff;--totbg:#0f2038;--navy:#050f1e;--gold:#e8a020}'
-      +'body{font-family:Arial,Helvetica,sans-serif;color:var(--ink);padding:24px;box-sizing:border-box;background:var(--paper)}'
-      +'.wrap{max-width:816px;margin:0 auto}'
-      +'.lh{border-bottom:3px solid var(--navy);padding-bottom:14px;margin-bottom:6px}'
-      +'html.dark .lh{border-color:var(--gold)}'
-      +'.lh h1{font-size:21px;margin:0;color:var(--ink);letter-spacing:.02em}'
-      +'.lh .sub{font-size:10.5px;color:var(--muted);margin-top:4px}'
-      +'.meta{display:flex;justify-content:space-between;margin:16px 0 6px;font-size:12px;color:var(--ink);gap:10px;flex-wrap:wrap}'
-      +'h2.doc{font-size:13px;color:var(--gold);letter-spacing:.14em;margin:18px 0 4px}'
-      +'html:not(.dark) h2.doc{color:#0f3d6e}'
-      +'.inv-meta{background:var(--totbg);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-size:12px;display:flex;gap:24px;flex-wrap:wrap;margin:10px 0}'
-      +'.inv-meta b{color:var(--ink)}'
-      +'table.sec{width:100%;border-collapse:collapse;margin:14px 0 4px;font-size:12px}'
-      +'table.sec td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}'
-      +'table.sec .amt{text-align:right;white-space:nowrap;width:110px}'
-      +'table.sec tr.hd td{background:var(--bar);color:var(--barink);font-weight:bold;font-size:11px;letter-spacing:.06em;text-transform:uppercase}'
-      +'table.sec tr.tot td{font-weight:bold;border-top:2px solid var(--navy);border-bottom:none;background:var(--totbg)}'
-      +'html.dark table.sec tr.tot td{border-top-color:var(--gold)}'
-      +'.grand{display:flex;justify-content:space-between;align-items:center;background:var(--navy);color:#fff;border-radius:6px;padding:12px 16px;margin-top:18px;gap:8px;flex-wrap:wrap}'
-      +'html.dark .grand{border:1px solid var(--gold)}'
-      +'.grand .l{font-size:13px;font-weight:bold;letter-spacing:.08em}'
-      +'.grand .v{font-size:20px;font-weight:bold;color:var(--gold)}'
-      +'.terms{margin-top:14px;font-size:11px;color:var(--muted)}'
-      +'.foot{margin-top:26px;font-size:10px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}'
-      +'.noprint{margin:0 0 18px;display:flex;gap:8px;flex-wrap:wrap}'
-      +'.noprint button{background:#0f3d6e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;cursor:pointer}'
-      +'.noprint button.thm{background:#333c4e}'
-      +'@media(max-width:640px){body{padding:14px}.wrap{max-width:100%}.lh h1{font-size:17px}.lh .sub{font-size:9.5px}.meta{flex-direction:column}.meta>div[style]{text-align:left!important}table.sec{font-size:11px}table.sec td{padding:5px 6px}table.sec .amt{width:84px}.grand .v{font-size:17px}}'
-      +'@media print{.noprint{display:none}body{padding:14px}}'
-      +'</style></head><body>'
-      +'<div class="wrap">'
-      +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
-      +'<button class="thm" onclick="document.documentElement.classList.toggle(\'dark\')">\uD83C\uDF13 Light / Dark</button></div>'
-      +'<div class="lh"><h1>MULLINS CONSTRUCTION INC.</h1>'
-      +'<div class="sub">License #855578 \u00b7 1702-L Meridian Ave #164, San Jose, CA 95125 \u00b7 408.569.3434 \u00b7 mullinsconstruction@yahoo.com</div></div>'
+    var inner=''
       +'<h2 class="doc">'+docLabel+'</h2>'
-      +'<div class="inv-meta"><span>Invoice #: <b>'+invEsc(invNum)+'</b></span><span>Issue date: <b>'+fmt(issueD)+'</b></span><span>Due date: <b>'+(dueDays==='0'?'Due on receipt':fmt(dueD))+'</b></span></div>'
-      +'<div class="meta"><div><b>Bill to:</b><br><b>'+invEsc(p.client||proj)+'</b>'+(p.address?'<br>'+invEsc(p.address):'')+'</div>'
-      +'<div style="text-align:right"><b>Project:</b> '+invEsc(proj)+(periodLabel?'<br>Work period: <b>'+periodLabel+'</b>':'')+(isFinal?'<br><b>Final billing \u2014 project complete</b>':'')+'</div></div>'
+      +'<div class="inv-meta"><span>Invoice #: <b>'+dEsc(invNum)+'</b></span><span>Issue date: <b>'+fmt(issueD)+'</b></span><span>Due date: <b>'+(dueDays==='0'?'Due on receipt':fmt(dueD))+'</b></span></div>'
+      +'<div class="meta"><div><b>Bill to:</b><br><b>'+dEsc(p.client||proj)+'</b>'+(p.address?'<br>'+dEsc(p.address):'')+'</div>'
+      +'<div style="text-align:right"><b>Project:</b> '+dEsc(proj)+(periodLabel?'<br>Work period: <b>'+periodLabel+'</b>':'')+(isFinal?'<br><b>Final billing \u2014 project complete</b>':'')+'</div></div>'
       +bodyHtml
-      +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+invMoney(Math.max(invoiceTotal,0))+'</span></div>'
+      +'<div class="grand"><span class="l">BALANCE DUE</span><span class="v">'+dMoney(Math.max(invoiceTotal,0))+'</span></div>'
       +'<div class="terms">Please make checks payable to Mullins Construction Inc. Payment due '+(dueDays==='0'?'upon receipt':'within '+dueDays+' days')+'. Thank you for your business.</div>'
-      +'<div class="foot">'+(isFinal?'Final invoice \u2014 reflects all charges for the project less payments received.':'Thank you for choosing Mullins Construction.')+' Questions? Call 408.569.3434.</div>'
-      +'</div></body></html>';
-    return doc;
+      +'<div class="foot">'+(isFinal?'Final invoice \u2014 reflects all charges for the project less payments received.':'Thank you for choosing Mullins Construction.')+' Questions? Call 408.569.3434.</div>';
+    return docShell(docLabel+' '+dEsc(invNum)+' \u2014 '+dEsc(proj),inner);
   }
+  window.__buildInvoiceForEmail=buildInvoiceHTML;
 
-  function invGetOpts(){
-    return {
-      proj:document.getElementById('inv-proj-label').textContent,
+  // ───────── UI: shared styles ─────────
+  var st=document.createElement('style');
+  st.textContent=''
+    +'.jp-stmt-btn{background:#0f3460;border:none;border-radius:6px;color:var(--text,#eee);padding:7px 12px;font-size:12px;cursor:pointer;margin:6px 0 2px;width:100%}'
+    +'.jp-stmt-btn:hover{background:#1a4a8a}'
+    +'.jp-inv-btn{background:#3d2f0a;border:1px solid #6b5416;border-radius:6px;color:var(--accent,#e8a020);padding:7px 12px;font-size:12px;cursor:pointer;margin:4px 0 2px;width:100%;font-weight:bold}'
+    +'.jp-inv-btn:hover{background:#54430f}'
+    +'.doc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9300;align-items:center;justify-content:center}'
+    +'.doc-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(440px,94vw);max-height:92vh;overflow:auto}'
+    +'.doc-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 12px}'
+    +'.doc-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
+    +'.doc-box input,.doc-box select,.doc-box textarea{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px;box-sizing:border-box;font-family:inherit}'
+    +'.doc-box textarea{min-height:80px;resize:vertical}'
+    +'.doc-row{display:flex;gap:8px}.doc-row>div{flex:1}'
+    +'.doc-go{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:14px;width:100%}'
+    +'.doc-pdf-btn{background:#0f3460;color:#dde;border:1px solid #2a3a5e;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}'
+    +'.doc-email-btn{background:#1a5f2a;color:#dfe;border:1px solid #2a7a3a;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}'
+    +'.doc-cancel{font-size:11px;color:#667;cursor:pointer}';
+  document.head.appendChild(st);
+
+  // ───────── UI: statement box ─────────
+  var sov=document.createElement('div');
+  sov.className='doc-overlay';sov.id='stmt-overlay';
+  sov.innerHTML='<div class="doc-box" id="stmt-box"><h3>\uD83D\uDCC4 Statement</h3>'
+    +'<div id="stmt-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
+    +'<label>From (blank = job start)</label><input type="date" id="stmt-from">'
+    +'<label>To</label><input type="date" id="stmt-to">'
+    +'<label>Detail</label><select id="stmt-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option></select>'
+    +'<button class="doc-go" id="stmt-go">Generate Statement</button>'
+    +'<button class="doc-pdf-btn" id="stmt-pdf">\u2B07 Download PDF</button>'
+    +'<button class="doc-pdf-btn" id="stmt-pdf-dark">\uD83C\uDF19 Download PDF (Dark)</button>'
+    +'<button class="doc-email-btn" id="stmt-email">\uD83D\uDCE7 Email to Client</button>'
+    +'<div style="text-align:center;margin-top:8px"><span class="doc-cancel" onclick="document.getElementById(\'stmt-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(sov);
+  sov.addEventListener('click',function(e){if(e.target===sov)sov.style.display='none';});
+
+  var curStmtProj=null;
+  window.openStatement=function(proj){
+    curStmtProj=proj;
+    document.getElementById('stmt-proj-label').textContent=proj;
+    document.getElementById('stmt-from').value='';
+    var d=new Date();
+    document.getElementById('stmt-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    sov.style.display='flex';
+  };
+  function stmtOpts(){
+    return {proj:document.getElementById('stmt-proj-label').textContent,
+      from:document.getElementById('stmt-from').value,
+      to:document.getElementById('stmt-to').value,
+      detail:document.getElementById('stmt-detail').value};
+  }
+  document.getElementById('stmt-go').addEventListener('click',function(){
+    var o=stmtOpts();
+    openBlob(buildStatementHTML(o.proj,o.from,o.to,o.detail));
+    sov.style.display='none';
+  });
+  document.getElementById('stmt-pdf').addEventListener('click',async function(){
+    var o=stmtOpts();
+    var ok=await downloadPdf(buildStatementHTML(o.proj,o.from,o.to,o.detail),'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement',false,this);
+    if(ok)sov.style.display='none';
+  });
+  document.getElementById('stmt-pdf-dark').addEventListener('click',async function(){
+    var o=stmtOpts();
+    var ok=await downloadPdf(buildStatementHTML(o.proj,o.from,o.to,o.detail),'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement-Dark',true,this);
+    if(ok)sov.style.display='none';
+  });
+
+  // ───────── UI: invoice box ─────────
+  var iov=document.createElement('div');
+  iov.className='doc-overlay';iov.id='inv-overlay';
+  iov.innerHTML='<div class="doc-box" id="inv-box"><h3>\uD83E\uDDFE Invoice</h3>'
+    +'<div id="inv-proj-label" style="font-size:13px;color:#dde;font-weight:bold"></div>'
+    +'<label>Invoice type</label><select id="inv-type"><option value="progress">Progress \u2014 bill work for a period</option><option value="final">Final \u2014 bill everything owed on the job</option></select>'
+    +'<div class="doc-row"><div><label>Invoice #</label><input type="text" id="inv-num"></div>'
+    +'<div><label>Due</label><select id="inv-due"><option value="30">Net 30</option><option value="15">Net 15</option><option value="0">Due on receipt</option><option value="45">Net 45</option></select></div></div>'
+    +'<label>Detail</label><select id="inv-detail"><option value="standard">Standard \u2014 per worker + material lines</option><option value="summary">Summary \u2014 totals only</option><option value="full">Full \u2014 every day</option><option value="fixedprice">Fixed price \u2014 description + amount</option></select>'
+    +'<div id="inv-fixed-wrap" style="display:none">'
+    +'<label>Description of work</label><textarea id="inv-desc" placeholder="Describe the work performed\u2026"></textarea>'
+    +'<label>Amount ($)</label><input type="number" step="0.01" id="inv-amount">'
+    +'</div>'
+    +'<div id="inv-period-wrap"><label>Work period \u2014 From (blank = job start)</label><input type="date" id="inv-from">'
+    +'<label>Work period \u2014 To</label><input type="date" id="inv-to"></div>'
+    +'<button class="doc-go" id="inv-go">Generate Invoice</button>'
+    +'<button class="doc-pdf-btn" id="inv-pdf">\u2B07 Download PDF</button>'
+    +'<button class="doc-pdf-btn" id="inv-pdf-dark">\uD83C\uDF19 Download PDF (Dark)</button>'
+    +'<button class="doc-email-btn" id="inv-email">\uD83D\uDCE7 Email to Client</button>'
+    +'<div style="text-align:center;margin-top:8px"><span class="doc-cancel" onclick="document.getElementById(\'inv-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(iov);
+  iov.addEventListener('click',function(e){if(e.target===iov)iov.style.display='none';});
+
+  function syncInvFields(){
+    var t=document.getElementById('inv-type').value;
+    var d=document.getElementById('inv-detail').value;
+    var isFP=d==='fixedprice';
+    document.getElementById('inv-fixed-wrap').style.display=isFP?'block':'none';
+    document.getElementById('inv-period-wrap').style.display=(t==='final'||isFP)?'none':'block';
+  }
+  document.getElementById('inv-type').addEventListener('change',syncInvFields);
+  document.getElementById('inv-detail').addEventListener('change',syncInvFields);
+
+  window.openInvoice=function(proj){
+    var p=(data.projects||[]).find(function(x){return (x.name||'')===proj;})||{};
+    document.getElementById('inv-proj-label').textContent=proj;
+    document.getElementById('inv-num').value=nextInvNum();
+    var status=String(p.status||'').toLowerCase();
+    document.getElementById('inv-type').value=(status==='complete'||status==='completed')?'final':'progress';
+    document.getElementById('inv-desc').value=p.scopeNotes||p.scope||p.notes||p.scopeText||'';
+    document.getElementById('inv-amount').value=p.contractAmount||'';
+    document.getElementById('inv-detail').value=(parseFloat(p.contractAmount||0)>0)?'fixedprice':'standard';
+    document.getElementById('inv-from').value='';
+    var d=new Date();
+    document.getElementById('inv-to').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    syncInvFields();
+    iov.style.display='flex';
+  };
+  function invOpts(){
+    return {proj:document.getElementById('inv-proj-label').textContent,
       from:document.getElementById('inv-from').value,
       to:document.getElementById('inv-to').value,
       detail:document.getElementById('inv-detail').value,
@@ -6378,119 +6304,41 @@ function cwInitListeners(){
       due:document.getElementById('inv-due').value,
       type:document.getElementById('inv-type').value,
       desc:document.getElementById('inv-desc').value,
-      amount:document.getElementById('inv-amount').value
-    };
+      amount:document.getElementById('inv-amount').value};
   }
-
   document.getElementById('inv-go').addEventListener('click',function(){
-    var o=invGetOpts();
-    bumpInvNum(o.num);
-    var doc=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount);
-    var blob=new Blob([doc],{type:'text/html'});
-    var url=URL.createObjectURL(blob);
-    window.open(url,'_blank');
-    setTimeout(function(){try{URL.revokeObjectURL(url);}catch(e){}},60000);
-    ov.style.display='none';
+    var o=invOpts();bumpInvNum(o.num);
+    openBlob(buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount));
+    iov.style.display='none';
+  });
+  document.getElementById('inv-pdf').addEventListener('click',async function(){
+    var o=invOpts();bumpInvNum(o.num);
+    var ok=await downloadPdf(buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount),'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,''),false,this);
+    if(ok)iov.style.display='none';
+  });
+  document.getElementById('inv-pdf-dark').addEventListener('click',async function(){
+    var o=invOpts();bumpInvNum(o.num);
+    var ok=await downloadPdf(buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount),'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,'')+'-Dark',true,this);
+    if(ok)iov.style.display='none';
   });
 
-  function invPdf(dark,btn){
-    return async function(){
-      var o=invGetOpts();
-      bumpInvNum(o.num);
-      var orig=btn.textContent;
-      btn.textContent='Generating\u2026';btn.disabled=true;
-      try{
-        var html=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount);
-        if(dark)html=html.replace('<html lang="en">','<html lang="en" class="dark">');
-        var fname='Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,'')+(dark?'-Dark':'');
-        var r=await fetch('/api/statement/pdf',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({html:html,filename:fname})});
-        if(!r.ok)throw new Error('server error');
-        var blob=await r.blob();
-        var a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);
-        a.download=fname+'.pdf';
-        document.body.appendChild(a);a.click();a.remove();
-        ov.style.display='none';
-      }catch(e){alert('PDF generation failed \u2014 is the server updated?');}
-      btn.textContent=orig;btn.disabled=false;
-    };
-  }
-  var pb=document.getElementById('inv-pdf'),pbd=document.getElementById('inv-pdf-dark');
-  pb.addEventListener('click',invPdf(false,pb));
-  pbd.addEventListener('click',invPdf(true,pbd));
-
-  var _rjp2=window.renderJobPanel;
-  window.renderJobPanel=function(proj){
-    var html=_rjp2(proj);
-    var btn='<button class="jp-inv-btn" onclick="openInvoice(\''+proj.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')">\uD83E\uDDFE Invoice</button>';
-    return html.replace('<button class="jp-stmt-btn"',btn+'<button class="jp-stmt-btn"');
-  };
-  if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
-})();
-</script>
-<!-- ══ CHAT WIDGET LIGHT-MODE FIX v2 — forces readable text in the floating chat widget when the dashboard is in light theme. Paste above </body></html> at the very bottom of public/dashboard.html. ══ -->
-<style>
-  html.light .cw,
-  html.light .cw *,
-  html.light [class*="cw-"],
-  html.light [class*="cw-"] *,
-  html.light [id*="cw-"],
-  html.light [id*="cw-"] * {
-    color: #1a1a2e !important;
-  }
-  html.light .cw input,
-  html.light .cw textarea,
-  html.light [class*="cw-"] input,
-  html.light [class*="cw-"] textarea,
-  html.light [id*="cw-"] input,
-  html.light [id*="cw-"] textarea {
-    color: #1a1a2e !important;
-    background: #ffffff !important;
-    border: 1px solid #ccd0d8 !important;
-  }
-  html.light .cw input::placeholder,
-  html.light .cw textarea::placeholder,
-  html.light [class*="cw-"] input::placeholder,
-  html.light [class*="cw-"] textarea::placeholder,
-  html.light [id*="cw-"] input::placeholder,
-  html.light [id*="cw-"] textarea::placeholder {
-    color: #667 !important;
-    opacity: 1;
-  }
-</style>
-<!-- ══ DOC EMAIL v1 — adds "📧 Email" to Invoice and Statement option boxes. Free-type recipient (pre-filled from client record when present), sends panel-built PDF via /api/send-email, files to Job Docs. Paste above </body></html> at the VERY BOTTOM of public/dashboard.html. ══ -->
-<script>
-(function(){
-  var st=document.createElement('style');
-  st.textContent='#de-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9400;align-items:center;justify-content:center}'
-    +'#de-box{background:var(--panel,#16213e);border:2px solid var(--accent,#e8a020);border-radius:12px;padding:18px;width:min(440px,94vw)}'
-    +'#de-box h3{color:var(--accent,#e8a020);font-size:15px;margin:0 0 10px}'
-    +'#de-box label{font-size:11px;color:#88a;display:block;margin:8px 0 3px}'
-    +'#de-box input,#de-box textarea{width:100%;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:#dde;padding:7px 9px;font-size:13px;box-sizing:border-box;font-family:inherit}'
-    +'#de-box textarea{min-height:70px;resize:vertical}'
-    +'#de-send{background:var(--accent,#e8a020);color:#111;border:none;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:12px;width:100%}'
-    +'.de-email-btn{background:#1a5f2a;color:#dfe;border:1px solid #2a7a3a;border-radius:7px;padding:9px 18px;font-weight:bold;cursor:pointer;margin-top:8px;width:100%}';
-  document.head.appendChild(st);
-
-  var ov=document.createElement('div');
-  ov.id='de-overlay';
-  ov.innerHTML='<div id="de-box"><h3>\uD83D\uDCE7 Email Document</h3>'
+  // ───────── UI: email dialog (shared) ─────────
+  var eov=document.createElement('div');
+  eov.className='doc-overlay';eov.id='de-overlay';
+  eov.innerHTML='<div class="doc-box"><h3>\uD83D\uDCE7 Email Document</h3>'
     +'<div id="de-doc-label" style="font-size:12px;color:#8a94a8"></div>'
     +'<label>To (email address)</label><input type="email" id="de-to" placeholder="client@example.com">'
     +'<label>Subject</label><input type="text" id="de-subject">'
     +'<label>Message (appears in the email body)</label><textarea id="de-msg">Please find your document attached. Let me know if you have any questions.</textarea>'
-    +'<button id="de-send">Send Email</button>'
-    +'<div style="text-align:center;margin-top:8px"><span style="font-size:11px;color:#667;cursor:pointer" onclick="document.getElementById(\'de-overlay\').style.display=\'none\'">Cancel</span></div></div>';
-  document.body.appendChild(ov);
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.style.display='none';});
+    +'<button class="doc-go" id="de-send">Send Email</button>'
+    +'<div style="text-align:center;margin-top:8px"><span class="doc-cancel" onclick="document.getElementById(\'de-overlay\').style.display=\'none\'">Cancel</span></div></div>';
+  document.body.appendChild(eov);
+  eov.addEventListener('click',function(e){if(e.target===eov)eov.style.display='none';});
 
-  var pending=null; // {proj, docHtml, filename, docType, subject}
-
-  window.openDocEmail=function(cfg){
-    pending=cfg;
+  var pendingEmail=null;
+  function openDocEmail(cfg){
+    pendingEmail=cfg;
     var p=(data.projects||[]).find(function(x){return (x.name||'')===cfg.proj;})||{};
-    // find client email: project record, then clients list by client name
     var em=p.clientEmail||'';
     if(!em&&p.client&&data.clients){
       var cl=(data.clients||[]).find(function(c){return (c.name||'')===p.client;});
@@ -6499,87 +6347,58 @@ function cwInitListeners(){
     document.getElementById('de-to').value=em;
     document.getElementById('de-subject').value=cfg.subject;
     document.getElementById('de-doc-label').textContent=cfg.filename+' \u2014 '+cfg.proj;
-    ov.style.display='flex';
-  };
-
+    eov.style.display='flex';
+  }
   document.getElementById('de-send').addEventListener('click',async function(){
-    if(!pending)return;
+    if(!pendingEmail)return;
     var to=document.getElementById('de-to').value.trim();
     if(!to||to.indexOf('@')<0){alert('Enter a valid email address.');return;}
     var btn=this;btn.textContent='Sending\u2026';btn.disabled=true;
     try{
-      var p=(data.projects||[]).find(function(x){return (x.name||'')===pending.proj;})||{};
+      var p=(data.projects||[]).find(function(x){return (x.name||'')===pendingEmail.proj;})||{};
       var r=await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
           to:to,
-          subject:document.getElementById('de-subject').value||pending.subject,
-          html:'<div style="padding:10px 30px;font-family:Arial,sans-serif;font-size:14px;color:#333">'+pending.filename+' is attached.</div>',
-          rawPdfHtml:pending.docHtml,
-          pdfFilename:pending.filename,
+          subject:document.getElementById('de-subject').value||pendingEmail.subject,
+          html:'<div style="padding:10px 30px;font-family:Arial,sans-serif;font-size:14px;color:#333">'+pendingEmail.filename+' is attached.</div>',
+          rawPdfHtml:pendingEmail.docHtml,
+          pdfFilename:pendingEmail.filename,
           clientName:(p.client||'').split(' ')[0]||'',
           emailBody:document.getElementById('de-msg').value,
-          project:pending.proj,
-          docType:pending.docType
+          project:pendingEmail.proj,
+          docType:pendingEmail.docType
         })});
       var j=await r.json();
       if(!r.ok||!j.success)throw new Error(j.error||'send failed');
       alert('\u2705 Sent to '+to+(j.filed?' and filed to Job Docs.':'.'));
-      ov.style.display='none';
+      eov.style.display='none';
     }catch(e){alert('Email failed \u2014 '+(e.message||'server error'));}
     btn.textContent='Send Email';btn.disabled=false;
   });
 
-  // ── Add "📧 Email" to the INVOICE options box ──
-  function addInvoiceEmailBtn(){
-    var box=document.getElementById('inv-box');
-    if(!box||document.getElementById('inv-email'))return;
-    var anchor=document.getElementById('inv-pdf-dark');
-    var b=document.createElement('button');
-    b.id='inv-email';b.className='de-email-btn';
-    b.textContent='\uD83D\uDCE7 Email to Client';
-    anchor.parentNode.insertBefore(b,anchor.nextSibling);
-    b.addEventListener('click',function(){
-      var proj=document.getElementById('inv-proj-label').textContent;
-      var num=document.getElementById('inv-num').value||'Invoice';
-      var html=window.buildInvoiceHTML? null : null;
-      // build the doc using the invoice builder via the same opts the buttons use
-      var from=document.getElementById('inv-from').value;
-      var to2=document.getElementById('inv-to').value;
-      var detail=document.getElementById('inv-detail').value;
-      var due=document.getElementById('inv-due').value;
-      var type=document.getElementById('inv-type').value;
-      var desc=document.getElementById('inv-desc')?document.getElementById('inv-desc').value:'';
-      var amount=document.getElementById('inv-amount')?document.getElementById('inv-amount').value:'';
-      // buildInvoiceHTML lives inside the INVOICE v3 closure; expose check:
-      if(typeof window.__buildInvoiceForEmail!=='function'){alert('Invoice builder not exposed \u2014 needs the one-line insert (see instructions).');return;}
-      var docHtml=window.__buildInvoiceForEmail(proj,from,to2,detail,num,due,type,desc,amount);
-      document.getElementById('inv-overlay').style.display='none';
-      openDocEmail({proj:proj,docHtml:docHtml,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+num.replace(/[^a-zA-Z0-9-]/g,'')+'.pdf',docType:'invoice',subject:'Invoice '+num+' from Mullins Construction'});
-    });
-  }
+  document.getElementById('inv-email').addEventListener('click',function(){
+    var o=invOpts();bumpInvNum(o.num);
+    var docHtml=buildInvoiceHTML(o.proj,o.from,o.to,o.detail,o.num,o.due,o.type,o.desc,o.amount);
+    iov.style.display='none';
+    openDocEmail({proj:o.proj,docHtml:docHtml,filename:'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-'+o.num.replace(/[^a-zA-Z0-9-]/g,'')+'.pdf',docType:'invoice',subject:'Invoice '+o.num+' from Mullins Construction'});
+  });
+  document.getElementById('stmt-email').addEventListener('click',function(){
+    var o=stmtOpts();
+    var docHtml=buildStatementHTML(o.proj,o.from,o.to,o.detail);
+    sov.style.display='none';
+    openDocEmail({proj:o.proj,docHtml:docHtml,filename:'Mullins-'+o.proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement.pdf',docType:'statement',subject:'Account Statement from Mullins Construction'});
+  });
 
-  // ── Add "📧 Email" to the STATEMENT options box ──
-  function addStatementEmailBtn(){
-    var box=document.getElementById('stmt-box');
-    if(!box||document.getElementById('stmt-email'))return;
-    var anchor=document.getElementById('stmt-pdf-dark');
-    var b=document.createElement('button');
-    b.id='stmt-email';b.className='de-email-btn';
-    b.textContent='\uD83D\uDCE7 Email to Client';
-    anchor.parentNode.insertBefore(b,anchor.nextSibling);
-    b.addEventListener('click',function(){
-      var proj=document.getElementById('stmt-proj-label').textContent;
-      var from=document.getElementById('stmt-from').value;
-      var to2=document.getElementById('stmt-to').value;
-      var detail=document.getElementById('stmt-detail').value;
-      if(typeof window.buildStatementHTML!=='function'){alert('Statement builder not found.');return;}
-      var docHtml=window.buildStatementHTML(proj,from,to2,detail);
-      document.getElementById('stmt-overlay').style.display='none';
-      openDocEmail({proj:proj,docHtml:docHtml,filename:'Mullins-'+proj.replace(/[^a-zA-Z0-9]/g,'')+'-Statement.pdf',docType:'statement',subject:'Account Statement from Mullins Construction'});
-    });
-  }
-  addInvoiceEmailBtn();
-  addStatementEmailBtn();
+  // ───────── panel buttons ─────────
+  var _rjp=window.renderJobPanel;
+  window.renderJobPanel=function(proj){
+    var html=_rjp(proj);
+    var safe=proj.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    var btns='<button class="jp-inv-btn" onclick="openInvoice(\''+safe+'\')">\uD83E\uDDFE Invoice</button>'
+      +'<button class="jp-stmt-btn" onclick="openStatement(\''+safe+'\')">\uD83D\uDCC4 Statement</button>';
+    return html.replace('<div class="pay-section">',btns+'<div class="pay-section">');
+  };
+  if(typeof renderJobPanels==='function')try{renderJobPanels();}catch(e){}
 })();
 </script>
 </body></html>
