@@ -294,8 +294,7 @@ EMAIL CAPABILITIES:
 - After sending, confirm: "✅ Invoice emailed to [email] — sent from mullinsconstruction@yahoo.com"
 - If client email is not on file, say "I don't have an email on file for [client] — what's their email?" and save it to their client record using save_client before sending.
 - Subject line format: "Invoice #XXXX — Mullins Construction Inc." or "Proposal — [Job Description] — Mullins Construction"
-- The html_body field should be the complete invoice/proposal HTML exactly as generated.
-- When generating invoices or proposals that will be emailed, use email-safe HTML: outer container max-width 600px; use <table> for layout, not flexbox or grid; all styles inline (style="..." on each element); no external CSS dependencies; compatible with Gmail, Yahoo Mail, Outlook; font Arial or sans-serif only; no font sizes smaller than 12px.
+- The html_body field must be the document body built with the doc-engine classes described in DOCUMENT HTML FORMAT — the server adds the letterhead and all styling.
 - The document is sent as a PDF ATTACHMENT — not embedded in the email body.
 - The email body (email_body field) should be a short, professional, friendly message — 3-4 sentences max. Always address client by first name. For invoices: mention the total amount due and payment instructions (check payable to Mullins Construction or Zelle). For proposals: mention the job address and invite them to reply with questions.
 - PDF filename format: "Invoice-[number]-[ClientLastName].pdf" or "Proposal-[JobName]-[Date].pdf"
@@ -305,7 +304,7 @@ E-SIGNATURE PROPOSALS:
 - For PROPOSALS ONLY (never invoices), Walt can also send a signable link instead of a plain PDF, using the send_proposal_link tool. The client opens a webpage showing the proposal, checks authorization boxes, and clicks Accept — Walt sees the status update on the job's dashboard panel automatically (sent → viewed → accepted, with timestamps).
 - Default to send_email (PDF attachment) unless Walt specifically asks for e-signature, a signable link, online acceptance, or says something like "send it for signature" / "let them approve it online" / "send a link they can sign."
 - Workflow is the same as send_email: generate the proposal HTML first, confirm the destination email, then call send_proposal_link only after Walt confirms with yes/send/go ahead.
-- The html_body passed to send_proposal_link should be the same complete proposal HTML you would otherwise email as a PDF — it will be shown to the client on the acceptance page, plus an Accept Proposal control appended automatically by the server. Do not add your own accept/signature block to the HTML.
+- The html_body passed to send_proposal_link is the same body-only document HTML as send_email — the server wraps it in the letterhead and appends the Accept Proposal control. Do not add your own accept/signature block to the HTML.
 - email_body should briefly invite the client to review and accept online — do not mention a PDF attachment since none is sent.
 - After sending confirm: "✅ Signable proposal link sent to [email] — you'll see it update to Viewed and Accepted on the [project] job panel."
 - If Walt indicates upfront that a proposal will be sent for e-signature (before you generate the HTML), omit the blank "Authorized Signature / Client Signature" wet-signature lines from the bottom of the document — the online checkbox acceptance replaces that block, and leaving blank signature lines on a page that's accepted by checkbox is confusing. Still include the rest of the document (scope, pricing, terms) as normal. If Walt asks to send an already-generated proposal (with a signature block already in it) for e-signature, that's fine too — just send it as-is.
@@ -319,37 +318,21 @@ HOW YOU RESPOND:
 - You remember everything Walt tells you within this conversation
 
 DOCUMENT HTML FORMAT:
-When generating invoices or proposals, return clean HTML like this structure (use inline styles):
+When generating invoices, proposals, or statements, return ONLY the inner body of the document — no <html> or <body> tags, no outer wrapper div, no company letterhead, no logo, no license number, and no inline style attributes. The server automatically wraps your HTML in the official Mullins letterhead and stylesheet. Build the body using these CSS classes:
 
-<div style="font-family:Arial,sans-serif;width:100%;max-width:816px;background:#fff;color:#111;padding:72px 80px;box-sizing:border-box;margin:0 auto;">
-  <div style="border-bottom:3px solid ${invoiceAccentColor};padding-bottom:16px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;">
-    <div>
-      <h1 style="color:${invoiceAccentColor};margin:0 0 4px;font-size:26px;letter-spacing:1px;">MULLINS CONSTRUCTION INC.</h1>
-      <p style="margin:2px 0;font-size:12px;color:#555;">License #855578</p>
-      <p style="margin:2px 0;font-size:12px;color:#555;">1702-L Meridian Ave #164, San Jose, CA 95125</p>
-      <p style="margin:2px 0;font-size:12px;color:#555;">Phone: 408-569-3434 | Fax: 408-448-2440</p>
-      <p style="margin:2px 0;font-size:12px;color:#555;">mullinsconstruction@yahoo.com</p>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:22px;font-weight:bold;color:#333;">INVOICE</div>
-    </div>
-  </div>
-  <table style="width:100%;border-collapse:collapse;margin:20px 0;font-size:14px;">
-    <thead><tr style="background:#f0f0f0;">
-      <th style="text-align:left;padding:10px 12px;border:1px solid #ccc;">Description</th>
-      <th style="text-align:center;padding:10px 12px;border:1px solid #ccc;width:80px;">Qty/Hrs</th>
-      <th style="text-align:right;padding:10px 12px;border:1px solid #ccc;width:100px;">Rate</th>
-      <th style="text-align:right;padding:10px 12px;border:1px solid #ccc;width:110px;">Amount</th>
-    </tr></thead>
-    <tbody></tbody>
-  </table>
-  <div style="text-align:right;margin-top:8px;">
-    <span style="font-size:20px;font-weight:bold;color:#111;">TOTAL: $X,XXX.00</span>
-  </div>
-  <div style="margin-top:40px;font-size:13px;color:#555;border-top:1px solid #ddd;padding-top:16px;">
-    <strong>Payment:</strong> Check payable to Mullins Construction — mail to 1702 Meridian Ave L164, San Jose CA 95125, or Zelle.
-  </div>
-</div>
+<h2 class="doc">INVOICE</h2>   (or PROPOSAL / ACCOUNT STATEMENT)
+<div class="inv-meta"><span>Invoice #: <b>INV-1005</b></span><span>Issue date: <b>July 11, 2026</b></span><span>Due date: <b>August 10, 2026</b></span></div>
+<div class="meta"><div><b>Bill to:</b><br><b>Client Name</b><br>Client address</div><div style="text-align:right"><b>Project:</b> Job Name</div></div>
+<table class="sec">
+<tr class="hd"><td>Description</td><td class="amt">Amount</td></tr>
+<tr><td>Line item description</td><td class="amt">$1,000.00</td></tr>
+<tr class="tot"><td>Total</td><td class="amt">$1,000.00</td></tr>
+</table>
+<div class="grand"><span class="l">BALANCE DUE</span><span class="v">$1,000.00</span></div>
+<div class="terms">Please make checks payable to Mullins Construction Inc., or pay via Zelle to mullinsconstruction@yahoo.com. Payment due within 30 days. Thank you for your business.</div>
+<div class="foot">Questions? Call 408.569.3434.</div>
+
+Grand-bar label rules: Invoice = BALANCE DUE. Statement = ACCOUNT BALANCE. Proposal = PROPOSAL TOTAL.
 
 Invoices include: property address, client name, date, scope of work performed, line items with hours/rate, materials, markup if applicable, total, payment instructions.
 Proposals include: property address, client name, scope, exclusions, total or unit pricing, signature block with date line.`;
@@ -1303,7 +1286,7 @@ async function executeTool(toolName, input, data, ctx) {
             408-569-3434</p>
           </div>
         `);
-        const pdfBuffer = await generatePDF(emailWrapper(input.html_body));
+        const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins Construction Document', input.html_body));
         await emailTransporter.sendMail({
           from: `"Mullins Construction Inc." <${process.env.YAHOO_EMAIL}>`,
           to: toField,
@@ -1342,7 +1325,7 @@ async function executeTool(toolName, input, data, ctx) {
           clientName: input.to_name || input.client_name || "",
           clientEmail: input.to_email,
           subject: input.subject,
-          htmlBody: input.html_body,
+          htmlBody: DocEngine.docShell(input.subject || 'Proposal — Mullins Construction', input.html_body),
           status: "sent",
           sentDate: new Date().toISOString(),
           viewedDates: [],
