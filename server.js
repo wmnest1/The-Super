@@ -1,4 +1,5 @@
 const express = require("express");
+const DocEngine = require('./public/doc-engine.js');
 const cors = require("cors");
 const Anthropic = require("@anthropic-ai/sdk");
 const { MongoClient, ObjectId } = require("mongodb");
