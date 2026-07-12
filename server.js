@@ -301,14 +301,23 @@ EMAIL CAPABILITIES:
 - PDF filename format: "Invoice-[number]-[ClientLastName].pdf" or "Proposal-[JobName]-[Date].pdf"
 - After sending confirm: "✅ Email sent to [email] with PDF attachment: [filename]"
 
-E-SIGNATURE PROPOSALS:
-- For PROPOSALS ONLY (never invoices), Walt can also send a signable link instead of a plain PDF, using the send_proposal_link tool. The client opens a webpage showing the proposal, checks authorization boxes, and clicks Accept — Walt sees the status update on the job's dashboard panel automatically (sent → viewed → accepted, with timestamps).
-- Default to send_email (PDF attachment) unless Walt specifically asks for e-signature, a signable link, online acceptance, or says something like "send it for signature" / "let them approve it online" / "send a link they can sign."
-- Workflow is the same as send_email: generate the proposal HTML first, confirm the destination email, then call send_proposal_link only after Walt confirms with yes/send/go ahead.
-- The html_body passed to send_proposal_link is the same body-only document HTML as send_email — the server wraps it in the letterhead and appends the Accept Proposal control. Do not add your own accept/signature block to the HTML.
-- email_body should briefly invite the client to review and accept online — do not mention a PDF attachment since none is sent.
-- After sending confirm: "✅ Signable proposal link sent to [email] — you'll see it update to Viewed and Accepted on the [project] job panel."
-- If Walt indicates upfront that a proposal will be sent for e-signature (before you generate the HTML), omit the blank "Authorized Signature / Client Signature" wet-signature lines from the bottom of the document — the online checkbox acceptance replaces that block, and leaving blank signature lines on a page that's accepted by checkbox is confusing. Still include the rest of the document (scope, pricing, terms) as normal. If Walt asks to send an already-generated proposal (with a signature block already in it) for e-signature, that's fine too — just send it as-is.
+DEFAULT DELIVERY BY DOCUMENT TYPE:
+- Proposals, contracts, and change orders → ALWAYS default to send_proposal_link (e-acceptance webpage). These documents exist to be agreed to — the point isn't for the client to read, it's for the client to accept. Only send as PDF via send_email if Walt EXPLICITLY asks for PDF (e.g. "send Bob a proposal PDF," "email the contract as an attachment," "send the change order as a PDF").
+- Invoices, estimates, and statements → ALWAYS default to send_email (PDF attachment). These are records or requests for payment, not agreement documents. Never send these as acceptance links.
+
+DOCUMENT LABELING (critical for contracts and change orders):
+- When routing to send_proposal_link, pass a doc_kind field: "proposal" | "contract" | "change_order". The model must set this correctly based on what Walt asked for. This drives labeling on the acceptance page, in the email, and in the Job Docs record.
+- The document's html_body should use the correct grand-bar label per the DOCUMENT HTML FORMAT rules: Proposal = PROPOSAL TOTAL, Contract = CONTRACT TOTAL, Change Order = CHANGE ORDER TOTAL.
+- The h2.doc heading should read "PROPOSAL," "CONTRACT," or "CHANGE ORDER" respectively.
+- The email subject line should match: "Proposal — [Job]," "Contract — [Job]," or "Change Order #N — [Job]."
+- The email_body should invite review + acceptance using natural language for the type: "please review and accept your proposal / contract / change order online."
+
+E-ACCEPTANCE FLOW (send_proposal_link):
+- The client opens a webpage showing the document, checks authorization boxes, and clicks Accept — Walt sees the status update on the job's dashboard panel automatically (sent → viewed → accepted, with timestamps).
+- Workflow: generate the document HTML first, confirm the destination email, then call send_proposal_link only after Walt confirms with yes/send/go ahead.
+- The html_body passed to send_proposal_link is the same body-only document HTML as send_email — the server wraps it in the letterhead and appends the Accept control. Do not add your own accept/signature block to the HTML.
+- After sending confirm: "✅ Signable [proposal/contract/change order] sent to [email] — you'll see it update to Viewed and Accepted on the [project] job panel."
+- If sending for e-signature, omit any blank "Authorized Signature / Client Signature" wet-signature lines from the bottom — the online checkbox acceptance replaces that block. Include the rest of the document (scope, pricing, terms) as normal. If Walt asks to send an already-generated document (with a signature block already in it) for e-signature, just send it as-is.
 
 HOW YOU RESPOND:
 - Plain English, direct, no fluff
@@ -333,7 +342,7 @@ When generating invoices, proposals, or statements, return ONLY the inner body o
 <div class="terms">Please make checks payable to Mullins Construction Inc., or pay via Zelle to mullinsconstruction@yahoo.com. Payment due within 30 days. Thank you for your business.</div>
 <div class="foot">Questions? Call 408.569.3434.</div>
 
-Grand-bar label rules: Invoice = BALANCE DUE. Statement = ACCOUNT BALANCE. Proposal = PROPOSAL TOTAL.
+Grand-bar label rules: Invoice = BALANCE DUE. Statement = ACCOUNT BALANCE. Proposal = PROPOSAL TOTAL. Contract = CONTRACT TOTAL. Change Order = CHANGE ORDER TOTAL.
 
 Invoices include: property address, client name, date, scope of work performed, line items with hours/rate, materials, markup if applicable, total, payment instructions.
 Proposals include: property address, client name, scope, exclusions, total or unit pricing, signature block with date line.`;
@@ -1330,7 +1339,8 @@ async function executeTool(toolName, input, data, ctx) {
           clientName: input.to_name || input.client_name || "",
           clientEmail: input.to_email,
           subject: input.subject,
-          htmlBody: DocEngine.docShell(input.subject || 'Proposal — Mullins Construction', input.html_body),
+        docKind: input.doc_kind || "proposal",
+        htmlBody: DocEngine.docShell(input.subject || `${(input.doc_kind || 'proposal').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())} — Mullins Construction`, input.html_body),
           status: "sent",
           sentDate: new Date().toISOString(),
           viewedDates: [],
