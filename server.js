@@ -581,7 +581,8 @@ const TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        to_email: { type: "string", description: "Recipient email address." },
+        to_email: { type: "string", description: "Recipient email address. OMIT for owner-review sends — the server routes those automatically." },
+        owner_review: { type: "boolean", description: "Set true when Walt asks to send the document to himself for review ('send it to me', 'email me a copy'). Server routes the recipient — do not pass to_email." },
         to_name: { type: "string", description: "Recipient full name." },
         subject: { type: "string", description: "Email subject line, e.g. 'Invoice #1003 — Mullins Construction Inc.' or 'Proposal — Kitchen Remodel — Mullins Construction'" },
         html_body: { type: "string", description: "Complete HTML content of the invoice or proposal exactly as generated — do not simplify or strip it." },
@@ -591,24 +592,26 @@ const TOOLS = [
         project: { type: "string", description: "Project/job name this document belongs to — match to an existing project name. Always set this for invoices and proposals so the document is saved to that job's document history." },
         doc_type: { type: "string", enum: ["invoice", "proposal", "other"], description: "What kind of document this is. Used to file it in the job's document history." }
       },
-      required: ["to_email", "subject", "html_body"]
+      required: ["subject", "html_body"]
     }
   },
   {
     name: "send_proposal_link",
-    description: `Send a PROPOSAL (never an invoice) to a client as a secure e-signature link instead of a PDF attachment. Use only when Walt specifically asks for e-signature / a signable link / online acceptance — e.g. "send this for signature", "let them approve it online", "send a link they can accept". Otherwise keep using send_email for proposals. The client receives an email with a "Review Proposal" button that opens a webpage showing the proposal content with checkboxes and an Accept Proposal button. Walt will see live status (sent/viewed/accepted, with timestamps) on that project's dashboard job panel. Always confirm before sending: "Ready to send [client] a signable proposal link at [email] — shall I send it?" Then send only after Walt confirms.`,
+    description: `Send a proposal, contract, or change order as a secure e-acceptance link. This is the DEFAULT delivery method for proposals, contracts, and change orders — use it whenever Walt asks to send one of those document types, unless he explicitly says PDF or attachment. The client (or Walt, for owner-review sends) opens a webpage showing the document and clicks Accept.`,
     input_schema: {
       type: "object",
       properties: {
         project: { type: "string", description: "Project/job name this proposal is for. Match to an existing project name if possible." },
-        to_email: { type: "string", description: "Client's email address." },
+        to_email: { type: "string", description: "Client's email address. OMIT for owner-review sends — the server routes those automatically." },
+        owner_review: { type: "boolean", description: "Set true when Walt asks to send the document to himself for review. Server routes the recipient — do not pass to_email." },
+        doc_kind: { type: "string", enum: ["proposal", "contract", "change_order"], description: "What kind of agreement document this is. Drives labeling on the acceptance page." },
         to_name: { type: "string", description: "Client's full name." },
         client_name: { type: "string", description: "Client's first name for the email greeting." },
         subject: { type: "string", description: "Email subject line, e.g. 'Proposal — Kitchen Remodel — Mullins Construction'" },
         html_body: { type: "string", description: "Complete HTML content of the proposal exactly as generated — this is what the client will see and accept. Do not simplify, strip, or add your own signature block to it." },
         email_body: { type: "string", description: "Short 2-3 sentence friendly email message inviting the client to review and accept the proposal online. Mention the job address. Do not mention a PDF attachment." }
       },
-      required: ["project", "to_email", "subject", "html_body"]
+      required: ["project", "subject", "html_body"]
     }
   },
   {
