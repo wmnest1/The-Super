@@ -1334,11 +1334,14 @@ async function executeTool(toolName, input, data, ctx) {
     case "send_proposal_link": {
       try {
         const token = makeProposalToken();
+        const isOwnerReview = input.owner_review === true;
+      const reviewEmail = process.env.OWNER_REVIEW_EMAIL;
+      const routedEmail = (isOwnerReview && reviewEmail) ? reviewEmail : input.to_email;
         const record = {
           id: token,
           project: input.project,
           clientName: input.to_name || input.client_name || "",
-          clientEmail: input.to_email,
+          clientEmail: routedEmail,
           subject: input.subject,
         docKind: input.doc_kind || "proposal",
         htmlBody: DocEngine.docShell(input.subject || `${(input.doc_kind || 'proposal').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())} — Mullins Construction`, input.html_body),
@@ -1371,7 +1374,9 @@ async function executeTool(toolName, input, data, ctx) {
             408-569-3434</p>
           </div>
         `);
-        const toField = input.to_name ? `${input.to_name} <${input.to_email}>` : input.to_email;
+        const toField = (isOwnerReview && reviewEmail)
+        ? `Walt (owner review) <${reviewEmail}>`
+        : (input.to_name ? `${input.to_name} <${input.to_email}>` : input.to_email);
         await emailTransporter.sendMail({
           from: `"Mullins Construction Inc." <${process.env.YAHOO_EMAIL}>`,
           to: toField,
@@ -1380,7 +1385,7 @@ async function executeTool(toolName, input, data, ctx) {
           text: `${input.email_body || "Please review your proposal."}\n\nReview it here: ${link}`
         });
         return { ok: true, action: "created", type: "proposal", data: record,
-          message: `Proposal link sent to ${input.to_email}. Walt can track viewed/accepted status on the ${input.project} job panel.` };
+          message: `Proposal link sent to ${routedEmail}. Walt can track viewed/accepted status on the ${input.project} job panel.` };
       } catch (e) {
         console.error("send_proposal_link error:", e.message);
         return { ok: false, error: e.message };
