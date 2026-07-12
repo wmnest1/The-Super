@@ -291,6 +291,7 @@ EMAIL CAPABILITIES:
 - Client emails are in the CLIENTS data above — always check there first.
 - Workflow: Generate the invoice/proposal first, then ask "Want me to email this to [client name] at [email]?" — wait for Walt to confirm, then call send_email.
 - If Walt says "generate and email an invoice for Barbara" — do both in sequence: generate first, confirm the email address, then send after Walt says yes/go ahead/send it.
+- OWNER REVIEW SENDS: If Walt asks you to send/email a document TO HIM ("email me the invoice", "send me a copy", "send it to me", "email me a proposal for Bob"), pass owner_review: true to send_email. Do NOT ask for or invent an email address — the server routes it. The document is still generated normally for the real project/client (Job Docs still filed under the real project). Only the delivery recipient changes. After sending, confirm: "✅ Sent to you for review — client copy not sent." If Walt later says something like "ok send it to Bob" or "send that to the client now," send a normal (non-review) email to the client's real address. IMPORTANT: "me" only triggers owner review when it's the recipient. "Email Bob the invoice" or "Bob asked me to send it to him" are normal client sends — "me" there is grammatical, not directional.
 - After sending, confirm: "✅ Invoice emailed to [email] — sent from mullinsconstruction@yahoo.com"
 - If client email is not on file, say "I don't have an email on file for [client] — what's their email?" and save it to their client record using save_client before sending.
 - Subject line format: "Invoice #XXXX — Mullins Construction Inc." or "Proposal — [Job Description] — Mullins Construction"
@@ -1271,9 +1272,12 @@ async function executeTool(toolName, input, data, ctx) {
     }
     case "send_email": {
       try {
-        const toField = input.to_name
-          ? `${input.to_name} <${input.to_email}>`
-          : input.to_email;
+        const isOwnerReview = input.owner_review === true;
+      const reviewEmail = process.env.OWNER_REVIEW_EMAIL;
+      const routedEmail = (isOwnerReview && reviewEmail) ? reviewEmail : input.to_email;
+      const toField = (isOwnerReview && reviewEmail)
+        ? `Walt (owner review) <${reviewEmail}>`
+        : (input.to_name ? `${input.to_name} <${input.to_email}>` : input.to_email);
         const clientFirstName = input.client_name || (input.to_name ? input.to_name.split(' ')[0] : 'there');
         const bodyHtml = emailWrapper(`
           <div style="padding:30px;font-family:Arial,sans-serif;font-size:15px;color:#333;line-height:1.6;">
@@ -1299,8 +1303,9 @@ async function executeTool(toolName, input, data, ctx) {
             contentType: 'application/pdf'
           }]
         });
-        return { success: true, message: `Email sent to ${input.to_email} with PDF attachment: ${input.pdf_filename || 'document.pdf'}`, savedDoc: await (async () => {
+        return { success: true, message: `Email sent to ${routedEmail} with PDF attachment: ${input.pdf_filename || 'document.pdf'}`, savedDoc: await (async () => {
           try {
+            if (isOwnerReview) return false;
             await saveJobDocument({
               project: input.project || null,
               name: input.pdf_filename || input.subject || "Document",
