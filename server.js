@@ -1323,7 +1323,7 @@ async function executeTool(toolName, input, data, ctx) {
               project: input.project || null,
               name: input.pdf_filename || input.subject || "Document",
               docType: input.doc_type || (/(invoice)/i.test(input.subject || "") ? "invoice" : /(proposal)/i.test(input.subject || "") ? "proposal" : "other"),
-              html: input.html_body,
+              html: DocEngine.docShell(input.subject || 'Mullins Construction Document', input.html_body),
               source: "sent-email"
             });
             return true;
