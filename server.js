@@ -1320,12 +1320,13 @@ async function executeTool(toolName, input, data, ctx) {
           try {
             if (isOwnerReview) return false;
             await saveJobDocument({
-              project: input.project || null,
-              name: input.pdf_filename || input.subject || "Document",
-              docType: input.doc_type || (/(invoice)/i.test(input.subject || "") ? "invoice" : /(proposal)/i.test(input.subject || "") ? "proposal" : "other"),
-              html: DocEngine.docShell(input.subject || 'Mullins Construction Document', input.html_body),
-              source: "sent-email"
-            });
+          project: input.project || null,
+          name: input.pdf_filename || input.subject || "Document",
+          docType: input.doc_type || (/(invoice)/i.test(input.subject || "") ? "invoice" : /(proposal)/i.test(input.subject || "") ? "proposal" : "other"),
+          data: pdfBuffer.toString('base64'),
+          mimeType: 'application/pdf',
+          source: "sent-email"
+        });
             return true;
           } catch (e) { console.error("saveJobDocument (send_email):", e.message); return false; }
         })() };
