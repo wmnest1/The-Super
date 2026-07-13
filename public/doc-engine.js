@@ -61,7 +61,7 @@
       +'<style>'+DOC_CSS+'</style></head><body>'
       +'<div class="wrap">'
       +'<div class="noprint"><button onclick="window.print()">\uD83D\uDDA8 Print / Save as PDF</button>'
-      +'<div>'
+      +'</div>'
       +LETTERHEAD
       +inner
       +'</div></body></html>';
