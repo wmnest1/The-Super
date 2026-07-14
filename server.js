@@ -1632,6 +1632,21 @@ app.post("/api/proposal/:token/accept", async (req, res) => {
     record.acceptedSnapshot = record.htmlBody;
     await saveData(data);
     notifyWaltProposalAccepted(record);
+    // File the signed PDF to Job Docs
+      try {
+        const label = (record.docKind || 'proposal').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const signedBanner = '<div style="margin-top:24px;padding:14px 18px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;color:#1b5e20;"><b>\u2713 Signed</b> \u2014 Accepted by ' + String(record.acceptedBy).replace(/</g,'&lt;') + ' (' + String(record.acceptedEmail).replace(/</g,'&lt;') + ') on ' + new Date(record.acceptedAt).toLocaleString('en-US') + '. This document has been signed and is locked.</div>';
+        const signedHtml = record.htmlBody.replace('</body>', signedBanner + '</body>');
+        const signedPdf = await generatePDF(signedHtml);
+        await saveJobDocument({
+          project: record.project || null,
+          name: 'SIGNED - ' + (record.subject || label),
+          docType: record.docKind || 'proposal',
+          data: signedPdf.toString('base64'),
+          mimeType: 'application/pdf',
+          source: 'signed-acceptance'
+        });
+      } catch (e) { console.error('signed-pdf filing:', e.message); }
     res.json({ ok: true });
   } catch (err) {
     console.error("proposal accept error:", err);
