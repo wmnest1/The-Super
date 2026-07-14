@@ -353,6 +353,7 @@ html.light .cw-msg.assistant{background:#f0f4f8}
   <div class="header-btns">
     <button class="hbtn" onclick="getAIFlags()">🤖 AI Flags</button>
     <button class="hbtn" onclick="openMaterials()">📦 Materials</button>
+    <button class="hbtn" onclick="openDocsModal('__unfiled__')">🗂 Unfiled</button>
     <button class="hbtn" onclick="toggleChatWidget()">💬 Chat</button>
     <button class="hbtn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
     <button class="hbtn gold" onclick="refreshAll()">↺ Refresh</button>
@@ -4085,7 +4086,7 @@ function cwInitListeners(){
 
   window.openDocsModal = function(proj){
     docsCurrentProject = proj;
-    document.getElementById('docs-title').textContent = '\u{1F4C1} Job Docs — ' + proj;
+    document.getElementById('docs-title').textContent = (proj === '__unfiled__') ? '\uD83D\uDDC2 Unfiled / Prospects' : '\uD83D\uDCC1 Job Docs \u2014 ' + proj;
     document.getElementById('docs-overlay').classList.add('active');
     refreshDocsList();
   };
