@@ -1356,7 +1356,8 @@ async function executeTool(toolName, input, data, ctx) {
           acceptedEmail: null,
           acceptedIP: null,
           acceptedAt: null,
-          acceptedSnapshot: null
+          acceptedSnapshot: null,
+          reviewOnly: isOwnerReview ? true : undefined
         };
         if (!data.proposals) data.proposals = [];
         data.proposals.push(record);
