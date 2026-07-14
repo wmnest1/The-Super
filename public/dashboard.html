@@ -3752,7 +3752,7 @@ function cwInitListeners(){
   function renderProposalsBar(){
     const wrapEl = document.getElementById('prop-card-wrap');
     if (!wrapEl) return;
-    const list = (data.proposals || []).filter(p => !p.reviewOnly).slice().sort(
+    const list = (data.proposals || []).slice().sort(
       const at = new Date(a.acceptedAt || (a.viewedDates||[])[a.viewedDates.length-1] || a.sentDate);
       const bt = new Date(b.acceptedAt || (b.viewedDates||[])[b.viewedDates.length-1] || b.sentDate);
       return bt - at;
