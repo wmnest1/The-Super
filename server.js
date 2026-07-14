@@ -2049,7 +2049,7 @@ app.delete("/api/appointments/:id", async (req, res) => {
 app.get("/api/docs", async (req, res) => {
   try {
     const col = await filesCol();
-    const query = req.query.project ? { project: req.query.project } : {};
+    const query = req.query.project === "__unfiled__" ? { project: null } : (req.query.project ? { project: req.query.project } : {});
     const docs = await col.find(query, { projection: { data: 0, html: 0 } }).sort({ uploadedAt: -1 }).limit(200).toArray();
     res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source })));
   } catch (err) {
