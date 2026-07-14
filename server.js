@@ -1478,7 +1478,7 @@ app.post('/api/send-email', async (req, res) => {
 function buildProposalPage(record, opts) {
   const { alreadyAccepted } = opts;
   const acceptedAtDisplay = record.acceptedAt
-    ? new Date(record.acceptedAt).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
+    ? new Date(record.acceptedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : "";
   const actionBlock = alreadyAccepted
     ? `<div style="margin-top:32px;padding:20px 24px;background:#eafbea;border:1px solid #b6e6b6;border-radius:8px;font-family:Arial,sans-serif;">
@@ -1570,7 +1570,7 @@ function buildProposalPage(record, opts) {
 
 async function notifyWaltProposalAccepted(record) {
   try {
-    const acceptedAtDisplay = new Date(record.acceptedAt).toLocaleString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    const acceptedAtDisplay = new Date(record.acceptedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     const link = `${PUBLIC_BASE_URL}/proposal/${record.id}`;
     await emailTransporter.sendMail({
       from: `"The Super" <${process.env.YAHOO_EMAIL}>`,
@@ -1635,7 +1635,7 @@ app.post("/api/proposal/:token/accept", async (req, res) => {
     // File the signed PDF to Job Docs
       try {
         const label = (record.docKind || 'proposal').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const signedBanner = '<div style="margin-top:24px;padding:14px 18px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;color:#1b5e20;"><b>\u2713 Signed</b> \u2014 Accepted by ' + String(record.acceptedBy).replace(/</g,'&lt;') + ' (' + String(record.acceptedEmail).replace(/</g,'&lt;') + ') on ' + new Date(record.acceptedAt).toLocaleString('en-US') + '. This document has been signed and is locked.</div>';
+        const signedBanner = '<div style="margin-top:24px;padding:14px 18px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;color:#1b5e20;"><b>\u2713 Signed</b> \u2014 Accepted by ' + String(record.acceptedBy).replace(/</g,'&lt;') + ' (' + String(record.acceptedEmail).replace(/</g,'&lt;') + ') on ' + new Date(record.acceptedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + '. This document has been signed and is locked.</div>';
         const signedHtml = record.htmlBody.replace('</body>', signedBanner + '</body>');
         const signedPdf = await generatePDF(signedHtml);
         await saveJobDocument({
