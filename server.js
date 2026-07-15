@@ -706,6 +706,18 @@ const TOOLS = [
       },
       required: ["project"]
     }
+  },
+  {
+    name: "vault_lookup",
+    description: "Search Walt's Personal Vault for reference info he has saved — account numbers, gate codes, addresses, member numbers, VINs, policy numbers, support PINs, renewal dates, etc. Vault data is NOT in your context, so you MUST call this tool to answer any question about it. Use whenever Walt asks 'what's my/his X', 'when does X renew', 'what's the code for X', or similar. Passwords are never stored here. Only return what Walt asked for — do not read out an entire entry unless he asks for all of it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "What to search for, e.g. 'AT&T', 'Floyd', 'Cabo condo', 'Ram 2500'. Matches against title, category, field labels, and notes." },
+        category: { type: "string", description: "Optional category filter, e.g. 'Utilities', 'Family', 'Travel', 'Vehicles'." }
+      },
+      required: ["query"]
+    }
   }
 ];
 
