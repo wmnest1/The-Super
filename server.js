@@ -74,6 +74,21 @@ async function generatePDF(html) {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
+// ---- Login gate ----
+const AUTH_USER = process.env.AUTH_USER;
+const AUTH_PASS = process.env.AUTH_PASS;
+const PUBLIC_PATHS = [/^\/proposal\//, /^\/api\/proposal\//, /^\/mullins-logo/, /^\/doc-engine\.js/];
+app.use((req, res, next) => {
+  if (!AUTH_USER || !AUTH_PASS) return next();
+  if (PUBLIC_PATHS.some(rx => rx.test(req.path))) return next();
+  const hdr = req.headers.authorization || "";
+  if (hdr.startsWith("Basic ")) {
+    const [u, p] = Buffer.from(hdr.slice(6), "base64").toString().split(":");
+    if (u === AUTH_USER && p === AUTH_PASS) return next();
+  }
+  res.setHeader("WWW-Authenticate", 'Basic realm="The Super"');
+  res.status(401).send("Authentication required.");
+});
 app.use(express.static("public"));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
