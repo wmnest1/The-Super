@@ -878,6 +878,38 @@
       <div id="list-expenses"></div>
     </div>
 
+    <div class="tab-content" id="tab-vault">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button class="add-new-btn" onclick="vaultShowForm()">+ Add Entry</button>
+        <input id="vault-search" type="text" placeholder="Search vault…" oninput="vaultRender()" style="flex:1;min-width:160px">
+        <select id="vault-cat-filter" onchange="vaultRender()" style="max-width:160px"><option value="">All categories</option></select>
+      </div>
+      <div class="data-form" id="vault-form" style="display:none;">
+        <div class="form-row">
+          <div class="field"><label>Category</label><input id="v-category" type="text" placeholder="Utilities, Family, Travel, Vehicles…" list="vault-cat-list"><datalist id="vault-cat-list"></datalist></div>
+          <div class="field"><label>Title</label><input id="v-title" type="text" placeholder="AT&amp;T Fiber"></div>
+        </div>
+        <div class="form-row">
+          <div class="field full">
+            <label>Details</label>
+            <div id="v-fields"></div>
+            <button class="cancel-btn" onclick="vaultAddField()" style="margin-top:6px">+ Add Field</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Renewal / Expiration Date</label><input id="v-renewal" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div class="field full"><label>Notes</label><textarea id="v-notes" placeholder="Anything else worth remembering…"></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="save-btn" onclick="vaultSave()">💾 Save</button>
+          <button class="cancel-btn" onclick="vaultHideForm()">Cancel</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#667;margin:4px 0 10px">🔐 No passwords here — account numbers, PINs, codes, and reference info only.</div>
+      <div id="vault-list"></div>
+    </div>
     <div class="tab-content" id="tab-theme">
       <h3 class="theme-section-title">🎨 App Theme</h3>
       <div class="theme-row">
