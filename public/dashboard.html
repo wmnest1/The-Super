@@ -4076,6 +4076,8 @@ function cwInitListeners(){
     + '<div id="docs-list"><div class="docs-empty">Loading\u2026</div></div>'
     + '<div id="docs-foot">'
     + '<input type="file" id="docs-file-input" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md" style="display:none" onchange="docsHandleUpload(event)">'
+    + '<input type="file" id="docs-cam-input" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event)">'
+    + '<button id="docs-cam-btn" onclick="document.getElementById(\'docs-cam-input\').click()">\u{1F4F7} Take Photo</button>'
     + '<button id="docs-upload-btn" onclick="document.getElementById(\'docs-file-input\').click()">\u2B06 Upload to this job</button>'
     + '<span id="docs-upload-status" style="font-size:11px;color:#667"></span>'
     + '</div></div>';
