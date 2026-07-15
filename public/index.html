@@ -1476,6 +1476,7 @@
     document.getElementById('tab-' + tab).classList.add('active');
     if (tab === 'notes') renderNotes();
     if (tab === 'expenses') renderExpenses();
+    if (tab === 'vault') vaultLoad();
     if (tab === 'theme') {
       fillPaletteStrips();
       if (_loadedTheme) {
