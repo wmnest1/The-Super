@@ -1632,6 +1632,119 @@
     fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appData) });
     renderList(tab);
   }
+  // ── Personal Vault (own collection — never touches appData) ──
+  let vaultData = [];
+  let vaultEditId = null;
+  async function vaultLoad(){
+    try {
+      const res = await fetch('/api/vault');
+      vaultData = await res.json();
+      if (!Array.isArray(vaultData)) vaultData = [];
+    } catch (e) { vaultData = []; }
+    vaultRender();
+  }
+  function vaultCats(){
+    return [...new Set(vaultData.map(v => v.category).filter(Boolean))].sort();
+  }
+  function vaultRender(){
+    const listEl = document.getElementById('vault-list');
+    if (!listEl) return;
+    const filterEl = document.getElementById('vault-cat-filter');
+    const cats = vaultCats();
+    if (filterEl) {
+      const cur = filterEl.value;
+      filterEl.innerHTML = '<option value="">All categories</option>' + cats.map(c => '<option value="' + escP(c) + '">' + escP(c) + '</option>').join('');
+      filterEl.value = cur;
+    }
+    const dl = document.getElementById('vault-cat-list');
+    if (dl) dl.innerHTML = cats.map(c => '<option value="' + escP(c) + '">').join('');
+    const q = (document.getElementById('vault-search')?.value || '').toLowerCase().trim();
+    const cat = document.getElementById('vault-cat-filter')?.value || '';
+    let rows = vaultData;
+    if (cat) rows = rows.filter(v => v.category === cat);
+    if (q) rows = rows.filter(v => {
+      const hay = [v.title, v.category, v.notes, ...(v.fields||[]).map(f => f.label + ' ' + f.value)].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="empty-state">' + (vaultData.length ? 'No entries match.' : 'Vault is empty — add your first entry.') + '</div>';
+      return;
+    }
+    listEl.innerHTML = rows.map(v => {
+      const details = (v.fields || []).filter(f => f.label || f.value)
+        .map(f => '<strong>' + escP(f.label) + ':</strong> ' + escP(f.value)).join('<br>');
+      const renew = v.renewalDate ? '<br>📅 Renews: ' + escP(v.renewalDate) : '';
+      const notes = v.notes ? '<br><em>' + escP(v.notes) + '</em>' : '';
+      const badge = v.category ? '<span style="background:#0f3460;border-radius:4px;padding:1px 7px;font-size:11px;margin-left:8px;color:#aac;">' + escP(v.category) + '</span>' : '';
+      return '<div class="record-card" onclick="vaultShowForm(\'' + v.id + '\')" title="Click to edit">'
+        + '<div class="record-info"><div class="record-name">' + escP(v.title) + badge + '</div>'
+        + '<div class="record-detail entry-summary">' + details + renew + notes + '</div></div>'
+        + '<div class="record-actions"><button class="del-btn" onclick="event.stopPropagation();vaultDelete(\'' + v.id + '\')">Del</button></div></div>';
+    }).join('');
+  }
+  function vaultFieldRow(label, value){
+    const wrap = document.createElement('div');
+    wrap.className = 'form-row';
+    wrap.style.marginBottom = '6px';
+    wrap.innerHTML = '<div class="field"><input type="text" class="v-f-label" placeholder="Label (Account #)" value="' + escP(label||'') + '"></div>'
+      + '<div class="field"><input type="text" class="v-f-value" placeholder="Value" value="' + escP(value||'') + '"></div>';
+    const del = document.createElement('button');
+    del.className = 'del-btn';
+    del.textContent = '✕';
+    del.onclick = () => wrap.remove();
+    wrap.appendChild(del);
+    return wrap;
+  }
+  function vaultAddField(label, value){
+    document.getElementById('v-fields').appendChild(vaultFieldRow(label, value));
+  }
+  function vaultShowForm(id){
+    vaultEditId = id || null;
+    const entry = id ? vaultData.find(v => v.id === id) : null;
+    document.getElementById('v-category').value = entry?.category || '';
+    document.getElementById('v-title').value = entry?.title || '';
+    document.getElementById('v-renewal').value = entry?.renewalDate || '';
+    document.getElementById('v-notes').value = entry?.notes || '';
+    const fw = document.getElementById('v-fields');
+    fw.innerHTML = '';
+    const fields = entry?.fields?.length ? entry.fields : [{ label:'', value:'' }, { label:'', value:'' }];
+    fields.forEach(f => vaultAddField(f.label, f.value));
+    document.getElementById('vault-form').style.display = 'block';
+  }
+  function vaultHideForm(){
+    document.getElementById('vault-form').style.display = 'none';
+    vaultEditId = null;
+  }
+  async function vaultSave(){
+    const title = document.getElementById('v-title').value.trim();
+    if (!title) { alert('Title is required.'); return; }
+    const labels = [...document.querySelectorAll('#v-fields .v-f-label')].map(i => i.value.trim());
+    const values = [...document.querySelectorAll('#v-fields .v-f-value')].map(i => i.value.trim());
+    const fields = labels.map((l, i) => ({ label: l, value: values[i] || '' })).filter(f => f.label || f.value);
+    const body = {
+      id: vaultEditId || undefined,
+      category: document.getElementById('v-category').value.trim(),
+      title: title,
+      fields: fields,
+      notes: document.getElementById('v-notes').value.trim(),
+      renewalDate: document.getElementById('v-renewal').value || ''
+    };
+    try {
+      const res = await fetch('/api/vault', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      const j = await res.json();
+      if (!res.ok || j.error) throw new Error(j.error || 'Save failed');
+      vaultHideForm();
+      await vaultLoad();
+    } catch (e) { alert('Save failed: ' + e.message); }
+  }
+  async function vaultDelete(id){
+    if (!confirm('Delete this vault entry?')) return;
+    try {
+      await fetch('/api/vault/' + id, { method:'DELETE' });
+      await vaultLoad();
+    } catch (e) {}
+    vaultLoad();
+  }
   function renderAllLists() {
     ['clients','projects','crew','subs','unitPrices','entries'].forEach(renderList);
     renderNotes();
