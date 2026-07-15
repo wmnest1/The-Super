@@ -1632,6 +1632,7 @@
     fetch('/api/data', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appData) });
     renderList(tab);
   }
+  function escP(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
   // ── Personal Vault (own collection — never touches appData) ──
   let vaultData = [];
   let vaultEditId = null;
