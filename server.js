@@ -149,6 +149,14 @@ async function filesCol() {
   return db.collection("files");
 }
 
+// ── Personal Vault (separate collection — NEVER loaded into the system prompt) ──
+// Vault data reaches the AI only through the vault_lookup tool, on explicit request.
+// Do not add vault fields to EMPTY_DATA, loadData, or buildSystemPrompt.
+async function vaultCol() {
+  const db = await connectDB();
+  return db.collection("vault");
+}
+
 async function saveJobDocument({ project, client, name, docType, mimeType, data, html, source }) {
   const col = await filesCol();
   const record = {
