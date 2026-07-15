@@ -1449,6 +1449,40 @@ async function executeTool(toolName, input, data, ctx) {
         return { ok: false, error: e.message };
       }
     }
+   case "vault_lookup": {
+      try {
+        const col = await vaultCol();
+        const q = String(input.query || "").trim();
+        if (!q) return { ok: false, readOnly: true, error: "No search term given." };
+        const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        const filter = {
+          $or: [
+            { title: rx },
+            { category: rx },
+            { notes: rx },
+            { "fields.label": rx },
+            { "fields.value": rx }
+          ]
+        };
+        if (input.category) filter.category = new RegExp(String(input.category).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        const hits = await col.find(filter).limit(5).toArray();
+        if (!hits.length) return { ok: true, readOnly: true, found: 0, message: `Nothing in the Vault matches "${q}".` };
+        return {
+          ok: true,
+          readOnly: true,
+          found: hits.length,
+          entries: hits.map(v => ({
+            category: v.category || "",
+            title: v.title || "",
+            fields: (v.fields || []).map(f => ({ label: f.label, value: f.value })),
+            notes: v.notes || "",
+            renewalDate: v.renewalDate || ""
+          }))
+        };
+      } catch (e) {
+        return { ok: false, readOnly: true, error: e.message };
+      }
+    } 
     default:
       return { ok: false, error: "Unknown tool: " + toolName };
   }
