@@ -134,10 +134,11 @@ async function filesCol() {
   return db.collection("files");
 }
 
-async function saveJobDocument({ project, name, docType, mimeType, data, html, source }) {
+async function saveJobDocument({ project, client, name, docType, mimeType, data, html, source }) {
   const col = await filesCol();
   const record = {
     project: project || null,
+    client: client || null,
     name: name || "Untitled",
     docType: docType || "file",           // 'invoice' | 'proposal' | 'file'
     kind: html ? "generated" : "upload",  // generated = HTML we produced; upload = binary file
