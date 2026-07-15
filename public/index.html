@@ -1711,7 +1711,11 @@
         notesHtml
       ].filter(Boolean).join('<br>');
     }
-    const docsBtn = tab === 'projects' ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>` : '';
+    const docsBtn = tab === 'projects'
+      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>`
+      : (tab === 'clients'
+        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openClientDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">\u{1F4F7} Photos</button>`
+        : '');
     const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
     const dragAttrs = canDrag
       ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
@@ -2557,17 +2561,27 @@
     + '<div id="docs-list"><div class="docs-empty">Loading\u2026</div></div>'
     + '<div id="docs-foot">'
     + '<input type="file" id="docs-file-input" accept="image/*,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md" style="display:none" onchange="docsHandleUpload(event)">'
-    + '<button id="docs-upload-btn" onclick="document.getElementById(\'docs-file-input\').click()">\u2B06 Upload to this job</button>'
+    + '<input type="file" id="docs-cam-input" accept="image/*" capture="environment" style="display:none" onchange="docsHandleUpload(event)">'
+    + '<button id="docs-cam-btn" onclick="document.getElementById(\'docs-cam-input\').click()">\u{1F4F7} Take Photo</button>'
+    + '<button id="docs-upload-btn" onclick="document.getElementById(\'docs-file-input\').click()">\u2B06 Upload</button>'
     + '<span id="docs-upload-status" style="font-size:11px;color:#667"></span>'
     + '</div></div>';
   document.body.appendChild(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeDocsModal(); });
 
   let docsCurrentProject = null;
-
+  let docsCurrentClient = null;
   window.openDocsModal = function(proj){
     docsCurrentProject = proj;
-    document.getElementById('docs-title').textContent = '\u{1F4C1} Job Docs — ' + proj;
+    docsCurrentClient = null;
+    document.getElementById('docs-title').textContent = '\u{1F4C1} Job Docs \u2014 ' + proj;
+    document.getElementById('docs-overlay').classList.add('active');
+    refreshDocsList();
+  };
+  window.openClientDocsModal = function(clientName){
+    docsCurrentClient = clientName;
+    docsCurrentProject = null;
+    document.getElementById('docs-title').textContent = '\u{1F4F7} Photos \u2014 ' + clientName;
     document.getElementById('docs-overlay').classList.add('active');
     refreshDocsList();
   };
@@ -2591,13 +2605,16 @@
     listEl.innerHTML = '<div class="docs-empty">Loading\u2026</div>';
     let files = [];
     try {
-      const res = await fetch('/api/docs?project=' + encodeURIComponent(docsCurrentProject));
+     const qs = docsCurrentClient
+        ? ('client=' + encodeURIComponent(docsCurrentClient))
+        : ('project=' + encodeURIComponent(docsCurrentProject));
+      const res = await fetch('/api/docs?' + qs); 
       files = await res.json();
       if (!Array.isArray(files)) files = [];
     } catch (e) { files = []; }
 
     // Merge in e-signature proposals for this project (stored separately in data.proposals)
-    const sigProps = ((typeof appData !== 'undefined' && appData.proposals) || [])
+    const sigProps = (docsCurrentClient ? [] : ((typeof appData !== 'undefined' && appData.proposals) || []))
       .filter(p => p.project === docsCurrentProject)
       .map(p => ({
         id: null, sig: true, token: p.id,
@@ -2610,7 +2627,9 @@
     const rows = [...files, ...sigProps].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
     if (!rows.length) {
-      listEl.innerHTML = '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';
+      listEl.innerHTML = docsCurrentClient
+        ? '<div class="docs-empty">No photos for this client yet.<br>Use \u{1F4F7} Take Photo or \u2B06 Upload below.</div>'
+        : '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';
       return;
     }
 
@@ -2635,26 +2654,58 @@
     refreshDocsList();
   };
 
+  window.docsShrinkImage = function(file){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1500;
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w = Math.round(w*r); h = Math.round(h*r); }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          resolve({ b64: dataUrl.split(',')[1], mimeType: 'image/jpeg' });
+        };
+        img.onerror = () => reject(new Error('Could not read image'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.readAsDataURL(file);
+    });
+  };
   window.docsHandleUpload = async function(event){
     const file = event.target.files[0];
     event.target.value = '';
     if (!file) return;
-    if (file.size > 9 * 1024 * 1024) { document.getElementById('docs-upload-status').textContent = 'Too large — keep files under 9 MB.'; return; }
+    const isImage = (file.type || '').startsWith('image/');
+    if (!isImage && file.size > 9 * 1024 * 1024) { document.getElementById('docs-upload-status').textContent = 'Too large \u2014 keep files under 9 MB.'; return; }
     const statusEl = document.getElementById('docs-upload-status');
     const btn = document.getElementById('docs-upload-btn');
     statusEl.textContent = 'Uploading\u2026';
     btn.disabled = true;
     try {
-      const buf = await file.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-      const b64 = btoa(binary);
+      let b64, mimeType, name = file.name;
+      if (isImage) {
+        const shrunk = await docsShrinkImage(file);
+        b64 = shrunk.b64;
+        mimeType = shrunk.mimeType;
+        name = name.replace(/\.[^.]+$/, '') + '.jpg';
+      } else {
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        b64 = btoa(binary);
+        mimeType = file.type || 'application/octet-stream';
+      }
       const res = await fetch('/api/docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project: docsCurrentProject, name: file.name, mimeType: file.type || 'application/octet-stream', data: b64 })
+        body: JSON.stringify({ project: docsCurrentProject, client: docsCurrentClient, name: name, mimeType: mimeType, data: b64 })
       });
       const j = await res.json();
       if (!res.ok || j.error) throw new Error(j.error || 'Upload failed');
