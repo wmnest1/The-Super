@@ -2090,9 +2090,12 @@ app.delete("/api/appointments/:id", async (req, res) => {
 app.get("/api/docs", async (req, res) => {
   try {
     const col = await filesCol();
-    const query = req.query.project === "__unfiled__" ? { project: null } : (req.query.project ? { project: req.query.project } : {});
+    let query = {};
+    if (req.query.client) query = { client: req.query.client };
+    else if (req.query.project === "__unfiled__") query = { project: null, client: null };
+    else if (req.query.project) query = { project: req.query.project };
     const docs = await col.find(query, { projection: { data: 0, html: 0 } }).sort({ uploadedAt: -1 }).limit(200).toArray();
-    res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source })));
+    res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, client: d.client, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -2120,10 +2123,10 @@ app.get("/api/docs/:id/view", async (req, res) => {
 
 app.post("/api/docs", async (req, res) => {
   try {
-    const { project, name, mimeType, data, docType } = req.body;
+  const { project, client, name, mimeType, data, docType } = req.body;  
     if (!data) return res.status(400).json({ error: "No file data." });
     if (data.length > 13000000) return res.status(400).json({ error: "File too large — keep uploads under ~9 MB." });
-    const saved = await saveJobDocument({ project, name, docType: docType || "file", mimeType, data, source: "docs-modal" });
+    const saved = await saveJobDocument({ project, client, name, docType: docType || "file", mimeType, data, source: "docs-modal" });
     res.json({ ok: true, ...saved });
   } catch (err) {
     res.status(500).json({ error: err.message });
