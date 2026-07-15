@@ -2108,7 +2108,57 @@ app.delete("/api/appointments/:id", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
+// ── Personal Vault API ──
+app.get("/api/vault", async (req, res) => {
+  try {
+    const col = await vaultCol();
+    const items = await col.find({}).sort({ category: 1, title: 1 }).toArray();
+    res.json(items.map(v => ({
+      id: v._id.toString(),
+      category: v.category || "",
+      title: v.title || "",
+      fields: v.fields || [],
+      notes: v.notes || "",
+      renewalDate: v.renewalDate || "",
+      updatedAt: v.updatedAt || ""
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/vault", async (req, res) => {
+  try {
+    const { id, category, title, fields, notes, renewalDate } = req.body;
+    if (!title) return res.status(400).json({ error: "Title is required." });
+    const record = {
+      category: category || "",
+      title: title,
+      fields: Array.isArray(fields) ? fields : [],
+      notes: notes || "",
+      renewalDate: renewalDate || "",
+      updatedAt: new Date().toISOString()
+    };
+    const col = await vaultCol();
+    if (id) {
+      await col.updateOne({ _id: new ObjectId(id) }, { $set: record });
+      res.json({ ok: true, id: id });
+    } else {
+      const result = await col.insertOne(record);
+      res.json({ ok: true, id: result.insertedId.toString() });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.delete("/api/vault/:id", async (req, res) => {
+  try {
+    const col = await vaultCol();
+    await col.deleteOne({ _id: new ObjectId(req.params.id) });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // ── Job documents API ──
 app.get("/api/docs", async (req, res) => {
   try {
