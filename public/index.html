@@ -1469,7 +1469,7 @@
   function switchTab(tab) {
     activeTab = tab;
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
-      const tabs = ['clients','projects','crew','subs','unitPrices','entries','notes','expenses','theme'];
+      const tabs = ['clients','projects','crew','subs','unitPrices','entries','notes','expenses','vault','theme'];
       b.classList.toggle('active', tabs[i] === tab);
     });
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
