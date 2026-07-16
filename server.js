@@ -713,7 +713,7 @@ const TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "What to search for, e.g. 'AT&T', 'Floyd', 'Cabo condo', 'Ram 2500'. Matches against title, category, field labels, and notes." },
+        query: { type: "string", description: "ONE short keyword — the entity name only, not the whole question. For 'what's my Alaska Air flyer number' search 'Alaska'. For 'AT&T account number' search 'AT&T'. For 'gate code for the Cabo condo' search 'Cabo'. Never pass a full phrase or sentence — it will not match. Matches against title, category, field labels, and notes." },
         category: { type: "string", description: "Optional category filter, e.g. 'Utilities', 'Family', 'Travel', 'Vehicles'." }
       },
       required: ["query"]
