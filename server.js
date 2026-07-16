@@ -718,6 +718,32 @@ const TOOLS = [
       },
       required: ["query"]
     }
+    },
+  {
+    name: "vault_save",
+    description: "Add a new entry to Walt's Personal Vault, or add fields to an existing one. Use when Walt says things like 'save my Alaska flyer number 80927453', 'add the Cabo gate code 4471 to my vault', or says yes after you offer to save something. NEVER store passwords — if Walt gives you a password, decline and tell him it belongs in a password manager, not the Vault. Before saving, call vault_lookup first to see if an entry already exists; if it does, pass its exact title so the fields merge instead of creating a duplicate.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Entry name, e.g. 'Alaska Air', 'AT&T Fiber', 'Cabo Condo'. If updating an existing entry, use its exact existing title." },
+        category: { type: "string", description: "Category, e.g. 'Utilities', 'Family', 'Travel', 'Vehicles', 'Insurance'. Pick a sensible one if Walt didn't say." },
+        fields: {
+          type: "array",
+          description: "The details to save. Each item is a label and a value.",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string", description: "e.g. 'Account #', 'Support PIN', 'Gate code', 'VIN'" },
+              value: { type: "string", description: "The value itself" }
+            },
+            required: ["label", "value"]
+          }
+        },
+        notes: { type: "string", description: "Optional extra context." },
+        renewal_date: { type: "string", description: "Optional renewal/expiration date, YYYY-MM-DD." }
+      },
+      required: ["title", "fields"]
+    }
   }
 ];
 
