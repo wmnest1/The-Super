@@ -1509,6 +1509,46 @@ async function executeTool(toolName, input, data, ctx) {
         return { ok: false, readOnly: true, error: e.message };
       }
     } 
+    case "vault_save": {
+      try {
+        const col = await vaultCol();
+        const title = String(input.title || "").trim();
+        if (!title) return { ok: false, error: "Title is required." };
+        const incoming = (input.fields || []).filter(f => f && f.label && f.value);
+        if (!incoming.length) return { ok: false, error: "No fields to save." };
+        const pw = /password|passcode|passwd/i;
+        const bad = incoming.find(f => pw.test(f.label));
+        if (bad) return { ok: false, error: "Passwords don't go in the Vault. Tell Walt to keep it in a password manager — the Vault is for account numbers, PINs, and reference info." };
+        const existing = await col.findOne({ title: new RegExp("^" + title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i") });
+        if (existing) {
+          const merged = [...(existing.fields || [])];
+          for (const f of incoming) {
+            const i = merged.findIndex(m => (m.label || "").toLowerCase() === f.label.toLowerCase());
+            if (i >= 0) merged[i] = { label: f.label, value: f.value };
+            else merged.push({ label: f.label, value: f.value });
+          }
+          await col.updateOne({ _id: existing._id }, { $set: {
+            fields: merged,
+            category: input.category || existing.category || "",
+            notes: input.notes || existing.notes || "",
+            renewalDate: input.renewal_date || existing.renewalDate || "",
+            updatedAt: new Date().toISOString()
+          }});
+          return { ok: true, readOnly: true, action: "updated", title: existing.title, fields: merged.length };
+        }
+        await col.insertOne({
+          category: input.category || "",
+          title: title,
+          fields: incoming,
+          notes: input.notes || "",
+          renewalDate: input.renewal_date || "",
+          updatedAt: new Date().toISOString()
+        });
+        return { ok: true, readOnly: true, action: "created", title: title, fields: incoming.length };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
     default:
       return { ok: false, error: "Unknown tool: " + toolName };
   }
