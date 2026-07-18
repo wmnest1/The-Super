@@ -242,7 +242,6 @@ COMPANY INFO:
 - License #855578
 - 1702-L Meridian Ave #164, San Jose, CA 95125
 - Phone: 408-569-3434
-- Fax: 408-448-2440
 - Email: mullinsconstruction@yahoo.com
 
 YOUR JOB:
