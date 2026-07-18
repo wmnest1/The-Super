@@ -82,7 +82,7 @@ function buildPhotoSection(records, title) {
     const label = r.caption || prettyDate(r.uploadedAt);
     return `
       <div style="page-break-inside:avoid;flex:0 0 auto;max-width:100%;display:flex;flex-direction:column;align-items:center;margin-bottom:8px;">
-        <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="height:370px;max-width:596px;width:auto;object-fit:contain;border:1px solid #e2e2e2;border-radius:4px;" />
+        <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="height:395px;max-width:596px;width:auto;object-fit:contain;border:1px solid #e2e2e2;border-radius:4px;" />
         ${label ? `<div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;text-align:center;">${label}</div>` : ""}
       </div>`;
   }).join("");
