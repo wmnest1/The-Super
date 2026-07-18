@@ -1376,7 +1376,25 @@ async function executeTool(toolName, input, data, ctx) {
             408-569-3434</p>
           </div>
         `);
-        const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins Construction Document', input.html_body));
+        let docHtml = input.html_body;
+if (input.include_photos === true) {
+  try {
+    const pcol = await filesCol();
+    const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const ors = [];
+    if (input.project) ors.push({ project: input.project });
+    if (input.client_name) ors.push({ client: new RegExp(esc(input.client_name), 'i') });
+    if (ors.length) {
+      const photoRecords = await pcol.find({
+        mimeType: { $regex: '^image/' },
+        data: { $ne: null },
+        $or: ors
+      }).sort({ uploadedAt: 1 }).limit(12).toArray();
+      docHtml += buildPhotoSection(photoRecords);
+    }
+  } catch (e) { console.error('photo section:', e.message); }
+}
+const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins Construction Document', docHtml));
         await emailTransporter.sendMail({
           from: `"Mullins Construction Inc." <${process.env.YAHOO_EMAIL}>`,
           to: toField,
