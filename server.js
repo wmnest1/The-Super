@@ -78,18 +78,21 @@ function buildPhotoSection(records, title) {
     if (isNaN(d)) return "";
     return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
   };
-  const items = records.map(r => {
+  const cells = records.map(r => {
     const label = r.caption || prettyDate(r.uploadedAt);
     return `
-    <div style="page-break-inside:avoid;margin:0 0 18px 0;text-align:center;">
-      <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="max-width:100%;max-height:4.1in;border:1px solid #ddd;border-radius:4px;" />
-      ${label ? `<div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;">${label}</div>` : ""}
-    </div>`;
+      <div style="page-break-inside:avoid;flex:1 1 320px;max-width:340px;display:flex;flex-direction:column;align-items:center;margin-bottom:8px;">
+        <div style="width:100%;height:340px;display:flex;align-items:center;justify-content:center;background:#fafafa;border:1px solid #e2e2e2;border-radius:4px;overflow:hidden;">
+          <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+        </div>
+        ${label ? `<div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;text-align:center;">${label}</div>` : ""}
+      </div>`;
   }).join("");
   return `
-    <div style="page-break-before:always;"></div>
-    <h2 class="doc" style="font-family:Arial,sans-serif;">${title || "REFERENCE PHOTOS"}</h2>
-    ${items}`;
+    <h2 class="doc" style="font-family:Arial,sans-serif;margin-top:22px;">${title || "REFERENCE PHOTOS"}</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-start;">
+      ${cells}
+    </div>`;
 }
 
 const app = express();
