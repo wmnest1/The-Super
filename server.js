@@ -81,8 +81,8 @@ function buildPhotoSection(records, title) {
   const cells = records.map(r => {
     const label = r.caption || prettyDate(r.uploadedAt);
     return `
-      <div style="page-break-inside:avoid;flex:1 1 320px;max-width:340px;display:flex;flex-direction:column;align-items:center;margin-bottom:8px;">
-        <div style="width:100%;height:340px;display:flex;align-items:center;justify-content:center;background:#fafafa;border:1px solid #e2e2e2;border-radius:4px;overflow:hidden;">
+      <div style="page-break-inside:avoid;flex:0 1 290px;display:flex;flex-direction:column;align-items:center;margin-bottom:8px;">
+        <div style="width:290px;height:290px;display:flex;align-items:center;justify-content:center;background:#fafafa;border:1px solid #e2e2e2;border-radius:4px;overflow:hidden;">
           <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="max-width:100%;max-height:100%;object-fit:contain;" />
         </div>
         ${label ? `<div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;text-align:center;">${label}</div>` : ""}
