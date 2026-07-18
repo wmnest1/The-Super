@@ -1401,7 +1401,8 @@ if (input.include_photos === true) {
         data: { $ne: null },
         $or: ors
       }).sort({ uploadedAt: 1 }).limit(12).toArray();
-      docHtml += buildPhotoSection(photoRecords);
+      const photoTitle = input.photo_report === true ? "PROJECT PHOTOS" : "REFERENCE PHOTOS";
+        docHtml += buildPhotoSection(photoRecords, photoTitle);
     }
   } catch (e) { console.error('photo section:', e.message); }
 }
