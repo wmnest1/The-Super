@@ -70,6 +70,18 @@ async function generatePDF(html) {
     await browser.close();
   }
 }
+function buildPhotoSection(records, title) {
+  if (!records || !records.length) return "";
+  const items = records.map(r => `
+    <div style="page-break-inside:avoid;margin:0 0 18px 0;text-align:center;">
+      <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="max-width:100%;max-height:4.1in;border:1px solid #ddd;border-radius:4px;" />
+      <div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;">${r.caption || r.name || ""}${r.uploadedAt ? " &middot; " + String(r.uploadedAt).slice(0, 10) : ""}</div>
+    </div>`).join("");
+  return `
+    <div style="page-break-before:always;"></div>
+    <h2 class="doc" style="font-family:Arial,sans-serif;">${title || "PROJECT PHOTOS"}</h2>
+    ${items}`;
+}
 
 const app = express();
 app.use(cors());
