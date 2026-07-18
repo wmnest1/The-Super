@@ -72,14 +72,23 @@ async function generatePDF(html) {
 }
 function buildPhotoSection(records, title) {
   if (!records || !records.length) return "";
-  const items = records.map(r => `
+  const prettyDate = iso => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
+  };
+  const items = records.map(r => {
+    const label = r.caption || prettyDate(r.uploadedAt);
+    return `
     <div style="page-break-inside:avoid;margin:0 0 18px 0;text-align:center;">
       <img src="data:${r.mimeType || 'image/jpeg'};base64,${r.data}" style="max-width:100%;max-height:4.1in;border:1px solid #ddd;border-radius:4px;" />
-      <div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;">${r.caption || r.name || ""}${r.uploadedAt ? " &middot; " + String(r.uploadedAt).slice(0, 10) : ""}</div>
-    </div>`).join("");
+      ${label ? `<div style="font-family:Arial,sans-serif;font-size:11px;color:#555;margin-top:6px;">${label}</div>` : ""}
+    </div>`;
+  }).join("");
   return `
     <div style="page-break-before:always;"></div>
-    <h2 class="doc" style="font-family:Arial,sans-serif;">${title || "PROJECT PHOTOS"}</h2>
+    <h2 class="doc" style="font-family:Arial,sans-serif;">${title || "REFERENCE PHOTOS"}</h2>
     ${items}`;
 }
 
