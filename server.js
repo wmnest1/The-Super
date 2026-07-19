@@ -1681,7 +1681,7 @@ function buildProposalPage(record, opts) {
           <div style="font-size:12px;color:#666;margin-bottom:4px;">Your Email</div>
           <input id="accept-email" type="email" placeholder="you@example.com" style="width:100%;max-width:320px;padding:9px 10px;border:1px solid #ccc;border-radius:5px;font-size:14px;box-sizing:border-box;">
         </div>
-        <button id="accept-btn" onclick="submitAcceptance()" style="background:#1a5fa8;color:#fff;border:none;border-radius:6px;padding:13px 26px;font-size:15px;font-weight:bold;cursor:pointer;">Accept Proposal</button>
+        <button id="accept-btn" onclick="submitAcceptance()" style="background:#1a5fa8;color:#fff;border:none;border-radius:6px;padding:13px 26px;font-size:15px;font-weight:bold;cursor:pointer;">Accept ${docLabel}</button>
         <div id="accept-error" style="color:#c0392b;font-size:13px;margin-top:10px;display:none;"></div>
       </div>
       <script>
