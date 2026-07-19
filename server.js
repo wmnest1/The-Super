@@ -1669,7 +1669,7 @@ function buildProposalPage(record, opts) {
         <div style="font-size:12px;color:#888;margin-top:8px;">This proposal has been signed and is locked. Contact Mullins Construction with any questions.</div>
       </div>`
     : `<div id="accept-block" style="margin-top:32px;padding:24px;background:#f7f9fc;border:1px solid #dbe3ee;border-radius:8px;font-family:Arial,sans-serif;">
-        <div style="font-size:16px;font-weight:bold;color:#222;margin-bottom:14px;">Proposal Acceptance</div>
+        <div style="font-size:16px;font-weight:bold;color:#222;margin-bottom:14px;">${docLabel} Acceptance</div>
         <label style="display:block;font-size:14px;color:#333;margin-bottom:10px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I have reviewed this proposal.</label>
         <label style="display:block;font-size:14px;color:#333;margin-bottom:10px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I approve the scope of work and pricing shown above.</label>
         <label style="display:block;font-size:14px;color:#333;margin-bottom:16px;"><input type="checkbox" class="accept-chk" style="margin-right:8px;">I authorize Mullins Construction Inc. to proceed with the work described above.</label>
