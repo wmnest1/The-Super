@@ -1705,7 +1705,7 @@ function buildProposalPage(record, opts) {
             window.location.reload();
           } catch (e) {
             showErr(e.message || 'Something went wrong — please try again.');
-            btn.disabled = false; btn.textContent = 'Accept Proposal';
+            btn.disabled = false; btn.textContent = 'Accept ${docLabel}';
           }
         }
         function showErr(msg){
