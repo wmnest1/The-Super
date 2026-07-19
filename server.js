@@ -1657,6 +1657,8 @@ app.post('/api/send-email', async (req, res) => {
 // ── E-signature proposal page ──
 function buildProposalPage(record, opts) {
   const { alreadyAccepted } = opts;
+  const docLabel = (record.docKind || 'proposal').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const docLabelLower = docLabel.toLowerCase();
   const acceptedAtDisplay = record.acceptedAt
     ? new Date(record.acceptedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : "";
