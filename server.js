@@ -1820,6 +1820,9 @@ app.post("/api/proposal/:token/accept", async (req, res) => {
         const signedBanner = '<div style="margin-top:24px;padding:14px 18px;background:#e8f5e9;border:1px solid #4caf50;border-radius:8px;font-family:Arial,sans-serif;font-size:13px;color:#1b5e20;"><b>\u2713 Signed</b> \u2014 Accepted by ' + String(record.acceptedBy).replace(/</g,'&lt;') + ' (' + String(record.acceptedEmail).replace(/</g,'&lt;') + ') on ' + new Date(record.acceptedAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + '. This document has been signed and is locked.</div>';
         const signedHtml = record.htmlBody.replace('</body>', signedBanner + '</body>');
         const signedPdf = await generatePDF(signedHtml);
+        const _rawProj = (record.project || '').trim();
+        const _matchedProj = _rawProj ? fuzzyMatchProject(_rawProj, data.projects || []) : null;
+        const _fileProject = _matchedProj && (data.projects || []).some(p => (p.name || '').toLowerCase() === _matchedProj.toLowerCase()) ? _matchedProj : null;
         const savedSigned = await saveJobDocument({
           project: record.project || null,
           name: 'SIGNED - ' + (record.subject || label),
