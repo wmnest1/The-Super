@@ -1666,7 +1666,7 @@ function buildProposalPage(record, opts) {
     ? `<div style="margin-top:32px;padding:20px 24px;background:#eafbea;border:1px solid #b6e6b6;border-radius:8px;font-family:Arial,sans-serif;">
         <div style="font-size:16px;font-weight:bold;color:#1a7a1a;margin-bottom:6px;">✓ Signed</div>
         <div style="font-size:14px;color:#333;">Accepted by <strong>${(record.acceptedBy || record.acceptedEmail || "").replace(/</g,"&lt;")}</strong> on ${acceptedAtDisplay}.</div>
-        <div style="font-size:12px;color:#888;margin-top:8px;">This proposal has been signed and is locked. Contact Mullins Construction with any questions.</div>
+        <div style="font-size:12px;color:#888;margin-top:8px;">This ${docLabelLower} has been signed and is locked. Contact Mullins Construction with any questions.</div>
       </div>`
     : `<div id="accept-block" style="margin-top:32px;padding:24px;background:#f7f9fc;border:1px solid #dbe3ee;border-radius:8px;font-family:Arial,sans-serif;">
         <div style="font-size:16px;font-weight:bold;color:#222;margin-bottom:14px;">${docLabel} Acceptance</div>
