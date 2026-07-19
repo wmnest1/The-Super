@@ -1426,7 +1426,7 @@
   function setMicUI(listening) {
     const btn = document.getElementById('mic-btn');
     btn.classList.toggle('listening', listening);
-    btn.textContent = listening ? '🔴' : '🎤';
+    btn.style.color = listening ? '#e53935' : '';
     document.getElementById('status-bar').textContent = listening
       ? 'Listening — speak naturally, pauses OK...'
       : 'The Super — Ready';
