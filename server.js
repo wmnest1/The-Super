@@ -1832,6 +1832,7 @@ app.post("/api/proposal/:token/accept", async (req, res) => {
         const _fileProject = _matchedProj && (data.projects || []).some(p => (p.name || '').toLowerCase() === _matchedProj.toLowerCase()) ? _matchedProj : null;
         const savedSigned = await saveJobDocument({
           project: _fileProject,
+          lead: record.lead || null,
           name: 'SIGNED - ' + (record.subject || label),
           docType: record.docKind || 'proposal',
           data: signedPdf.toString('base64'),
