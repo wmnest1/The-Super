@@ -1628,6 +1628,7 @@
 
   function populateForm(tab, record) {
     const map = {
+      leads:      [['l-name',record.name],['l-phone',record.phone],['l-email',record.email],['l-address',record.address],['l-source',record.source],['l-status',record.status],['l-value',record.value],['l-lastcontact',record.lastContact],['l-followup',record.followup],['l-desc',record.desc],['l-notes',record.notes],['l-created',record.created]],
       clients:    [['c-name',record.name],['c-phone',record.phone],['c-email',record.email],['c-address',record.address],['c-notes',record.notes]],
       projects:   [['p-name',record.name],['p-client',record.client],['p-address',record.address],['p-status',record.status],['p-start',record.startDate],['p-rate',record.rate],['p-oosrate',record.oosRate],['p-contract',record.contractAmount],['p-markup',record.markup],['p-submarkup',record.subMarkup],['p-notes',record.notes],['p-color',record.color]],
       crew:       [['cr-name',record.name],['cr-nick',record.nickname],['cr-role',record.role],['cr-rate',record.hourlyRate],['cr-phone',record.phone],['cr-notes',record.notes]],
