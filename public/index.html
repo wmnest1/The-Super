@@ -2833,8 +2833,8 @@
     } catch (e) { files = []; }
 
     // Merge in e-signature proposals for this project (stored separately in data.proposals)
-    const sigProps = ((docsCurrentClient || docsCurrentLead) ? [] : ((typeof appData !== 'undefined' && appData.proposals) || []))
-      .filter(p => p.project === docsCurrentProject)
+    const sigProps = (docsCurrentClient ? [] : ((typeof appData !== 'undefined' && appData.proposals) || []))
+    .filter(p => docsCurrentLead ? (p.lead === docsCurrentLead) : (p.project === docsCurrentProject))  
       .map(p => ({
         id: null, sig: true, token: p.id,
         name: (p.subject || 'Proposal') + (p.status === 'accepted' ? ' (signed)' : ''),
