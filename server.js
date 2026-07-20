@@ -1502,7 +1502,7 @@ const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins
           text: `${input.email_body || "Please review your proposal."}\n\nReview it here: ${link}`
         });
         return { ok: true, action: "created", type: "proposal", data: record,
-          message: `Proposal link sent to ${routedEmail}. Walt can track viewed/accepted status on the ${input.project} job panel.` };
+          message: `Link sent to ${routedEmail}.${input.lead ? ` Filed to the ${input.lead} lead card.` : input.project ? ` Track viewed/accepted status on the ${input.project} job panel.` : ''}` };
       } catch (e) {
         console.error("send_proposal_link error:", e.message);
         return { ok: false, error: e.message };
