@@ -2325,7 +2325,8 @@ app.get("/api/docs", async (req, res) => {
   try {
     const col = await filesCol();
     let query = {};
-    if (req.query.client) query = { client: req.query.client };
+    if (req.query.lead) query = { lead: req.query.lead };
+    else if (req.query.client) query = { client: req.query.client };
     else if (req.query.project === "__unfiled__") query = { project: null, client: null };
     else if (req.query.project) query = { project: req.query.project };
     const docs = await col.find(query, { projection: { data: 0, html: 0 } }).sort({ uploadedAt: -1 }).limit(200).toArray();
