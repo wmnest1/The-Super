@@ -409,6 +409,8 @@ CURRENT DATA:
 CLIENTS:
 ${(data.clients||[]).map(c => `- ${c.name}${c.phone?" | "+c.phone:""}${c.email?" | "+c.email:""}${c.address?" | "+c.address:""}${c.notes?" | Notes: "+c.notes:""}`).join("\n") || "None on file"}
 
+LEADS (prospects — not yet clients; may have no project):
+${(data.leads||[]).map(l => `- ${l.name} [${l.status||"New"}]${l.phone?" | "+l.phone:""}${l.email?" | "+l.email:""}${l.address?" | "+l.address:""}${l.source?" | Source: "+l.source:""}${l.followup?" | Follow-up: "+l.followup:""}${l.value?" | Est: "+l.value:""}${l.desc?" | Wants: "+l.desc:""}`).join("\n") || "None on file"}
 PROJECTS:
 ${(data.projects||[]).map(p => `- ${p.name} [${p.status||"Active"}]${p.client?" | Client: "+p.client:""}${p.address?" | "+p.address:""}${p.startDate?" | Start: "+p.startDate:""}${p.rate?" | Billing: $"+p.rate+"/hr":""}${(p.oosRate!==undefined&&p.oosRate!=="")?" | OOS Rate: $"+p.oosRate+"/hr (for extra/change-order work)":""}${p.contractAmount?" | Contract: $"+p.contractAmount:""}${(p.markup!==undefined&&p.markup!=="")?" | Materials Markup: "+p.markup+"%":""}${(p.subMarkup!==undefined&&p.subMarkup!=="")?" | Subs Markup: "+p.subMarkup+"%":""}${p.notes?" | Scope: "+p.notes:""}`).join("\n") || "None on file"}
 
