@@ -1668,7 +1668,7 @@
       if (!record.date) { alert('Please select a date.'); return; }
       if (!record.project) { alert('Please select a project.'); return; }
     } else {
-      const primaryField = { clients:'name', projects:'name', crew:'name', subs:'company', unitPrices:'description' }[tab];
+      const primaryField = { leads:'name', clients:'name', projects:'name', crew:'name', subs:'company', unitPrices:'description' }[tab];
       if (!record[primaryField]) { alert('Please fill in the required field.'); return; }
     }
     if (!appData[tab]) appData[tab] = [];
