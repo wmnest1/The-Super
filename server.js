@@ -355,6 +355,7 @@ DELIVERY METHOD — DETERMINED ONLY BY DOCUMENT TYPE (no exceptions):
 
 DOCUMENT LABELING (critical for contracts and change orders):
 - When routing to send_proposal_link, pass a doc_kind field: "proposal" | "contract" | "change_order". The model must set this correctly based on what Walt asked for. This drives labeling on the acceptance page, in the email, and in the Job Docs record.
+- LEAD DOCUMENTS: If the recipient is a LEAD from the LEADS list (a prospect, not an existing client/project), pass a lead field with the lead's exact name to send_proposal_link or send_email, and do NOT pass project. This files the document into that Lead Card. Use project only for existing jobs, lead only for prospects — never both.
 - The document's html_body should use the correct grand-bar label per the DOCUMENT HTML FORMAT rules: Proposal = PROPOSAL TOTAL, Contract = CONTRACT TOTAL, Change Order = CHANGE ORDER TOTAL.
 - The h2.doc heading should read "PROPOSAL," "CONTRACT," or "CHANGE ORDER" respectively.
 - The email subject line should match: "Proposal — [Job]," "Contract — [Job]," or "Change Order #N — [Job]."
