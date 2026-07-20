@@ -184,6 +184,7 @@ async function saveJobDocument({ project, client, lead, name, docType, mimeType,
   const record = {
     project: project || null,
     client: client || null,
+    lead: lead || null,
     name: name || "Untitled",
     docType: docType || "file",           // 'invoice' | 'proposal' | 'file'
     kind: html ? "generated" : "upload",  // generated = HTML we produced; upload = binary file
