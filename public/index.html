@@ -502,7 +502,54 @@
       <button class="tab-btn" onclick="switchTab('theme')">🎨 Theme</button>
     </div>
 
-    <div class="tab-content active" id="tab-clients">
+       <div class="tab-content" id="tab-leads">
+      <button class="add-new-btn" onclick="showForm('leads')">+ Add New</button>
+      <div class="data-form" id="form-leads" style="display:none;">
+        <input id="l-created" type="hidden">
+        <div class="form-row">
+          <div class="field"><label>Full Name</label><input id="l-name" type="text" placeholder="Jane Smith"></div>
+          <div class="field"><label>Phone</label><input id="l-phone" type="text" placeholder="408-555-1234"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Email</label><input id="l-email" type="text" placeholder="jane@email.com"></div>
+          <div class="field"><label>Referral Source</label><input id="l-source" type="text" placeholder="Referral, Yelp, sign, repeat client..."></div>
+        </div>
+        <div class="form-row">
+          <div class="field full"><label>Project Address</label><input id="l-address" type="text" placeholder="123 Main St, San Jose, CA 95125"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Status</label><select id="l-status">
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Site Visit Scheduled">Site Visit Scheduled</option>
+            <option value="Ballpark Sent">Ballpark Sent</option>
+            <option value="Proposal Sent">Proposal Sent</option>
+            <option value="Follow-Up">Follow-Up</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Won">Won</option>
+            <option value="Lost">Lost</option>
+          </select></div>
+          <div class="field"><label>Estimated Value</label><input id="l-value" type="text" placeholder="$ optional"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Last Contact</label><input id="l-lastcontact" type="date"></div>
+          <div class="field"><label>Next Follow-Up</label><input id="l-followup" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div class="field full"><label>Project Description</label><textarea id="l-desc" placeholder="What work did they ask about?"></textarea></div>
+        </div>
+        <div class="form-row">
+          <div class="field full"><label>Internal Notes</label><textarea id="l-notes" placeholder="Conversations, preferences, anything relevant..."></textarea></div>
+        </div>
+        <div class="form-actions">
+          <button class="save-btn" onclick="saveRecord('leads')">💾 Save</button>
+          <button class="cancel-btn" onclick="hideForm('leads')">Cancel</button>
+        </div>
+      </div>
+      <div id="list-leads"></div>
+    </div>
+
+    <div class="tab-content active" id="tab-clients">   
       <button class="add-new-btn" onclick="showForm('clients')">+ Add New</button>
       <div class="data-form" id="form-clients" style="display:none;">
         <div class="form-row">
