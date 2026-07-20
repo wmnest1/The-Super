@@ -2844,9 +2844,11 @@
     const rows = [...files, ...sigProps].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 
     if (!rows.length) {
-      listEl.innerHTML = docsCurrentClient
+    listEl.innerHTML = docsCurrentLead
+        ? '<div class="docs-empty">No documents for this lead yet.<br>Upload a file below \u2014 ballparks, estimates, photos, plans, or client docs.</div>'
+        : docsCurrentClient
         ? '<div class="docs-empty">No photos for this client yet.<br>Use \u{1F4F7} Take Photo or \u2B06 Upload below.</div>'
-        : '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';
+        : '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';  
       return;
     }
 
