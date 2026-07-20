@@ -1456,6 +1456,7 @@ const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins
           id: token,
           project: input.project,
           clientName: input.to_name || input.client_name || "",
+          lead: input.lead || undefined,
           clientEmail: routedEmail,
           subject: input.subject,
         docKind: input.doc_kind || "proposal",
