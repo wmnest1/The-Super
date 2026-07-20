@@ -653,7 +653,8 @@ const TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        project: { type: "string", description: "Project/job name this proposal is for. Match to an existing project name if possible." },
+        project: { type: "string", description: "Project/job name this proposal is for, for an existing job. Do NOT set for a lead — use the lead field instead." },
+        lead: { type: "string", description: "Lead/prospect name (exact, from the LEADS list) this document is for, when it's for a prospect rather than an existing project. Files it into that Lead Card. Use INSTEAD of project for leads." },
         to_email: { type: "string", description: "Client's email address. OMIT for owner-review sends — the server routes those automatically." },
         owner_review: { type: "boolean", description: "Set true when Walt asks to send the document to himself for review. Server routes the recipient — do not pass to_email." },
         doc_kind: { type: "string", enum: ["proposal", "contract", "change_order"], description: "What kind of agreement document this is. Drives labeling on the acceptance page." },
