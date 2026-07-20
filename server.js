@@ -664,7 +664,7 @@ const TOOLS = [
         html_body: { type: "string", description: "Complete HTML content of the proposal exactly as generated — this is what the client will see and accept. Do not simplify, strip, or add your own signature block to it." },
         email_body: { type: "string", description: "Short 2-3 sentence friendly email message inviting the client to review and accept the proposal online. Mention the job address. Do not mention a PDF attachment." }
       },
-      required: ["project", "subject", "html_body"]
+      required: ["subject", "html_body"]
     }
   },
   {
