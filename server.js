@@ -1430,6 +1430,7 @@ const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins
             if (isOwnerReview) return false;
             await saveJobDocument({
           project: input.project || null,
+          lead: input.lead || null,
           name: input.pdf_filename || input.subject || "Document",
           docType: input.doc_type || (/(invoice)/i.test(input.subject || "") ? "invoice" : /(proposal)/i.test(input.subject || "") ? "proposal" : "other"),
           data: pdfBuffer.toString('base64'),
