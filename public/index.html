@@ -1919,7 +1919,9 @@
       ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>`
       : (tab === 'clients'
         ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openClientDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">\u{1F4F7} Photos</button>`
-        : '');
+        : (tab === 'leads'
+        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openLeadDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">\u{1F4C4} Docs</button>`
+        : ''));
     const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
     const dragAttrs = canDrag
       ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
