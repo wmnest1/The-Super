@@ -1653,6 +1653,7 @@
       };
     }
     const maps = {
+      leads:      () => ({ name:g('l-name'), phone:g('l-phone'), email:g('l-email'), address:g('l-address'), source:g('l-source'), status:g('l-status'), value:g('l-value'), lastContact:g('l-lastcontact'), followup:g('l-followup'), desc:g('l-desc'), notes:g('l-notes'), created:g('l-created') || new Date().toISOString().slice(0,10) }),
       clients:    () => ({ name:g('c-name'), phone:g('c-phone'), email:g('c-email'), address:g('c-address'), notes:g('c-notes') }),
       projects:   () => ({ name:g('p-name'), client:g('p-client'), address:g('p-address'), status:g('p-status'), startDate:g('p-start'), rate:g('p-rate'), oosRate:g('p-oosrate'), contractAmount:g('p-contract'), markup:g('p-markup'), subMarkup:g('p-submarkup'), notes:g('p-notes'), color:g('p-color') }),
       crew:       () => ({ name:g('cr-name'), nickname:g('cr-nick'), role:g('cr-role'), hourlyRate:g('cr-rate'), phone:g('cr-phone'), notes:g('cr-notes') }),
