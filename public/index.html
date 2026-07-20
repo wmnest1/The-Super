@@ -2820,7 +2820,9 @@
     listEl.innerHTML = '<div class="docs-empty">Loading\u2026</div>';
     let files = [];
     try {
-     const qs = docsCurrentClient
+     const qs = docsCurrentLead
+        ? ('lead=' + encodeURIComponent(docsCurrentLead))
+        : docsCurrentClient
         ? ('client=' + encodeURIComponent(docsCurrentClient))
         : ('project=' + encodeURIComponent(docsCurrentProject));
       const res = await fetch('/api/docs?' + qs); 
