@@ -179,7 +179,7 @@ async function vaultCol() {
   return db.collection("vault");
 }
 
-async function saveJobDocument({ project, client, name, docType, mimeType, data, html, source }) {
+async function saveJobDocument({ project, client, lead, name, docType, mimeType, data, html, source }) {
   const col = await filesCol();
   const record = {
     project: project || null,
