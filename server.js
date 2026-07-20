@@ -2358,7 +2358,7 @@ app.get("/api/docs/:id/view", async (req, res) => {
 
 app.post("/api/docs", async (req, res) => {
   try {
-  const { project, client, name, mimeType, data, docType } = req.body;  
+  const { project, client, lead, name, mimeType, data, docType } = req.body;
     if (!data) return res.status(400).json({ error: "No file data." });
     if (data.length > 13000000) return res.status(400).json({ error: "File too large — keep uploads under ~9 MB." });
     const saved = await saveJobDocument({ project, client, name, docType: docType || "file", mimeType, data, source: "docs-modal" });
