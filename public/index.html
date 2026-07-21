@@ -1921,7 +1921,7 @@
     if (tab === 'leads') {
       const badge = r.status ? `<span style="background:#0f3460;border-radius:4px;padding:1px 7px;font-size:11px;margin-left:8px;color:#aac;">${r.status}</span>` : '';
       name = (r.name || '—') + badge;
-      details = [r.phone && `📞 ${r.phone}`, r.email && `✉️ ${r.email}`, r.address && `📍 ${r.address}`, r.source && `📣 ${r.source}`, r.value && `💰 Est: ${r.value}`, r.followup && `🔔 Follow-up: ${r.followup}`, r.created && `🗓 Added: ${r.created}`, r.desc && `📝 ${r.desc}`, (r.activity && r.activity.length) ? `⚡ Last: ${r.activity[r.activity.length-1].text} — ${(r.activity[r.activity.length-1].when||'').slice(0,10)}` : ''].filter(Boolean).join('<br>');
+    details = [r.phone && `📞 ${r.phone}`, r.email && `✉️ ${r.email}`, r.address && `📍 ${r.address}`, r.source && `📣 ${r.source}`, r.value && `💰 Est: ${r.value}`, r.followup && `🔔 Follow-up: ${r.followup}`, r.created && `🗓 Added: ${r.created}`, r.desc && `<span class="lead-desc" onclick="event.stopPropagation();this.classList.toggle('open')" title="Click to expand / collapse">📝 ${r.desc}</span>`, (r.activity && r.activity.length) ? `⚡ Last: ${r.activity[r.activity.length-1].text} — ${(r.activity[r.activity.length-1].when||'').slice(0,10)}` : ''].filter(Boolean).join('<br>'); 
     } else if (tab === 'clients') {
       name = r.name || '—';
       details = [r.phone && `📞 ${r.phone}`, r.email && `✉️ ${r.email}`, r.address && `📍 ${r.address}`].filter(Boolean).join('<br>');
