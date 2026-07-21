@@ -2950,7 +2950,9 @@
     listEl.innerHTML = '<div class="docs-empty">Loading\u2026</div>';
     let files = [];
     try {
-     const qs = docsCurrentLead
+     const qs = docsCurrentClientAll
+        ? ('clientAll=' + encodeURIComponent(docsCurrentClientAll) + '&only=' + (docsCurrentMode || 'docs'))
+        : docsCurrentLead
         ? ('lead=' + encodeURIComponent(docsCurrentLead))
         : docsCurrentClient
         ? ('client=' + encodeURIComponent(docsCurrentClient))
