@@ -2889,6 +2889,35 @@
     const ov = document.getElementById('act-overlay');
     if (ov) ov.style.display = 'none';
   };
+  window.convertLeadToClient = async function(i){
+    const lead = appData.leads[i];
+    if (!lead) return;
+    if (lead.converted) { alert((lead.name || 'This lead') + ' is already converted.'); return; }
+    if (!confirm('Convert "' + (lead.name || 'this lead') + '" to a client?')) return;
+    if (!appData.clients) appData.clients = [];
+    const exists = appData.clients.some(function(c){ return (c.name||'').trim().toLowerCase() === (lead.name||'').trim().toLowerCase(); });
+    if (!exists) {
+      appData.clients.push({ name: lead.name, phone: lead.phone || '', email: lead.email || '', address: lead.address || '', notes: [lead.notes, lead.source ? ('Source: ' + lead.source) : ''].filter(Boolean).join(' \u2014 ') });
+    }
+    let projName = '';
+    if (confirm('Also create a project/job for them now?')) {
+      projName = (prompt('Project name:', lead.name + (lead.desc ? ' \u2014 ' + lead.desc.slice(0,30) : '')) || '').trim();
+      if (projName) {
+        if (!appData.projects) appData.projects = [];
+        appData.projects.push({ name: projName, client: lead.name, address: lead.address || '', status: 'Active', startDate: '', rate: '', oosRate: '', contractAmount: '', markup: '', subMarkup: '', notes: lead.desc || '', color: '' });
+      }
+    }
+    lead.converted = true;
+    lead.convertedAt = new Date().toISOString();
+    if (!Array.isArray(lead.activity)) lead.activity = [];
+    lead.activity.push({ when: lead.convertedAt, type: 'converted', text: 'Converted to client' + (projName ? (' \u2014 project "' + projName + '" created') : '') });
+    await fetch('/api/data', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(appData) });
+    if (projName) {
+      try { await fetch('/api/docs/associate-lead', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ lead: lead.name, project: projName }) }); } catch(e){ console.error('associate docs:', e.message); }
+    }
+    renderList('leads'); renderList('clients'); renderList('projects');
+    alert((lead.name || 'Lead') + ' converted to a client' + (projName ? (' and project "' + projName + '" was created.\n\n\u26A0 Set the hourly rate for this project in the Projects tab before invoicing.') : '.'));
+  };
 
   function fmtDocWhen(iso){
     return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
