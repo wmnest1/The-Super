@@ -340,6 +340,15 @@
 
   /* ── Palette swatches ── */
   .palette-strip { display:flex; flex-wrap:wrap; gap:3px; margin:4px 0 2px; }
+  /* ── Per-icon colors (unset → currentColor = today's look) ── */
+  .data-btn svg                      { fill: var(--ic-database, currentColor); }
+  a[href="/dashboard.html"] svg      { stroke: var(--ic-dashboard, currentColor); }
+  [onclick="openGlobalSearch()"] svg { fill: var(--ic-search, currentColor); }
+  #theme-toggle svg                  { fill: var(--ic-theme, currentColor); }
+  .quick-btn svg                     { fill: var(--ic-changeorder, currentColor); }
+  #upload-btn svg                    { fill: var(--ic-upload, currentColor); }
+  #mic-btn svg                       { fill: var(--ic-mic, currentColor); }
+  #send-btn svg                      { stroke: var(--ic-send, currentColor); }
   .ps { width:18px; height:18px; border-radius:3px; cursor:pointer; border:1px solid rgba(255,255,255,0.2); transition:transform .1s; flex-shrink:0; }
   .ps:hover { transform:scale(1.25); border-color:rgba(255,255,255,0.6); }
   .palette-edit-grid { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
