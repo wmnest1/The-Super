@@ -2345,7 +2345,16 @@ app.get("/api/docs", async (req, res) => {
   try {
     const col = await filesCol();
     let query = {};
-    if (req.query.lead) query = { lead: req.query.lead };
+    if (req.query.clientAll) {
+      const _d = await loadData();
+      const _c = String(req.query.clientAll).trim().toLowerCase();
+      const _projNames = (_d.projects || []).filter(p => (p.client || '').trim().toLowerCase() === _c).map(p => p.name);
+      const _or = { $or: [ { client: req.query.clientAll }, { lead: req.query.clientAll }, { project: { $in: _projNames } } ] };
+      if (req.query.only === 'photos') query = { $and: [ _or, { mimeType: { $regex: '^image/' } } ] };
+      else if (req.query.only === 'docs') query = { $and: [ _or, { mimeType: { $not: { $regex: '^image/' } } } ] };
+      else query = _or;
+    }
+    else if (req.query.lead) query = { lead: req.query.lead };
     else if (req.query.client) query = { client: req.query.client };
     else if (req.query.project === "__unfiled__") query = { project: null, client: null, lead: null };
     else if (req.query.project) query = { project: req.query.project };
