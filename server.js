@@ -179,6 +179,16 @@ async function vaultCol() {
   return db.collection("vault");
 }
 
+function logLeadActivity(data, leadName, type, text) {
+  try {
+    if (!leadName || !data || !Array.isArray(data.leads)) return;
+    const key = String(leadName).trim().toLowerCase();
+    const lead = data.leads.find(l => (l.name || '').trim().toLowerCase() === key);
+    if (!lead) return;
+    if (!Array.isArray(lead.activity)) lead.activity = [];
+    lead.activity.push({ when: new Date().toISOString(), type: type, text: text });
+  } catch (e) { console.error('logLeadActivity:', e.message); }
+}
 async function saveJobDocument({ project, client, lead, name, docType, mimeType, data, html, source }) {
   const col = await filesCol();
   const record = {
