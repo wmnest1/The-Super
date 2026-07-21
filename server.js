@@ -1851,6 +1851,7 @@ app.post("/api/proposal/:token/accept", async (req, res) => {
           mimeType: 'application/pdf',
           source: 'signed-acceptance'
         });record.signedDocId = savedSigned.id;
+        if (record.lead) logLeadActivity(data, record.lead, 'accepted', ((record.docKind || 'proposal').replace('_',' ').replace(/\b\w/g, c => c.toUpperCase())) + ' accepted by ' + (record.acceptedBy || 'client'));
         await saveData(data);
       } catch (e) { console.error('signed-pdf filing:', e.message); }
     res.json({ ok: true });
