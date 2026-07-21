@@ -2426,6 +2426,65 @@
 
   // ── THEME ──
   const THEME_DEFAULTS = {accentColor:'#e8a020',bgColor:'#1a1a2e',panelColor:'#16213e',textColor:'#eeeeee',invoiceAccentColor:'#e8a020'};
+
+  // ── Per-icon colors ──────────────────────────────────────────────
+  const ICON_DEFS = [
+    { key:'database',    label:'Database' },
+    { key:'dashboard',   label:'Dashboard' },
+    { key:'search',      label:'Search' },
+    { key:'theme',       label:'Theme toggle' },
+    { key:'changeorder', label:'Change Order' },
+    { key:'upload',      label:'Attach / Upload' },
+    { key:'mic',         label:'Microphone' },
+    { key:'send',        label:'Send' },
+  ];
+  let iconColors = {};
+
+  function applyIconColors() {
+    const r = document.documentElement;
+    for (const d of ICON_DEFS) {
+      if (iconColors[d.key]) r.style.setProperty('--ic-'+d.key, iconColors[d.key]);
+      else r.style.removeProperty('--ic-'+d.key);
+    }
+  }
+
+  function setIconColor(key, c) {
+    iconColors[key] = c;
+    document.documentElement.style.setProperty('--ic-'+key, c);
+    const sw = document.getElementById('ic-sw-'+key);
+    if (sw) { sw.style.background = c; sw.style.border = '2px solid #2a3a5e'; }
+    const hint = document.getElementById('ic-hint-'+key);
+    if (hint) hint.textContent = '';
+    const inp = document.getElementById('ic-inp-'+key);
+    if (inp) inp.value = c;
+  }
+
+  function clearIconColor(key) {
+    delete iconColors[key];
+    document.documentElement.style.removeProperty('--ic-'+key);
+    renderIconColorRows();
+  }
+
+  function renderIconColorRows() {
+    const host = document.getElementById('icon-colors-rows');
+    if (!host) return;
+    host.innerHTML = ICON_DEFS.map(d => {
+      const on = !!iconColors[d.key];
+      const val = iconColors[d.key] || '#aaaacc';
+      const quick = appPalette.map(c =>
+        `<span class="ps" title="${c}" style="background:${c}" onclick="setIconColor('${d.key}','${c}')"></span>`
+      ).join('');
+      return `
+      <div class="theme-row">
+        <label>${d.label}</label>
+        <input type="color" id="ic-inp-${d.key}" value="${val}" oninput="setIconColor('${d.key}',this.value)">
+        <span class="theme-swatch" id="ic-sw-${d.key}" style="background:${on?val:'transparent'};border:${on?'2px solid #2a3a5e':'2px dashed #557'}"></span>
+        <span class="theme-hint" id="ic-hint-${d.key}">${on?'':'Auto (follows theme)'}</span>
+        <button type="button" class="cancel-btn" style="padding:2px 9px;font-size:12px;margin-left:4px" title="Back to Auto" onclick="clearIconColor('${d.key}')">↺</button>
+      </div>
+      <div class="palette-strip" style="padding-left:162px;margin-bottom:10px">${quick}</div>`;
+    }).join('');
+  }
   const DEFAULT_PALETTE = ['#cc4444','#e8720c','#e8c020','#2a9a2a','#1a8a8a','#1a5fa8','#6b2fbe','#b02080','#8b6914','#666666','#111111','#ffffff'];
   let appPalette = [...DEFAULT_PALETTE];
   let _loadedTheme = null;
