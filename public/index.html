@@ -1972,6 +1972,9 @@
       ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
       : '';
     const cardTitle = canDrag ? 'Click to open — drag to reorder' : 'Click to open';
+    const floatBtn = ['clients','projects','leads'].includes(tab)
+      ? `<button class="edit-btn" style="background:#0f3460" title="Pop out to a floating card" onclick="event.stopPropagation();openCardFloat('${tab}','${(tab==='leads' ? (r.id||r.name||'') : (r.name||'')).replace(/'/g, "\\'")}')">\u29C9</button>`
+      : '';
     return `<div class="record-card"${dragAttrs} onclick="showForm('${tab}', ${i})" title="${cardTitle}"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${tab === 'leads' ? `${r.converted ? '<span style="color:#2ecc40;font-size:12px;padding:4px 8px;white-space:nowrap">\u2713 Client</span>' : `<button class="edit-btn" style="background:#1a7a3a" onclick="event.stopPropagation();convertLeadToClient(${i})">\u2192 Client</button>`}<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openLeadActivity(${i})">\u26A1 Activity</button>` : ''}${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
   }
 
