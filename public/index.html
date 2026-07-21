@@ -2559,7 +2559,10 @@
       _loadedTheme = t;
       applyTheme(t);
       if (t.colorPalette && t.colorPalette.length === 12) appPalette = t.colorPalette;
+      iconColors = t.iconColors || {};
+      applyIconColors();
       fillPaletteStrips();
+      renderIconColorRows();
       const g = id => document.getElementById(id);
       if (g('th-accent'))  g('th-accent').value  = t.accentColor  || THEME_DEFAULTS.accentColor;
       if (g('th-bg'))      g('th-bg').value       = t.bgColor       || THEME_DEFAULTS.bgColor;
