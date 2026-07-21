@@ -1484,6 +1484,7 @@ const pdfBuffer = await generatePDF(DocEngine.docShell(input.subject || 'Mullins
         };
         if (!data.proposals) data.proposals = [];
         data.proposals.push(record);
+        if (input.lead) logLeadActivity(data, input.lead, 'proposal_sent', ((input.doc_kind || 'proposal').replace('_',' ').replace(/\b\w/g, c => c.toUpperCase())) + ' sent' + (isOwnerReview ? ' (owner review)' : ''));
 
         const link = `${PUBLIC_BASE_URL}/proposal/${token}`;
         const firstName = input.client_name || (input.to_name ? input.to_name.split(" ")[0] : "there");
