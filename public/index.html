@@ -3138,7 +3138,7 @@
       const res = await fetch('/api/docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ project: docsCurrentProject, client: docsCurrentClient, lead: docsCurrentLead, name: name, mimeType: mimeType, data: b64 }) 
+       body: JSON.stringify({ project: docsCurrentProject, client: (docsCurrentClient || docsCurrentClientAll), lead: docsCurrentLead, name: name, mimeType: mimeType, data: b64 })
       });
       const j = await res.json();
       if (!res.ok || j.error) throw new Error(j.error || 'Upload failed');
