@@ -2986,9 +2986,11 @@
 
     listEl.innerHTML = rows.map(d => {
       const href = d.sig ? ('/proposal/' + d.token) : ('/api/docs/' + d.id + '/view');
+      const _tl = ({ invoice:'Invoice', proposal:'Proposal', contract:'Contract', change_order:'Change Order', statement:'Statement', estimate:'Estimate' })[d.docType];
       const tag = escD(d.docType || 'file');
+      const _primary = _tl ? ('<b>\u{1F4C4} ' + escD(_tl) + '</b>' + (d.name ? ' \u2014 ' + escD(d.name) : '')) : ('\u{1F4C4} ' + escD(d.name || 'Document'));
       return '<div class="docs-row">'
-        + '<span class="docs-name" title="' + escD(d.name) + '">' + escD(d.name) + '</span>'
+        + '<span class="docs-name" title="' + escD(d.name) + '">' + _primary + '</span>'
         + '<span class="docs-tag ' + tag + '">' + tag + '</span>'
         + '<span class="docs-meta">' + fmtDocWhen(d.uploadedAt) + (d.size ? ' \u00b7 ' + fmtSize(d.size) : '') + '</span>'
         + '<a class="docs-view" href="' + href + '" target="_blank">View \u2192</a>'
