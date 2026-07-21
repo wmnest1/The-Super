@@ -1490,6 +1490,9 @@
     const btn = document.getElementById('mic-btn');
     btn.classList.toggle('listening', listening);
     btn.style.color = listening ? '#e53935' : '';
+    if (listening) btn.style.setProperty('--ic-mic', '#e53935');
+    else if (iconColors.mic) btn.style.setProperty('--ic-mic', iconColors.mic);
+    else btn.style.removeProperty('--ic-mic');
     document.getElementById('status-bar').textContent = listening
       ? 'Listening — speak naturally, pauses OK...'
       : 'The Super — Ready';
