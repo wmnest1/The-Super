@@ -3168,5 +3168,88 @@
 
 })();
 </script>
-</body>
+<script>
+/* ── Floating cards (Phase 1) — reuses the dashboard jp-float pattern ── */
+(function(){
+  if (window.__cardFloatInit) return; window.__cardFloatInit = true;
+  const MAX_CARD_FLOATS = 6;
+  const LABELS = { clients:'Client', projects:'Project', leads:'Lead' };
+  let zc = 7000;
+
+  function keyOf(tab, r){ return tab === 'leads' ? (r.id || r.name || '') : (r.name || ''); }
+  function findRec(tab, key){
+    const arr = (typeof appData !== 'undefined' && appData[tab]) || [];
+    const idx = arr.findIndex(r => keyOf(tab, r) === key);
+    return { rec: idx >= 0 ? arr[idx] : null, idx };
+  }
+  function bringFront(el){ el.style.zIndex = ++zc; }
+
+  function fill(wrap){
+    const { rec, idx } = findRec(wrap.dataset.tab, wrap.dataset.key);
+    if (!rec){ wrap.remove(); return; }
+    try { wrap.querySelector('.cf-body').innerHTML = renderCard(wrap.dataset.tab, rec, idx); }
+    catch(e){ wrap.querySelector('.cf-body').innerHTML = '<div style="padding:14px;color:#889;font-size:12px">Could not render this card.</div>'; }
+  }
+  window.refreshAllCardFloats = function(){ document.querySelectorAll('.card-float').forEach(fill); };
+
+  window.openCardFloat = function(tab, key){
+    const existing = [...document.querySelectorAll('.card-float')]
+      .find(f => f.dataset.tab === tab && f.dataset.key === key);
+    if (existing){ bringFront(existing); return; }
+    const all = document.querySelectorAll('.card-float');
+    if (all.length >= MAX_CARD_FLOATS) all[0].remove();
+    const { rec } = findRec(tab, key);
+    if (!rec) return;
+
+    const n = document.querySelectorAll('.card-float').length;
+    const wrap = document.createElement('div');
+    wrap.className = 'card-float';
+    wrap.dataset.tab = tab; wrap.dataset.key = key;
+    wrap.style.left = (90 + n * 34) + 'px';
+    wrap.style.top  = (86 + n * 34) + 'px';
+    const title = String(rec.name || key).replace(/</g,'&lt;');
+    wrap.innerHTML =
+      '<div class="cf-bar"><span>\u29C9 ' + (LABELS[tab]||'Card') + ' \u2014 ' + title + '</span>'
+      + '<button class="cf-x" title="Close">\u2715</button></div><div class="cf-body"></div>';
+    document.body.appendChild(wrap);
+    bringFront(wrap);
+    fill(wrap);
+
+    wrap.querySelector('.cf-x').addEventListener('click', () => wrap.remove());
+    wrap.addEventListener('pointerdown', () => bringFront(wrap));
+    const bar = wrap.querySelector('.cf-bar');
+    bar.addEventListener('pointerdown', function(e){
+      if (e.target.closest('.cf-x')) return;
+      e.preventDefault();
+      const sx = e.clientX, sy = e.clientY, ol = wrap.offsetLeft, ot = wrap.offsetTop;
+      function mv(ev){
+        let nl = ol + (ev.clientX - sx), nt = ot + (ev.clientY - sy);
+        nl = Math.max(-wrap.offsetWidth + 90, Math.min(nl, window.innerWidth - 60));
+        nt = Math.max(0, Math.min(nt, window.innerHeight - 38));
+        wrap.style.left = nl + 'px'; wrap.style.top = nt + 'px';
+      }
+      function up(){ document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); }
+      document.addEventListener('pointermove', mv);
+      document.addEventListener('pointerup', up);
+    });
+  };
+
+  if (typeof renderList === 'function'){
+    const _rl = renderList;
+    renderList = function(tab){ _rl(tab); try { window.refreshAllCardFloats(); } catch(e){} };
+  }
+
+  const s = document.createElement('style');
+  s.textContent =
+    '.card-float{position:fixed;z-index:7000;background:var(--panel);border:2px solid var(--accent);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:300px;min-height:170px;width:430px;height:auto;max-height:82vh}'
+  + '.cf-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f3460;color:#fff;cursor:move;user-select:none;flex-shrink:0;font-size:13px;font-weight:bold}'
+  + '.cf-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.cf-x{background:none;border:none;color:#aab;font-size:15px;cursor:pointer;flex-shrink:0;padding:0 2px}'
+  + '.cf-x:hover{color:#fff}'
+  + '.cf-body{overflow:auto;flex:1;padding:10px}'
+  + '.cf-body .record-card{cursor:default}'
+  + 'html.light .card-float{background:#fff}';
+  document.head.appendChild(s);
+})();
+</script></body>
 </html>
