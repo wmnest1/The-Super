@@ -1941,7 +1941,7 @@
       ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
       : '';
     const cardTitle = canDrag ? 'Click to open — drag to reorder' : 'Click to open';
-    return `<div class="record-card"${dragAttrs} onclick="showForm('${tab}', ${i})" title="${cardTitle}"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
+    return `<div class="record-card"${dragAttrs} onclick="showForm('${tab}', ${i})" title="${cardTitle}"><div class="record-info"><div class="record-name">${name}</div><div class="record-detail entry-summary">${details}</div></div><div class="record-actions">${tab === 'leads' ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openLeadActivity(${i})">\u26A1 Activity</button>` : ''}${docsBtn}<button class="del-btn" onclick="event.stopPropagation();deleteRecord('${tab}', ${i})">Del</button></div></div>`;
   }
 
   // ── Drag-to-reorder cards (master lists only) ──
