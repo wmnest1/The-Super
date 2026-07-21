@@ -325,6 +325,8 @@
   .record-info { flex: 1; }
   .record-name { font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 3px; }
   .record-detail { font-size: 12px; color: #888; line-height: 1.6; }
+  .lead-desc { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; cursor:pointer; }
+  .lead-desc.open { -webkit-line-clamp:unset; }
   .record-actions { display: flex; gap: 6px; }
   .edit-btn, .del-btn { background: none; border: 1px solid #2a3a5e; border-radius: 6px; color: #aaa; padding: 5px 10px; font-size: 12px; cursor: pointer; }
   .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
