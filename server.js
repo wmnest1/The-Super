@@ -2349,7 +2349,7 @@ app.get("/api/docs", async (req, res) => {
       const _d = await loadData();
       const _c = String(req.query.clientAll).trim().toLowerCase();
       const _projNames = (_d.projects || []).filter(p => (p.client || '').trim().toLowerCase() === _c).map(p => p.name);
-      const _or = { $or: [ { client: req.query.clientAll }, { lead: req.query.clientAll }, { project: { $in: _projNames } } ] };
+      const _or = { $or: [ { client: req.query.clientAll }, { lead: req.query.clientAll }, { project: { $in: _projNames } }, { project: req.query.clientAll } ] };
       if (req.query.only === 'photos') query = { $and: [ _or, { mimeType: { $regex: '^image/' } } ] };
       else if (req.query.only === 'docs') query = { $and: [ _or, { mimeType: { $not: { $regex: '^image/' } } } ] };
       else query = _or;
