@@ -1672,6 +1672,20 @@
       const primaryField = { leads:'name', clients:'name', projects:'name', crew:'name', subs:'company', unitPrices:'description' }[tab];
       if (!record[primaryField]) { alert('Please fill in the required field.'); return; }
     }
+    if (tab === 'leads') {
+      const now = new Date().toISOString();
+      if (editingIndex.leads >= 0) {
+        const old = appData.leads[editingIndex.leads] || {};
+        record.id = old.id || ('lead_' + Date.now());
+        record.activity = Array.isArray(old.activity) ? old.activity : [{ when: (old.created ? old.created + 'T00:00:00.000Z' : now), type: 'created', text: 'Lead created' }];
+        if ((old.status || '') !== (record.status || '')) {
+          record.activity.push({ when: now, type: 'status', text: 'Status changed to ' + (record.status || 'New') });
+        }
+      } else {
+        record.id = 'lead_' + Date.now();
+        record.activity = [{ when: now, type: 'created', text: 'Lead created' }];
+      }
+    }
     if (!appData[tab]) appData[tab] = [];
     if (editingIndex[tab] >= 0) appData[tab][editingIndex[tab]] = record;
     else appData[tab].push(record);
