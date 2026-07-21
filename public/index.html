@@ -2963,8 +2963,8 @@
     } catch (e) { files = []; }
 
     // Merge in e-signature proposals for this project (stored separately in data.proposals)
-    const sigProps = (docsCurrentClient ? [] : ((typeof appData !== 'undefined' && appData.proposals) || []))
-    .filter(p => docsCurrentLead ? (p.lead === docsCurrentLead) : (p.project === docsCurrentProject))  
+      const sigProps = ((docsCurrentClient || (docsCurrentClientAll && docsCurrentMode === 'photos')) ? [] : ((typeof appData !== 'undefined' && appData.proposals) || []))
+    .filter(function(p){ if (docsCurrentClientAll) { var _c = docsCurrentClientAll.trim().toLowerCase(); var _pn = (appData.projects || []).filter(function(pr){ return (pr.client||'').trim().toLowerCase() === _c; }).map(function(pr){ return pr.name; }); return _pn.indexOf(p.project) !== -1 || p.lead === docsCurrentClientAll || (p.clientName||'') === docsCurrentClientAll; } return docsCurrentLead ? (p.lead === docsCurrentLead) : (p.project === docsCurrentProject); })
       .map(p => ({
         id: null, sig: true, token: p.id,
         name: (p.subject || 'Proposal') + (p.status === 'accepted' ? ' (signed)' : ''),
