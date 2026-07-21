@@ -2389,6 +2389,16 @@ app.post("/api/docs", async (req, res) => {
   }
 });
 
+ app.post("/api/docs/associate-lead", async (req, res) => {
+  try {
+    const { lead, project } = req.body;
+    if (!lead || !project) return res.status(400).json({ error: "lead and project required." });
+    const col = await filesCol();
+    const r = await col.updateMany({ lead: lead }, { $set: { project: project } });
+    res.json({ ok: true, updated: r.modifiedCount });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete("/api/docs/:id", async (req, res) => {
   try {
     const col = await filesCol();
