@@ -2852,7 +2852,7 @@
     if (!lead || !listEl) return;
     const acts = (lead.activity || []).map(function(a, idx){ return { a: a, idx: idx }; }).sort(function(x, y){ return (y.a.when||'').localeCompare(x.a.when||''); });
     if (!acts.length) { listEl.innerHTML = '<div style="color:#8a97b5;padding:14px 0;font-size:13px">No activity yet.</div>'; return; }
-    const icon = function(t){ return t === 'created' ? '\u2795' : t === 'status' ? '\u{1F504}' : t === 'note' ? '\u{1F4DD}' : t === 'proposal_sent' ? '\u{1F4E4}' : t === 'accepted' ? '\u2705' : t === 'uploaded' ? '\u{1F4CE}' : '\u2022'; };
+    const icon = function(t){ return t === 'created' ? '\u2795' : t === 'status' ? '\u{1F504}' : t === 'note' ? '\u{1F4DD}' : t === 'proposal_sent' ? '\u{1F4E4}' : t === 'accepted' ? '\u2705' : t === 'uploaded' ? '\u{1F4CE}' : t === 'converted' ? '\u{1F91D}' : '\u2022'; };
     listEl.innerHTML = acts.map(function(o){ var a = o.a, idx = o.idx; return '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #23324f">'
       + '<div style="font-size:15px;line-height:1.3">' + icon(a.type) + '</div>'
       + '<div style="flex:1"><div style="color:var(--text);font-size:13px">' + escP(a.text || '') + '</div><div style="color:#8a97b5;font-size:11px;margin-top:2px">' + fmtActWhen(a.when) + '</div></div>'
