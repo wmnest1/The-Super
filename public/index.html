@@ -2798,6 +2798,7 @@
     docsCurrentProject = proj;
     docsCurrentClient = null;
     docsCurrentLead = null;
+    docsCurrentClientAll = null;
     document.getElementById('docs-title').textContent = '\u{1F4C1} Job Docs \u2014 ' + proj;
     document.getElementById('docs-overlay').classList.add('active');
     refreshDocsList();
@@ -2806,6 +2807,7 @@
     docsCurrentClient = clientName;
     docsCurrentProject = null;
     docsCurrentLead = null;
+    docsCurrentClientAll = null;
     document.getElementById('docs-title').textContent = '\u{1F4F7} Photos \u2014 ' + clientName;
     document.getElementById('docs-overlay').classList.add('active');
     refreshDocsList();
@@ -2814,7 +2816,18 @@
     docsCurrentLead = leadName;
     docsCurrentProject = null;
     docsCurrentClient = null;
+    docsCurrentClientAll = null;
     document.getElementById('docs-title').textContent = '\u{1F4C1} Lead Docs \u2014 ' + leadName;
+    document.getElementById('docs-overlay').classList.add('active');
+    refreshDocsList();
+  };
+  window.openClientAll = function(clientName, mode){
+    docsCurrentClientAll = clientName;
+    docsCurrentMode = mode;
+    docsCurrentProject = null;
+    docsCurrentClient = null;
+    docsCurrentLead = null;
+    document.getElementById('docs-title').textContent = (mode === 'photos' ? '\u{1F4F7} Photos \u2014 ' : '\u{1F4C4} Docs \u2014 ') + clientName;
     document.getElementById('docs-overlay').classList.add('active');
     refreshDocsList();
   };
