@@ -2409,6 +2409,18 @@ app.post("/api/docs", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post("/api/docs/meta", async (req, res) => {
+  try {
+    const { id, meta } = req.body;
+    if (!id || !meta || typeof meta !== "object") return res.status(400).json({ error: "id and meta required." });
+    const set = {};
+    for (const k of Object.keys(meta)) set["meta." + k] = meta[k];
+    const col = await filesCol();
+    await col.updateOne({ _id: new ObjectId(id) }, { $set: set });
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.delete("/api/docs/:id", async (req, res) => {
   try {
     const col = await filesCol();
