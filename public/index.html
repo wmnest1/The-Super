@@ -3699,5 +3699,36 @@
   + 'html.light .files-float{background:#fff}';
   document.head.appendChild(s);
 })();
-</script></body>
+</script><script>
+/* ── Record panels registry + openRecord entry point (shared by desktop floaters & mobile shell) ── */
+(function(){
+  if (window.__recordCoreInit) return; window.__recordCoreInit = true;
+
+  window.isMobile = function(){ return window.matchMedia('(max-width: 640px)').matches; };
+
+  function panelScope(scope, only){
+    const t = scope.type;
+    if (t === 'client')  return { clientAll: scope.name, mode: only, only: only };
+    if (t === 'lead')    return { lead: scope.name, only: only };
+    if (t === 'project') return { project: scope.name, only: only };
+    return {};
+  }
+  window.recordPanelScope = panelScope;
+
+  window.RECORD_PANELS = [
+    { id:'overview', label:'Overview', icon:'\u{1F3E0}', mount: function(c, scope){ if (window.mountOverview) window.mountOverview(c, scope); } },
+    { id:'photos',   label:'Photos',   icon:'\u{1F4F8}', mount: function(c, scope){ if (window.renderFileBrowser) window.renderFileBrowser(c, panelScope(scope,'photos'), {}); } },
+    { id:'docs',     label:'Docs',     icon:'\u{1F4C1}', mount: function(c, scope){ if (window.renderFileBrowser) window.renderFileBrowser(c, panelScope(scope,'docs'), {}); } },
+    { id:'chat',     label:'Chat',     icon:'\u{1F4AC}', mount: function(c, scope){ c.innerHTML = '<div style="padding:26px 18px;color:#889;font-size:13px;text-align:center;line-height:1.6">A scoped Opus for this record is coming \u2014 it\u2019ll know this record\u2019s fields, files, photos, and history.</div>'; } }
+  ];
+
+  window.openRecord = function(scope){
+    if (!scope || !scope.type || !scope.name) return;
+    if (window.isMobile() && window.openMobileWorkspace) return window.openMobileWorkspace(scope);
+    const TABS = { lead:'leads', client:'clients', project:'projects' };
+    if (window.openCardFloat) window.openCardFloat(TABS[scope.type] || scope.type, scope.name);
+  };
+})();
+</script>
+</body>
 </html>
