@@ -3615,5 +3615,42 @@
   document.head.appendChild(css);
 })();
 </script>
-</body>
+<script>
+/* ── Floating File Browser window (mounts renderFileBrowser in a draggable shell) ── */
+(function(){
+  if (window.__filesWinInit) return; window.__filesWinInit = true;
+  let z = 9500;
+  window.openFilesWindow = function(scope, title){
+    const wrap = document.createElement('div');
+    wrap.className = 'files-float';
+    wrap.style.left = '120px'; wrap.style.top = '90px'; wrap.style.zIndex = ++z;
+    wrap.innerHTML = '<div class="ff-bar"><span>\u{1F4C1} ' + String(title||'Files').replace(/</g,'&lt;') + '</span><button class="ff-x" title="Close">\u2715</button></div><div class="ff-body"></div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('pointerdown', ()=>{ wrap.style.zIndex = ++z; });
+    wrap.querySelector('.ff-x').addEventListener('click', ()=> wrap.remove());
+    const bar = wrap.querySelector('.ff-bar');
+    bar.addEventListener('pointerdown', function(e){
+      if (e.target.closest('.ff-x')) return; e.preventDefault();
+      const sx=e.clientX, sy=e.clientY, ol=wrap.offsetLeft, ot=wrap.offsetTop;
+      function mv(ev){ let nl=ol+(ev.clientX-sx), nt=ot+(ev.clientY-sy); nl=Math.max(-wrap.offsetWidth+90,Math.min(nl,window.innerWidth-60)); nt=Math.max(0,Math.min(nt,window.innerHeight-38)); wrap.style.left=nl+'px'; wrap.style.top=nt+'px'; }
+      function up(){ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); }
+      document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+    });
+    if (window.renderFileBrowser) window.renderFileBrowser(wrap.querySelector('.ff-body'), scope, {});
+  };
+  window.openLeadFiles = n => openFilesWindow({lead:n}, 'Files \u2014 '+n);
+  window.openClientFiles = n => openFilesWindow({clientAll:n, mode:'docs'}, 'Files \u2014 '+n);
+  window.openProjectFiles = n => openFilesWindow({project:n}, 'Files \u2014 '+n);
+
+  const s=document.createElement('style');
+  s.textContent =
+    '.files-float{position:fixed;z-index:9500;background:var(--panel);border:2px solid var(--accent);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:340px;min-height:260px;width:640px;height:560px;max-width:96vw;max-height:92vh}'
+  + '.ff-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f3460;color:#fff;cursor:move;user-select:none;flex-shrink:0;font-size:13px;font-weight:bold}'
+  + '.ff-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '.ff-x{background:none;border:none;color:#aab;font-size:15px;cursor:pointer;padding:0 2px}.ff-x:hover{color:#fff}'
+  + '.ff-body{flex:1;min-height:0;display:flex;flex-direction:column}'
+  + 'html.light .files-float{background:#fff}';
+  document.head.appendChild(s);
+})();
+</script></body>
 </html>
