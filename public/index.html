@@ -3259,5 +3259,114 @@
   + 'html.light .card-float{background:#fff}';
   document.head.appendChild(s);
 })();
-</script></body>
+</script>
+
+<script>
+/* ── Floating Opus chat (Phase 2): reparent the live #chat-dock, no rebuild ── */
+(function(){
+  if (window.__chatFloatInit) return; window.__chatFloatInit = true;
+  let pinned = false, minimized = false, built = false, ztop = 9000;
+  let shell, body, bar;
+
+  function build(){
+    if (built) return; built = true;
+    const css = document.createElement('style');
+    css.textContent =
+      '#chat-float{position:fixed;z-index:9000;background:var(--panel);border:2px solid var(--accent);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);display:none;flex-direction:column;overflow:hidden;resize:both;min-width:320px;min-height:220px;width:440px;height:600px;max-height:94vh}'
+    + '#chat-float.pinned{border-color:#2ecc40}'
+    + '#chat-float.min{height:auto!important;min-height:0;resize:none}'
+    + '#chat-float.min .chatf-body{display:none}'
+    + '.chatf-bar{display:flex;align-items:center;gap:4px;padding:8px 10px;background:#0f3460;color:#fff;cursor:move;user-select:none;flex-shrink:0;font-size:13px;font-weight:bold}'
+    + '.chatf-bar .ttl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.chatf-btn{background:none;border:none;color:#aab;font-size:14px;cursor:pointer;padding:2px 6px;border-radius:5px;line-height:1}'
+    + '.chatf-btn:hover{color:#fff;background:rgba(255,255,255,.14)}'
+    + '.chatf-btn.on{color:#2ecc40}'
+    + '.chatf-body{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}'
+    + '.chatf-body #chat-dock{flex:1;min-height:0}'
+    + 'html.light #chat-float{background:#fff}';
+    document.head.appendChild(css);
+
+    shell = document.createElement('div');
+    shell.id = 'chat-float';
+    shell.innerHTML =
+      '<div class="chatf-bar"><span class="ttl">\u{1F4AC} Opus</span>'
+      + '<button class="chatf-btn" data-act="pin" title="Pin on top">\u{1F4CC}</button>'
+      + '<button class="chatf-btn" data-act="min" title="Minimize">\u2796</button>'
+      + '<button class="chatf-btn" data-act="pop" title="Pop out to a window (coming soon)">\u2197</button>'
+      + '<button class="chatf-btn" data-act="dock" title="Dock to bottom">\u29C9</button></div>'
+      + '<div class="chatf-body"></div>';
+    document.body.appendChild(shell);
+    body = shell.querySelector('.chatf-body');
+    bar  = shell.querySelector('.chatf-bar');
+
+    bar.addEventListener('click', function(e){
+      const b = e.target.closest('.chatf-btn'); if (!b) return;
+      ({ dock: dockChat, pin: togglePin, min: toggleMin, pop: popOut })[b.dataset.act]();
+    });
+    bar.addEventListener('pointerdown', function(e){
+      if (e.target.closest('.chatf-btn')) return;
+      e.preventDefault();
+      const sx=e.clientX, sy=e.clientY, ol=shell.offsetLeft, ot=shell.offsetTop;
+      function mv(ev){
+        let nl=ol+(ev.clientX-sx), nt=ot+(ev.clientY-sy);
+        nl=Math.max(-shell.offsetWidth+100, Math.min(nl, window.innerWidth-70));
+        nt=Math.max(0, Math.min(nt, window.innerHeight-38));
+        shell.style.left=nl+'px'; shell.style.top=nt+'px'; shell.style.right='auto'; shell.style.bottom='auto';
+      }
+      function up(){ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); }
+      document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
+    });
+  }
+
+  document.addEventListener('pointerdown', function(e){
+    const f = e.target.closest('.card-float, #chat-float');
+    if (!f) return;
+    if (f.id === 'chat-float' && pinned){ f.style.zIndex = 999999; return; }
+    f.style.zIndex = ++ztop;
+  }, false);
+
+  function togglePin(){
+    pinned = !pinned;
+    shell.classList.toggle('pinned', pinned);
+    bar.querySelector('[data-act="pin"]').classList.toggle('on', pinned);
+    shell.style.zIndex = pinned ? 999999 : ++ztop;
+  }
+  function toggleMin(){
+    minimized = !minimized;
+    shell.classList.toggle('min', minimized);
+    bar.querySelector('[data-act="min"]').textContent = minimized ? '\u2795' : '\u2796';
+  }
+  function popOut(){
+    if (window.__popOutChat) return window.__popOutChat();
+    alert('Pop Out to a separate window is the next step \u2014 coming soon.');
+  }
+  function scrollBottom(){ const cb=document.getElementById('chat-box'); if (cb) cb.scrollTop=cb.scrollHeight; }
+
+  window.floatChat = function(){
+    build();
+    const dock = document.getElementById('chat-dock'); if (!dock) return;
+    if (shell.contains(dock)){ shell.style.zIndex = pinned?999999:++ztop; return; }
+    if (!shell.style.left && !shell.style.top){
+      shell.style.left = Math.max(20, window.innerWidth - 480) + 'px';
+      shell.style.top  = '90px';
+    }
+    body.appendChild(dock);
+    shell.style.display = 'flex';
+    shell.style.zIndex = pinned ? 999999 : ++ztop;
+    scrollBottom();
+  };
+  window.dockChat = function(){
+    const dock = document.getElementById('chat-dock'), anchor = document.getElementById('data-modal');
+    if (dock && anchor) document.body.insertBefore(dock, anchor);
+    if (shell) shell.style.display = 'none';
+    scrollBottom();
+  };
+  window.toggleChatFloat = function(){
+    const dock = document.getElementById('chat-dock');
+    if (shell && shell.style.display === 'flex' && shell.contains(dock)) dockChat();
+    else floatChat();
+  };
+})();
+</script>
+</body>
 </html>
