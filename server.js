@@ -203,7 +203,8 @@ async function saveJobDocument({ project, client, lead, name, docType, mimeType,
     html: html || null,                    // HTML for generated docs
     size: data ? Math.round(data.length * 0.75) : (html ? html.length : 0),
     uploadedAt: new Date().toISOString(),
-    source: source || "chat"
+    source: source || "chat",
+    meta: { title: title || "", category: null, tags: [] }
   };
   const result = await col.insertOne(record);
   return { id: result.insertedId.toString(), name: record.name, docType: record.docType };
