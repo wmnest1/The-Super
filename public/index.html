@@ -3765,7 +3765,7 @@
     window.RECORD_PANELS.forEach(p => {
       const b = document.createElement('button');
       b.className = 'mws-tab'; b.dataset.panel = p.id;
-      b.innerHTML = '<span class="mws-ti">' + p.icon + '</span><span class="mws-tl">' + p.label + '</span>';
+      b.innerHTML = '<span class="mws-ti">' + (MWS_ICONS[p.id] || p.icon) + '</span><span class="mws-tl">' + p.label + '</span>';
       b.addEventListener('click', () => activate(p.id));
       nav.appendChild(b);
     });
