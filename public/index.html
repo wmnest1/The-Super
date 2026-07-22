@@ -3730,5 +3730,99 @@
   };
 })();
 </script>
+<script>
+/* ── Mobile full-screen record workspace (iterates RECORD_PANELS; desktop untouched) ── */
+(function(){
+  if (window.__mwsInit) return; window.__mwsInit = true;
+
+  window.openMobileWorkspace = function(scope){
+    if (!scope || !window.RECORD_PANELS) return;
+    const prev = document.getElementById('mws'); if (prev) prev.remove();
+
+    const shell = document.createElement('div');
+    shell.id = 'mws';
+    const name = String(scope.name || '').replace(/</g,'&lt;');
+    shell.innerHTML =
+      '<div class="mws-top"><button class="mws-ic" data-mws="back" aria-label="Back">\u2190</button>'
+      + '<div class="mws-title">' + name + '</div>'
+      + '<button class="mws-ic" data-mws="more" aria-label="More">\u22EE</button></div>'
+      + '<div class="mws-body"></div><div class="mws-nav"></div><div class="mws-sheet" hidden></div>';
+    document.body.appendChild(shell);
+
+    const body = shell.querySelector('.mws-body');
+    const nav = shell.querySelector('.mws-nav');
+    const sheet = shell.querySelector('.mws-sheet');
+
+    window.RECORD_PANELS.forEach(p => {
+      const b = document.createElement('button');
+      b.className = 'mws-tab'; b.dataset.panel = p.id;
+      b.innerHTML = '<span class="mws-ti">' + p.icon + '</span><span class="mws-tl">' + p.label + '</span>';
+      b.addEventListener('click', () => activate(p.id));
+      nav.appendChild(b);
+    });
+
+    function activate(id){
+      const panel = window.RECORD_PANELS.find(p => p.id === id); if (!panel) return;
+      nav.querySelectorAll('.mws-tab').forEach(t => t.classList.toggle('on', t.dataset.panel === id));
+      body.innerHTML = '';
+      const host = document.createElement('div'); host.className = 'mws-panel'; body.appendChild(host);
+      try { panel.mount(host, scope); } catch(e){ host.innerHTML = '<div style="padding:20px;color:#889">Could not load.</div>'; }
+    }
+
+    shell.querySelector('.mws-top').addEventListener('click', function(e){
+      const b = e.target.closest('[data-mws]'); if (!b) return;
+      if (b.dataset.mws === 'back') shell.remove();
+      else toggleSheet();
+    });
+
+    function toggleSheet(){
+      if (!sheet.hidden){ sheet.hidden = true; return; }
+      const tab = ({lead:'leads',client:'clients',project:'projects'})[scope.type];
+      const arr = (window.appData && appData[tab]) || [];
+      const idx = arr.findIndex(r => (r.name||'') === scope.name || (tab==='leads' && (r.id||'')===scope.name));
+      let items = '';
+      if (scope.type === 'lead' && idx>=0){
+        items += '<button data-act="activity">\u26A1 Activity</button>';
+        if (!arr[idx].converted) items += '<button data-act="convert">\u2192 Convert to client</button>';
+      }
+      items += '<button data-act="delete" class="danger">\u{1F5D1} Delete</button><button data-act="close">Close menu</button>';
+      sheet.innerHTML = '<div class="mws-sheet-inner">' + items + '</div>';
+      sheet.hidden = false;
+      sheet.onclick = function(ev){
+        const a = ev.target.closest('[data-act]');
+        if (!a){ if (ev.target === sheet) sheet.hidden = true; return; }
+        const act = a.dataset.act; sheet.hidden = true;
+        if (act === 'activity' && window.openLeadActivity) openLeadActivity(idx);
+        else if (act === 'convert' && window.convertLeadToClient) convertLeadToClient(idx);
+        else if (act === 'delete' && window.deleteRecord){
+          if (confirm('Delete this ' + scope.type + '? This cannot be undone.')){ deleteRecord(tab, idx); shell.remove(); }
+        }
+      };
+    }
+
+    activate('overview');
+  };
+
+  const s = document.createElement('style');
+  s.textContent =
+    '#mws{position:fixed;inset:0;z-index:100000;background:var(--bg,#1a1a2e);display:flex;flex-direction:column}'
+  + '.mws-top{display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #2a3a5e;flex-shrink:0}'
+  + '.mws-ic{background:none;border:none;color:var(--text,#eee);font-size:22px;cursor:pointer;padding:2px 8px;line-height:1}'
+  + '.mws-title{flex:1;font-size:16px;font-weight:bold;color:var(--text,#eee);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}'
+  + '.mws-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}'
+  + '.mws-panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}'
+  + '.mws-nav{display:flex;border-top:1px solid #2a3a5e;flex-shrink:0;padding-bottom:env(safe-area-inset-bottom,0)}'
+  + '.mws-tab{flex:1;background:none;border:none;padding:8px 0 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;color:#889}'
+  + '.mws-tab.on{color:var(--accent,#e8a020)}'
+  + '.mws-ti{font-size:19px;line-height:1}.mws-tl{font-size:10px}'
+  + '.mws-sheet{position:absolute;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:5}'
+  + '.mws-sheet-inner{background:var(--panel,#16213e);width:100%;border-radius:14px 14px 0 0;padding:10px;display:flex;flex-direction:column;gap:6px}'
+  + '.mws-sheet-inner button{background:#0f3460;border:1px solid #2a3a5e;border-radius:8px;color:var(--text,#eee);font-size:15px;padding:13px;cursor:pointer;text-align:left}'
+  + '.mws-sheet-inner button.danger{color:#e57373}'
+  + '@media (max-width:640px){.cfe-cols{flex-direction:column;gap:0}.cfe-left{flex:0 0 auto}.cfe-right{flex:0 0 auto}}'
+  + 'html.light #mws{background:#f0f2f5}';
+  document.head.appendChild(s);
+})();
+</script>
 </body>
 </html>
