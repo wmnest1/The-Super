@@ -3278,7 +3278,10 @@
     if (!rec){ wrap.remove(); return; }
     const wide = wrap.classList.contains('wide') && EXP_TABS.includes(wrap.dataset.tab);
     const b = wrap.querySelector('.cf-body');
-    try { b.innerHTML = wide ? renderExpanded(wrap.dataset.tab, rec, idx) : renderCard(wrap.dataset.tab, rec, idx); }
+    try {
+      if (wide) window.mountOverview(b, { type: OV_SING[wrap.dataset.tab], name: wrap.dataset.key });
+      else b.innerHTML = renderCard(wrap.dataset.tab, rec, idx);
+    }
     catch(e){ b.innerHTML = '<div style="padding:14px;color:#889;font-size:12px">Could not render this card.</div>'; }
   }
   window.refreshAllCardFloats = function(){ document.querySelectorAll('.card-float').forEach(fill); };
