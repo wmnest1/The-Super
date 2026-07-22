@@ -3559,7 +3559,13 @@
 
     async function load(){
       itemsEl.innerHTML = '<div class="fb-empty">Loading\u2026</div>';
-      try { const res = await fetch('/api/docs?' + qsFromScope(scope)); const docs = await res.json(); render(Array.isArray(docs)?docs:[]); }
+      try {
+        const res = await fetch('/api/docs?' + qsFromScope(scope));
+        let docs = await res.json(); if (!Array.isArray(docs)) docs = [];
+        if (scope.only === 'photos') docs = docs.filter(isImg);
+        else if (scope.only === 'docs') docs = docs.filter(function(d){ return !isImg(d); });
+        render(docs);
+      }
       catch(e){ itemsEl.innerHTML = '<div class="fb-empty">Could not load files.</div>'; }
     }
     el._fbReload = load;
