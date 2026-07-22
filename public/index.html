@@ -3220,6 +3220,8 @@
       left = `<label>Client</label>${inp('client')}<label>Address</label>${inp('address')}<label>Start date</label>${inp('startDate')}<label>Rate $/hr</label>${inp('rate')}<label>Contract $</label>${inp('contractAmount')}<label>Materials markup %</label>${inp('markup')}`;
       right = `<label>Notes</label>${ta('notes')}`;
     }
+    const _fk = tab==='leads'?'openLeadFiles':tab==='clients'?'openClientFiles':'openProjectFiles';
+    acts += `<button class="cfe-act" onclick="${_fk}('${jsq(r.name)}')">\u{1F4C1} Files</button>`;
     return `<div class="cfe"><div class="cfe-head">${head}</div><div class="cfe-acts">${acts}</div>`
       + `<div class="cfe-cols"><div class="cfe-left">${left}</div><div class="cfe-right">${right}</div></div>`
       + `<div class="cfe-save-row"><button class="cfe-save" data-cfsave="1">\u{1F4BE} Save</button><button class="cfe-cancel" data-cfcancel="1">Cancel</button></div></div>`;
