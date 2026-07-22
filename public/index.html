@@ -3237,6 +3237,42 @@
     if (typeof renderList === 'function') renderList(wrap.dataset.tab); else fill(wrap);
   }
 
+  const OV_TAB = { lead:'leads', client:'clients', project:'projects' };
+  const OV_SING = { leads:'lead', clients:'client', projects:'project' };
+
+  window.mountOverview = function(container, scope, opts){
+    opts = opts || {};
+    const el = typeof container === 'string' ? document.querySelector(container) : container;
+    if (!el) return;
+    const tab = OV_TAB[scope.type] || scope.type;
+    el.dataset.ovTab = tab; el.dataset.ovKey = scope.name;
+    el._ovReload = function(){
+      const { rec, idx } = findRec(tab, el.dataset.ovKey);
+      if (!rec){ el.innerHTML = '<div style="padding:16px;color:#889;font-size:12px">This record was renamed or deleted.</div>'; return; }
+      try { el.innerHTML = renderExpanded(tab, rec, idx); } catch(e){ el.innerHTML = '<div style="padding:16px;color:#889;font-size:12px">Could not render.</div>'; }
+    };
+    if (!el._ovWired){
+      el._ovWired = true;
+      el.addEventListener('click', function(e){
+        if (e.target.closest('[data-cfsave]')){ e.stopPropagation(); saveOverview(el); }
+        else if (e.target.closest('[data-cfcancel]')){ e.stopPropagation(); el._ovReload(); }
+      });
+    }
+    el._ovReload();
+  };
+
+  function saveOverview(el){
+    const tab = el.dataset.ovTab;
+    const { rec } = findRec(tab, el.dataset.ovKey);
+    if (!rec) return;
+    el.querySelectorAll('[data-field]').forEach(f => { rec[f.dataset.field] = f.value; });
+    const newKey = keyOf(tab, rec);
+    el.dataset.ovKey = newKey;
+    const cf = el.closest('.card-float'); if (cf){ cf.dataset.key = newKey; cf.classList.add('saved'); setTimeout(()=>cf.classList.remove('saved'), 1200); }
+    try { fetch('/api/data', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(appData) }); } catch(e){}
+    if (typeof renderList === 'function') renderList(tab); else el._ovReload();
+  }
+
   function fill(wrap){
     const { rec, idx } = findRec(wrap.dataset.tab, wrap.dataset.key);
     if (!rec){ wrap.remove(); return; }
