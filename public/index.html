@@ -3709,7 +3709,10 @@
   function panelScope(scope, only){
     const t = scope.type;
     if (t === 'client')  return { clientAll: scope.name, mode: only, only: only };
-    if (t === 'lead')    return { lead: scope.name, only: only };
+    if (t === 'lead'){
+      const _l = ((window.appData && appData.leads) || []).find(l => (l.id||'') === scope.name || (l.name||'') === scope.name);
+      return { lead: _l ? _l.name : scope.name, only: only };
+    }
     if (t === 'project') return { project: scope.name, only: only };
     return {};
   }
