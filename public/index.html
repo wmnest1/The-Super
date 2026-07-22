@@ -3177,11 +3177,14 @@
 })();
 </script>
 <script>
-/* ── Floating cards (Phase 1) — reuses the dashboard jp-float pattern ── */
+/* ── Floating cards (Phase 1 + expanded editor) — reuses the dashboard jp-float pattern ── */
 (function(){
   if (window.__cardFloatInit) return; window.__cardFloatInit = true;
   const MAX_CARD_FLOATS = 6;
+  const WIDE = 620;
   const LABELS = { clients:'Client', projects:'Project', leads:'Lead' };
+  const EXP_TABS = ['leads','clients','projects'];
+  const LEAD_STATUSES = ['New','Contacted','Site Visit Scheduled','Ballpark Sent','Proposal Sent','Follow-Up','On Hold','Won','Lost'];
   let zc = 7000;
 
   function keyOf(tab, r){ return tab === 'leads' ? (r.id || r.name || '') : (r.name || ''); }
@@ -3191,18 +3194,59 @@
     return { rec: idx >= 0 ? arr[idx] : null, idx };
   }
   function bringFront(el){ el.style.zIndex = ++zc; }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+  function jsq(s){ return String(s==null?'':s).replace(/'/g,"\\'"); }
+
+  function renderExpanded(tab, r, idx){
+    const inp = (f,ph)=>`<input class="cfe-in" data-field="${f}" value="${esc(r[f])}" placeholder="${ph||''}">`;
+    const ta  = (f,ph)=>`<textarea class="cfe-ta" data-field="${f}" placeholder="${ph||''}">${esc(r[f])}</textarea>`;
+    let head='', left='', right='', acts='';
+    if (tab === 'leads'){
+      const st = LEAD_STATUSES.map(s=>`<option${s===r.status?' selected':''}>${esc(s)}</option>`).join('');
+      head = `<input class="cfe-name" data-field="name" value="${esc(r.name)}"><select class="cfe-in cfe-status" data-field="status">${st}</select>`;
+      acts = (r.converted ? '<span class="cfe-badge">\u2713 Client</span>' : `<button class="cfe-act" onclick="convertLeadToClient(${idx})">\u2192 Client</button>`)
+        + `<button class="cfe-act" onclick="openLeadActivity(${idx})">\u26A1 Activity</button>`
+        + `<button class="cfe-act" onclick="openLeadDocsModal('${jsq(r.name)}')">\u{1F4C4} Docs</button>`;
+      left = `<label>Phone</label>${inp('phone')}<label>Email</label>${inp('email')}<label>Address</label>${inp('address')}<label>Source</label>${inp('source')}<label>Est. value</label>${inp('value')}<label>Last contact</label>${inp('lastContact','mm/dd/yyyy')}<label>Follow-up</label>${inp('followup','mm/dd/yyyy')}`;
+      right = `<label>Project description</label>${ta('desc')}<label>Internal notes</label>${ta('notes')}`;
+    } else if (tab === 'clients'){
+      head = `<input class="cfe-name" data-field="name" value="${esc(r.name)}">`;
+      acts = `<button class="cfe-act" onclick="openClientAll('${jsq(r.name)}','docs')">\u{1F4C4} Docs</button><button class="cfe-act" onclick="openClientAll('${jsq(r.name)}','photos')">\u{1F4F7} Photos</button>`;
+      left = `<label>Phone</label>${inp('phone')}<label>Email</label>${inp('email')}<label>Address</label>${inp('address')}`;
+      right = `<label>Notes</label>${ta('notes')}`;
+    } else {
+      head = `<input class="cfe-name" data-field="name" value="${esc(r.name)}">`;
+      acts = `<button class="cfe-act" onclick="openDocsModal('${jsq(r.name)}')">\u{1F4C4} Docs</button>`;
+      left = `<label>Client</label>${inp('client')}<label>Address</label>${inp('address')}<label>Start date</label>${inp('startDate')}<label>Rate $/hr</label>${inp('rate')}<label>Contract $</label>${inp('contractAmount')}<label>Materials markup %</label>${inp('markup')}`;
+      right = `<label>Notes</label>${ta('notes')}`;
+    }
+    return `<div class="cfe"><div class="cfe-head">${head}</div><div class="cfe-acts">${acts}</div>`
+      + `<div class="cfe-cols"><div class="cfe-left">${left}</div><div class="cfe-right">${right}</div></div>`
+      + `<div class="cfe-save-row"><button class="cfe-save" data-cfsave="1">\u{1F4BE} Save</button><button class="cfe-cancel" data-cfcancel="1">Cancel</button></div></div>`;
+  }
+
+  function saveExpanded(wrap){
+    const { rec } = findRec(wrap.dataset.tab, wrap.dataset.key);
+    if (!rec) return;
+    wrap.querySelectorAll('[data-field]').forEach(el => { rec[el.dataset.field] = el.value; });
+    wrap.dataset.key = keyOf(wrap.dataset.tab, rec);
+    try { fetch('/api/data', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(appData) }); } catch(e){}
+    wrap.classList.add('saved'); setTimeout(()=>wrap.classList.remove('saved'), 1200);
+    if (typeof renderList === 'function') renderList(wrap.dataset.tab); else fill(wrap);
+  }
 
   function fill(wrap){
     const { rec, idx } = findRec(wrap.dataset.tab, wrap.dataset.key);
     if (!rec){ wrap.remove(); return; }
-    try { wrap.querySelector('.cf-body').innerHTML = renderCard(wrap.dataset.tab, rec, idx); }
-    catch(e){ wrap.querySelector('.cf-body').innerHTML = '<div style="padding:14px;color:#889;font-size:12px">Could not render this card.</div>'; }
+    const wide = wrap.classList.contains('wide') && EXP_TABS.includes(wrap.dataset.tab);
+    const b = wrap.querySelector('.cf-body');
+    try { b.innerHTML = wide ? renderExpanded(wrap.dataset.tab, rec, idx) : renderCard(wrap.dataset.tab, rec, idx); }
+    catch(e){ b.innerHTML = '<div style="padding:14px;color:#889;font-size:12px">Could not render this card.</div>'; }
   }
   window.refreshAllCardFloats = function(){ document.querySelectorAll('.card-float').forEach(fill); };
 
   window.openCardFloat = function(tab, key){
-    const existing = [...document.querySelectorAll('.card-float')]
-      .find(f => f.dataset.tab === tab && f.dataset.key === key);
+    const existing = [...document.querySelectorAll('.card-float')].find(f => f.dataset.tab === tab && f.dataset.key === key);
     if (existing){ bringFront(existing); return; }
     const all = document.querySelectorAll('.card-float');
     if (all.length >= MAX_CARD_FLOATS) all[0].remove();
@@ -3213,8 +3257,9 @@
     const wrap = document.createElement('div');
     wrap.className = 'card-float';
     wrap.dataset.tab = tab; wrap.dataset.key = key;
-    wrap.style.left = (90 + n * 34) + 'px';
-    wrap.style.top  = (86 + n * 34) + 'px';
+    wrap.style.left = (80 + n * 34) + 'px';
+    wrap.style.top  = (80 + n * 34) + 'px';
+    if (EXP_TABS.includes(tab)){ wrap.style.width = '700px'; wrap.style.height = '560px'; wrap.classList.add('wide'); }
     const title = String(rec.name || key).replace(/</g,'&lt;');
     wrap.innerHTML =
       '<div class="cf-bar"><span>\u29C9 ' + (LABELS[tab]||'Card') + ' \u2014 ' + title + '</span>'
@@ -3225,6 +3270,19 @@
 
     wrap.querySelector('.cf-x').addEventListener('click', () => wrap.remove());
     wrap.addEventListener('pointerdown', () => bringFront(wrap));
+    wrap.addEventListener('click', function(e){
+      if (e.target.closest('[data-cfsave]')){ e.stopPropagation(); saveExpanded(wrap); }
+      else if (e.target.closest('[data-cfcancel]')){ e.stopPropagation(); fill(wrap); }
+    });
+
+    if (window.ResizeObserver){
+      const ro = new ResizeObserver(() => {
+        const shouldWide = wrap.offsetWidth >= WIDE && EXP_TABS.includes(wrap.dataset.tab);
+        if (shouldWide !== wrap.classList.contains('wide')){ wrap.classList.toggle('wide', shouldWide); fill(wrap); }
+      });
+      ro.observe(wrap);
+    }
+
     const bar = wrap.querySelector('.cf-bar');
     bar.addEventListener('pointerdown', function(e){
       if (e.target.closest('.cf-x')) return;
@@ -3249,18 +3307,37 @@
 
   const s = document.createElement('style');
   s.textContent =
-    '.card-float{position:fixed;z-index:7000;background:var(--panel);border:2px solid var(--accent);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:300px;min-height:170px;width:430px;height:auto;max-height:82vh}'
+    '.card-float{position:fixed;z-index:7000;background:var(--panel);border:2px solid var(--accent);border-radius:12px;box-shadow:0 10px 36px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;resize:both;min-width:300px;min-height:170px;width:430px;height:auto;max-width:96vw;max-height:88vh;transition:border-color .2s,box-shadow .2s}'
+  + '.card-float.saved{border-color:#2ecc40;box-shadow:0 0 0 2px #2ecc40,0 10px 36px rgba(0,0,0,.6)}'
   + '.cf-bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;background:#0f3460;color:#fff;cursor:move;user-select:none;flex-shrink:0;font-size:13px;font-weight:bold}'
   + '.cf-bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
   + '.cf-x{background:none;border:none;color:#aab;font-size:15px;cursor:pointer;flex-shrink:0;padding:0 2px}'
   + '.cf-x:hover{color:#fff}'
   + '.cf-body{overflow:auto;flex:1;padding:10px}'
   + '.cf-body .record-card{cursor:default}'
-  + 'html.light .card-float{background:#fff}';
+  + 'html.light .card-float{background:#fff}'
+  + '.cfe{display:flex;flex-direction:column;font-size:13px}'
+  + '.cfe-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}'
+  + '.cfe-name{flex:1;font-size:16px;font-weight:bold;background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:8px 10px}'
+  + '.cfe-status{flex:0 0 190px}'
+  + '.cfe-acts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}'
+  + '.cfe-act{background:#0f3460;border:1px solid #2a3a5e;border-radius:6px;color:#cdd;font-size:12px;padding:6px 10px;cursor:pointer}'
+  + '.cfe-act:hover{color:#fff}'
+  + '.cfe-badge{color:#2ecc40;font-size:12px;padding:6px 8px}'
+  + '.cfe-cols{display:flex;gap:16px;align-items:flex-start}'
+  + '.cfe-left{flex:0 0 236px;display:flex;flex-direction:column}'
+  + '.cfe-right{flex:1;display:flex;flex-direction:column;min-width:0}'
+  + '.cfe label{font-size:10px;color:var(--accent);margin:9px 0 3px;text-transform:uppercase;letter-spacing:.04em}'
+  + '.cfe-in{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:7px 9px;font-size:13px;width:100%}'
+  + '.cfe-ta{background:#0f1a2e;border:1px solid #2a3a5e;border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;width:100%;min-height:140px;resize:vertical;line-height:1.55;font-family:inherit}'
+  + '.cfe-right .cfe-ta{min-height:200px}'
+  + '.cfe-save-row{display:flex;align-items:center;gap:10px;margin-top:16px}'
+  + '.cfe-save{background:var(--accent);border:none;border-radius:6px;color:#1a1a2e;font-weight:bold;padding:9px 18px;cursor:pointer}'
+  + '.cfe-cancel{background:#0f3460;border:1px solid #2a3a5e;border-radius:6px;color:#aac;padding:9px 16px;cursor:pointer}'
+  + 'html.light .cfe-name,html.light .cfe-in,html.light .cfe-ta{background:#fff;color:#222}';
   document.head.appendChild(s);
 })();
 </script>
-
 <script>
 /* ── Floating Opus chat (Phase 2): reparent the live #chat-dock, no rebuild ── */
 (function(){
