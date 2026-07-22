@@ -189,7 +189,7 @@ function logLeadActivity(data, leadName, type, text) {
     lead.activity.push({ when: new Date().toISOString(), type: type, text: text });
   } catch (e) { console.error('logLeadActivity:', e.message); }
 }
-async function saveJobDocument({ project, client, lead, name, docType, mimeType, data, html, source }) {
+async function saveJobDocument({ project, client, lead, name, docType, mimeType, data, html, source, title }) {
   const col = await filesCol();
   const record = {
     project: project || null,
