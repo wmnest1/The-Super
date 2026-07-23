@@ -159,6 +159,12 @@
         const now = Date.now();
         if (now - (el._fbLastOpen || 0) < 450) return;
         el._fbLastOpen = now;
+        const d = lastDocs.find(function(x){ return String(x.id) === String(id); });
+        if (d && isImg(d) && !item.dataset.sig){
+          const imgs = lastDocs.filter(isImg);
+          openLightbox(imgs, imgs.indexOf(d));
+          return;
+        }
         window.open(item.dataset.sig ? ('/proposal/' + item.dataset.token) : ('/api/docs/' + id + '/view'), '_blank');
         return;
       }
