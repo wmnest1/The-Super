@@ -103,6 +103,7 @@
     const el = typeof container === 'string' ? document.querySelector(container) : container;
     if (!el) return;
     let view = el.dataset.fbView || 'gallery';
+    let lastDocs = [];
     el.classList.add('fb-root');
     el.innerHTML =
       '<div class="fb-bar"><div class="fb-tools"></div><div class="fb-spacer"></div>'
