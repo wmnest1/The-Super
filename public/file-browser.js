@@ -102,11 +102,17 @@
     }
 
     itemsEl.addEventListener('click', async function(e){
-      const btn = e.target.closest('.fb-a'); if (!btn) return;
       const item = e.target.closest('.fb-item'); if (!item) return;
       const id = item.dataset.id;
+      if (e.target.closest('.fb-thumb')){
+        const now = Date.now();
+        if (now - (el._fbLastOpen || 0) < 450) return;
+        el._fbLastOpen = now;
+        window.open(item.dataset.sig ? ('/proposal/' + item.dataset.token) : ('/api/docs/' + id + '/view'), '_blank');
+        return;
+      }
+      const btn = e.target.closest('.fb-a'); if (!btn) return;
       const a = btn.dataset.a;
-      if (a === 'view'){ window.open(item.dataset.sig ? ('/proposal/' + item.dataset.token) : ('/api/docs/' + id + '/view'), '_blank'); return; }
       if (!id) return;
       else if (a === 'del'){ if (!confirm('Delete this file? This cannot be undone.')) return;
         try { await fetch('/api/docs/' + id, { method:'DELETE' }); load(); if (opts.onChange) opts.onChange(); } catch(err){ setStatus('Delete failed'); } }
