@@ -1542,7 +1542,7 @@
     else btn.style.removeProperty('--ic-mic');
     document.getElementById('status-bar').textContent = listening
       ? 'Listening — speak naturally, pauses OK...'
-      : 'The Super — Ready';
+      : readyStatusText();
   }
 
   // ── DATA MODAL ──
