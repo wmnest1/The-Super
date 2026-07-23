@@ -464,6 +464,17 @@
   html.light .copy-btn { background: #f5f5f5; border-color: var(--accent); color: #c8780a; }
   html.light .copy-btn:hover { background: var(--accent); color: #fff; }
   html.light .modal-overlay { background: rgba(0,0,0,.5); }
+/* ── Landing redesign: command bar on top, Business Data always visible ── */
+  body { height: auto; min-height: 100vh; }
+  #chat-dock { flex: none; }
+  #chat-box { flex: none; max-height: 46vh; }
+  #chat-box:empty { display: none; }
+  #input-area { border-top: none; border-bottom: 2px solid var(--accent); }
+  .chatf-body #chat-dock { flex: 1; }
+  .chatf-body #chat-box { max-height: none; flex: 1; }
+  #data-modal { display: block; position: static; background: none; z-index: auto; padding: 18px 0 60px; }
+  #data-modal .modal { width: min(1100px, 96vw); max-width: none; margin: 0 auto; height: auto; max-height: none; min-height: 0; resize: none; }
+  #data-modal .modal-close { display: none; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
