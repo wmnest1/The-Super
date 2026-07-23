@@ -1059,6 +1059,25 @@
 
 <script>
   let history = [];
+  let lastSyncAt = null;
+  function readyStatusText(){
+    return lastSyncAt
+      ? 'Connected \u2022 Last sync ' + lastSyncAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : 'Connecting\u2026';
+  }
+  function setReadyStatus(){
+    const sb = document.getElementById('status-bar');
+    if (sb && !sb.textContent.startsWith('Listening') && sb.textContent !== 'Working...') sb.textContent = readyStatusText();
+  }
+  function markSynced(){ lastSyncAt = new Date(); setReadyStatus(); }
+  (function(){
+    const _fetch = window.fetch;
+    window.fetch = function(url){
+      const p = _fetch.apply(this, arguments);
+      try { if (typeof url === 'string' && url.indexOf('/api/data') === 0) p.then(function(r){ if (r && r.ok) markSynced(); }); } catch(e){}
+      return p;
+    };
+  })();
   let recognition = null;
   let silenceTimer = null;
   let isListening = false;
