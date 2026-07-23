@@ -1970,11 +1970,11 @@
       ].filter(Boolean).join('<br>');
     }
     const docsBtn = tab === 'projects'
-      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">Docs</button>`
+      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('project','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button>`
       : (tab === 'clients'
-       ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openClientAll('${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openClientAll('${(r.name || '').replace(/'/g, "\\'")}','photos')">\u{1F4F7} Photos</button>` 
+        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('client','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('client','${(r.name || '').replace(/'/g, "\\'")}','photos')">\u{1F4F7} Photos</button>`
         : (tab === 'leads'
-        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openLeadDocsModal('${(r.name || '').replace(/'/g, "\\'")}')">\u{1F4C4} Docs</button>`
+        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('lead','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button>`
         : ''));
     const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
     const dragAttrs = canDrag
@@ -3729,6 +3729,12 @@
     { id:'chat',     label:'Chat',     icon:'\u{1F4AC}', mount: function(c, scope){ c.innerHTML = '<div style="padding:26px 18px;color:#889;font-size:13px;text-align:center;line-height:1.6">A scoped Opus for this record is coming \u2014 it\u2019ll know this record\u2019s fields, files, photos, and history.</div>'; } }
   ];
 
+  window.openRecordFiles = function(type, name, mode){
+    mode = mode || 'docs';
+    if (window.isMobile() && window.openMobileWorkspace) return window.openMobileWorkspace({ type: type, name: name }, mode === 'photos' ? 'photos' : 'docs');
+    if (window.openFilesWindow && window.recordPanelScope) return window.openFilesWindow(window.recordPanelScope({ type: type, name: name }, mode), (mode === 'photos' ? '\u{1F4F7} Photos' : '\u{1F4C1} Files') + ' \u2014 ' + name);
+  };
+
   window.openRecord = function(scope){
     if (!scope || !scope.type || !scope.name) return;
     if (window.isMobile() && window.openMobileWorkspace) return window.openMobileWorkspace(scope);
@@ -3748,7 +3754,7 @@
     chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>'
   };
 
-  window.openMobileWorkspace = function(scope){
+  window.openMobileWorkspace = function(scope, startPanel){
     if (!scope || !window.RECORD_PANELS) return;
     const prev = document.getElementById('mws'); if (prev) prev.remove();
 
@@ -3813,7 +3819,7 @@
       };
     }
 
-    activate('overview');
+    activate(startPanel || 'overview');
   };
 
   const s = document.createElement('style');
