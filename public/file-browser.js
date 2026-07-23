@@ -75,6 +75,7 @@
         let docs = await res.json(); if (!Array.isArray(docs)) docs = [];
         if (scope.only === 'photos') docs = docs.filter(isImg);
         else if (scope.only === 'docs') docs = docs.filter(function(d){ return !isImg(d); });
+        if (typeof opts.extraDocs === 'function'){ docs = docs.concat(opts.extraDocs() || []); docs.sort(function(a,b){ return new Date(b.uploadedAt||0) - new Date(a.uploadedAt||0); }); }
         render(docs);
       }
       catch(e){ itemsEl.innerHTML = '<div class="fb-empty">Could not load files.</div>'; }
