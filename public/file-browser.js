@@ -133,6 +133,7 @@
     el._fbReload = load;
 
     function render(docs){
+      lastDocs = docs;
       el.dataset.fbView = view;
       itemsEl.className = 'fb-items ' + (view === 'gallery' ? 'fb-gallery' : 'fb-list');
       if (!docs.length){ itemsEl.innerHTML = '<div class="fb-empty">No files yet. Upload or take a photo to add one.</div>'; return; }
