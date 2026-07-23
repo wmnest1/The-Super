@@ -2360,7 +2360,7 @@ app.get("/api/docs", async (req, res) => {
     else if (req.query.project === "__unfiled__") query = { project: null, client: null, lead: null };
     else if (req.query.project) query = { project: req.query.project };
     const docs = await col.find(query, { projection: { data: 0, html: 0 } }).sort({ uploadedAt: -1 }).limit(200).toArray();
-    res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, client: d.client, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source, meta: d.meta || {}, title: (d.meta && d.meta.title) || '' })));
+   res.json(docs.map(d => ({ id: d._id.toString(), project: d.project, client: d.client, name: d.name, docType: d.docType, kind: d.kind, mimeType: d.mimeType, size: d.size, uploadedAt: d.uploadedAt, source: d.source, meta: d.meta || {}, title: (d.meta && d.meta.title) || '', sig: !!d.sig, token: d.token || null }))); 
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
