@@ -92,11 +92,12 @@
                                : '<div class="fb-thumb fb-generic">' + iconFor(d) + '</div>';
         const sub = esc((d.docType && d.docType!=='file' ? d.docType.toUpperCase()+' \u00B7 ' : '') + fmtSize(d.size));
         const extra = (opts.tileActions ? opts.tileActions(d) : '');
-        return '<div class="fb-item" data-id="' + d.id + '">' + thumb
+        const acts = d.sig
+          ? '<button class="fb-a" data-a="view" title="View">\u{1F441}</button>'
+          : '<button class="fb-a" data-a="view" title="View">\u{1F441}</button><button class="fb-a" data-a="rename" title="Edit title">\u270F\uFE0F</button><button class="fb-a" data-a="del" title="Delete">\u{1F5D1}</button>';
+        return '<div class="fb-item" data-id="' + (d.id || '') + '"' + (d.sig ? ' data-sig="1" data-token="' + esc(d.token || '') + '"' : '') + '>' + thumb
           + '<div class="fb-meta"><div class="fb-title" title="'+t+'">'+t+'</div><div class="fb-sub">'+sub+'</div></div>'
-          + '<div class="fb-actions"><button class="fb-a" data-a="view" title="View">\u{1F441}</button>'
-          + '<button class="fb-a" data-a="rename" title="Edit title">\u270F\uFE0F</button>'
-          + '<button class="fb-a" data-a="del" title="Delete">\u{1F5D1}</button>' + extra + '</div></div>';
+          + '<div class="fb-actions">' + acts + extra + '</div></div>';
       }).join('');
     }
 
