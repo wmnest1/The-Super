@@ -1446,7 +1446,7 @@
       addMessage('Connection error — try again.', 'system');
     }
     document.getElementById('send-btn').disabled = false;
-    document.getElementById('status-bar').textContent = 'The Super — Ready';
+    setReadyStatus();
     isSending = false;
   }
 
