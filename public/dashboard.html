@@ -4119,43 +4119,17 @@ function cwInitListeners(){
 
   async function refreshDocsList(){
     const listEl = document.getElementById('docs-list');
-    listEl.innerHTML = '<div class="docs-empty">Loading\u2026</div>';
-    let files = [];
-    try {
-      const res = await fetch('/api/docs?project=' + encodeURIComponent(docsCurrentProject));
-      files = await res.json();
-      if (!Array.isArray(files)) files = [];
-    } catch (e) { files = []; }
-
-    // Merge in e-signature proposals for this project (stored separately in data.proposals)
-    const sigProps = ((typeof data !== 'undefined' && data.proposals) || [])
-      .filter(p => p.project === docsCurrentProject)
-      .map(p => ({
-        id: null, sig: true, token: p.id,
-        name: (p.subject || 'Proposal') + (p.status === 'accepted' ? ' (signed)' : ''),
-        docType: 'proposal',
-        uploadedAt: p.acceptedAt || p.sentDate,
-        size: 0
-      }));
-
-    const rows = [...files, ...sigProps].sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-
-    if (!rows.length) {
-      listEl.innerHTML = '<div class="docs-empty">No documents for this job yet.<br>Invoices and proposals you send are saved here automatically \u2014 or upload a file below.</div>';
-      return;
-    }
-
-    listEl.innerHTML = rows.map(d => {
-      const href = d.sig ? ('/proposal/' + d.token) : ('/api/docs/' + d.id + '/view');
-      const tag = escD(d.docType || 'file');
-      return '<div class="docs-row">'
-        + '<span class="docs-name" title="' + escD(d.name) + '">' + escD(d.name) + '</span>'
-        + '<span class="docs-tag ' + tag + '">' + tag + '</span>'
-        + '<span class="docs-meta">' + fmtDocWhen(d.uploadedAt) + (d.size ? ' \u00b7 ' + fmtSize(d.size) : '') + '</span>'
-        + '<a class="docs-view" href="' + href + '" target="_blank">View \u2192</a>'
-        + (d.sig ? '' : '<button class="docs-del" onclick="docsDelete(\'' + d.id + '\')" title="Delete">\u2715</button>')
-        + '</div>';
-    }).join('');
+    listEl.style.padding = '0';
+    const foot = document.getElementById('docs-foot'); if (foot) foot.style.display = 'none';
+    if (!window.renderFileBrowser){ listEl.innerHTML = '<div class="docs-empty">File browser failed to load \u2014 hard-reload.</div>'; return; }
+    const proj = docsCurrentProject;
+    window.renderFileBrowser(listEl, { project: proj }, {
+      extraDocs: function(){
+        return ((typeof data !== 'undefined' && data.proposals) || [])
+          .filter(p => p.project === proj)
+          .map(p => ({ id: null, sig: true, token: p.id, name: (p.subject || 'Proposal') + (p.status === 'accepted' ? ' (signed)' : ''), docType: 'proposal', mimeType: '', uploadedAt: p.acceptedAt || p.sentDate, size: 0 }));
+      }
+    });
   }
 
   window.docsDelete = async function(id){
