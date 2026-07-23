@@ -433,6 +433,7 @@
     .quick-btns { padding: 8px 10px; gap: 6px; }
     .quick-btns button { font-size: 12px; padding: 6px 10px; }
     .record-actions { flex-wrap: wrap; justify-content: flex-end; }
+    .record-info { flex: 1 1 100%; }
     .record-card { flex-wrap: wrap; }
     .modal { overflow-x: hidden; }
     #chat-box { padding: 12px 10px; gap: 10px; }
@@ -1969,13 +1970,9 @@
         notesHtml
       ].filter(Boolean).join('<br>');
     }
-    const docsBtn = tab === 'projects'
-      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('project','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button>`
-      : (tab === 'clients'
-        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('client','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('client','${(r.name || '').replace(/'/g, "\\'")}','photos')">\u{1F4F7} Photos</button>`
-        : (tab === 'leads'
-        ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('lead','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button>`
-        : ''));
+    const docsBtn = ['projects','clients','leads'].includes(tab)
+      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${tab.slice(0,-1)}','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${tab.slice(0,-1)}','${(r.name || '').replace(/'/g, "\\'")}','photos')">\u{1F4F7} Photos</button>`
+      : '';
     const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
     const dragAttrs = canDrag
       ? ` draggable="true" ondragstart="cardDragStart(event,'${tab}',${i})" ondragover="cardDragOver(event,'${tab}',${i})" ondragleave="cardDragLeave(event)" ondrop="cardDrop(event,'${tab}',${i})" ondragend="cardDragEnd(event)"`
