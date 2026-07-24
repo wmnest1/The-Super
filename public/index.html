@@ -1178,12 +1178,7 @@
             canvas.getContext('2d').drawImage(img, 0, 0, w, h);
             const compressed = canvas.toDataURL('image/jpeg', 0.82);
             const base64 = compressed.split(',')[1];
-            pendingImage = { kind: 'image', data: base64, type: 'image/jpeg', name: file.name };
-            document.getElementById('img-thumb').src = compressed;
-            const lbl = document.querySelector('.img-preview-label');
-            if (lbl) lbl.textContent = 'Image ready — add a message or send now';
-            document.getElementById('img-preview-bar').classList.add('active');
-            document.getElementById('upload-btn').classList.add('has-image');
+            addPending({ kind: 'image', data: base64, type: 'image/jpeg', name: file.name }, compressed);
           };
           img.src = e.target.result;
         };
