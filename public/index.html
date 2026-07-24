@@ -3566,6 +3566,8 @@
       return { lead: _l ? _l.name : scope.name, only: only };
     }
     if (t === 'project') return { project: scope.name, only: only };
+    if (t === 'crew') return { crew: scope.name, only: only };
+    if (t === 'sub') return { sub: scope.name, only: only };
     return {};
   }
   window.recordPanelScope = panelScope;
