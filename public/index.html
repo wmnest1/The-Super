@@ -3732,5 +3732,46 @@
 })();
 </script>
 <script>if (typeof openModal === 'function') openModal();</script>
+<script>
+/* ── Drag & drop: gallery drops upload to that record, anything else attaches to chat ── */
+(function(){
+  if (window.__dropInit) return; window.__dropInit = true;
+  let depth = 0, ov = null;
+  function hasFiles(e){ return e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1; }
+  function overlay(){
+    if (!ov){
+      ov = document.createElement('div');
+      ov.id = 'drop-ov';
+      ov.innerHTML = '<div class="drop-card">\u{1F4CE} Drop to attach<span>photo, PDF, Word, Excel, CSV, or text</span></div>';
+      document.body.appendChild(ov);
+    }
+    return ov;
+  }
+  function hide(){ depth = 0; if (ov) ov.classList.remove('on'); }
+  window.addEventListener('dragenter', function(e){ if (!hasFiles(e)) return; depth++; overlay().classList.add('on'); });
+  window.addEventListener('dragover', function(e){ if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  window.addEventListener('dragleave', function(e){ if (!hasFiles(e)) return; depth--; if (depth <= 0) hide(); });
+  window.addEventListener('drop', function(e){
+    if (!e.dataTransfer || !e.dataTransfer.files || !e.dataTransfer.files.length) return;
+    e.preventDefault(); hide();
+    const files = e.dataTransfer.files;
+    const fb = e.target.closest && e.target.closest('.fb-root');
+    if (fb && fb._fbUpload){ fb._fbUpload(files); return; }
+    if (typeof handleImageUpload === 'function'){
+      handleImageUpload({ target: { files: [files[0]], value: '' } });
+      const mi = document.getElementById('message-input'); if (mi) mi.focus();
+    }
+  });
+  window.addEventListener('dragend', hide);
+  const s = document.createElement('style');
+  s.textContent = '#drop-ov{position:fixed;inset:0;z-index:150000;display:none;align-items:center;justify-content:center;background:rgba(10,16,32,.72);pointer-events:none}'
+    + '#drop-ov.on{display:flex}'
+    + '.drop-card{border:2px dashed var(--accent,#e8a020);border-radius:16px;padding:32px 52px;text-align:center;color:var(--text,#eee);font-size:20px;font-weight:bold;background:rgba(22,33,62,.92)}'
+    + '.drop-card span{display:block;margin-top:8px;font-size:13px;font-weight:normal;color:#aab}'
+    + 'html.light .drop-card{background:rgba(255,255,255,.95);color:#1b2431}'
+    + 'html.light #drop-ov{background:rgba(240,242,245,.75)}';
+  document.head.appendChild(s);
+})();
+</script>
 </body>
 </html>
