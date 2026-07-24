@@ -1962,9 +1962,12 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message, history, imageData, imageType, documentData, documentName, attachments } = req.body;
     let data = await loadData();
-    const uploadedFile = documentData
-      ? { data: documentData, mimeType: "application/pdf", name: documentName || "Uploaded PDF" }
-      : (imageData ? { data: imageData, mimeType: imageType || "image/jpeg", name: "Uploaded image" } : null);
+    const _first = (Array.isArray(attachments) && attachments.length) ? attachments[0] : null;
+    const uploadedFile = _first
+      ? { data: _first.data, mimeType: _first.type || "application/octet-stream", name: _first.name || "Uploaded file" }
+      : (documentData
+        ? { data: documentData, mimeType: "application/pdf", name: documentName || "Uploaded PDF" }
+        : (imageData ? { data: imageData, mimeType: imageType || "image/jpeg", name: "Uploaded image" } : null));
     const chatModel = data.chatModel === "claude-sonnet-4-6" ? "claude-sonnet-4-6" : "claude-opus-4-8";
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
