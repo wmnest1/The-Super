@@ -189,12 +189,14 @@ function logLeadActivity(data, leadName, type, text) {
     lead.activity.push({ when: new Date().toISOString(), type: type, text: text });
   } catch (e) { console.error('logLeadActivity:', e.message); }
 }
-async function saveJobDocument({ project, client, lead, name, docType, mimeType, data, html, source, title }) {
+async function saveJobDocument({ project, client, lead, crew, sub, name, docType, mimeType, data, html, source, title }) {
   const col = await filesCol();
   const record = {
     project: project || null,
     client: client || null,
     lead: lead || null,
+    crew: crew || null,
+    sub: sub || null,
     name: name || "Untitled",
     docType: docType || "file",           // 'invoice' | 'proposal' | 'file'
     kind: html ? "generated" : "upload",  // generated = HTML we produced; upload = binary file
