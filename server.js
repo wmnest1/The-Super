@@ -1358,6 +1358,17 @@ async function executeTool(toolName, input, data, ctx) {
       data.projects.push(input);
       return { ok: true, action: "created", type: "project", data: input };
     }
+    case "save_sub": {
+      if (!data.subs) data.subs = [];
+      const _subKey = String(input.company || "").trim().toLowerCase();
+      const _subIdx = data.subs.findIndex(s => String(s.company || s.name || "").trim().toLowerCase() === _subKey);
+      if (_subIdx >= 0) {
+        data.subs[_subIdx] = { ...data.subs[_subIdx], ...input };
+        return { ok: true, action: "updated", type: "sub", data: input };
+      }
+      data.subs.push(input);
+      return { ok: true, action: "created", type: "sub", data: input };
+    }
     case "save_crew_member": {
       if (!data.crew) data.crew = [];
       const idx = data.crew.findIndex(c => c.name.toLowerCase() === input.name.toLowerCase());
