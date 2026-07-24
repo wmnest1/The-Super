@@ -3782,7 +3782,7 @@
     const fb = e.target.closest && e.target.closest('.fb-root');
     if (fb && fb._fbUpload){ fb._fbUpload(files); return; }
     if (typeof handleImageUpload === 'function'){
-      handleImageUpload({ target: { files: [files[0]], value: '' } });
+      Array.from(files).forEach(function(f){ handleImageUpload({ target: { files: [f], value: '' } }); });
       const mi = document.getElementById('message-input'); if (mi) mi.focus();
     }
   });
