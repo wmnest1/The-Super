@@ -6,6 +6,8 @@
     if (!s) return '';
     if (s.clientAll) return 'clientAll=' + encodeURIComponent(s.clientAll) + '&only=' + (s.mode || 'docs');
     if (s.lead)      return 'lead='    + encodeURIComponent(s.lead);
+    if (s.crew)      return 'crew='    + encodeURIComponent(s.crew);
+    if (s.sub)       return 'sub='     + encodeURIComponent(s.sub);
     if (s.client)    return 'client='  + encodeURIComponent(s.client);
     if (s.project === '__unfiled__') return 'project=__unfiled__';
     if (s.project)   return 'project=' + encodeURIComponent(s.project);
@@ -14,6 +16,8 @@
   function scopeToOwner(s){
     if (s.clientAll) return { client: s.clientAll };
     if (s.lead) return { lead: s.lead };
+    if (s.crew) return { crew: s.crew };
+    if (s.sub) return { sub: s.sub };
     if (s.client) return { client: s.client };
     if (s.project && s.project !== '__unfiled__') return { project: s.project };
     return {};
