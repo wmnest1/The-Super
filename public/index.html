@@ -1144,7 +1144,7 @@
     if (!text || !text.trim()) { addMessage('That file appears to be empty (no readable text found).', 'system'); return; }
     let truncated = false;
     if (text.length > MAX_TEXT_CHARS) { text = text.slice(0, MAX_TEXT_CHARS); truncated = true; }
-    pendingImage = { kind: 'text', text: text, name: name };
+    addPending({ kind: 'text', text: text, name: name }, fileIconDataUri(label || 'TXT', color || '#4a90d9'));
     setFilePreview(label, color, name, truncated ? 'large file — first part will be sent' : null);
   }
   function arrayBufferToBase64(buf){
