@@ -1084,6 +1084,43 @@
   let micSubmitted = false;
   let accumulatedTranscript = '';
   let pendingImage = null;
+  let pendingFiles = [];
+  function addPending(obj, thumbSrc){
+    obj.thumb = thumbSrc || fileIconDataUri('FILE', '#888');
+    pendingFiles.push(obj);
+    pendingImage = pendingFiles[0] || null;
+    renderPreviewBar();
+  }
+  window.removePending = function(i){
+    pendingFiles.splice(i, 1);
+    pendingImage = pendingFiles[0] || null;
+    renderPreviewBar();
+  };
+  function renderPreviewBar(){
+    const bar = document.getElementById('img-preview-bar');
+    if (!bar) return;
+    const btn = document.getElementById('upload-btn');
+    if (!pendingFiles.length){
+      bar.classList.remove('active'); bar.innerHTML = '';
+      if (btn) btn.classList.remove('has-image');
+      return;
+    }
+    bar.style.flexWrap = 'wrap'; bar.style.gap = '8px';
+    bar.innerHTML = pendingFiles.map(function(f, i){
+      return '<div class="img-thumb-wrap" title="' + String(f.name || '').replace(/"/g,'') + '">'
+        + '<img src="' + f.thumb + '" class="img-thumb" alt="">'
+        + '<button class="img-remove" title="Remove" onclick="removePending(' + i + ')">\u2715</button></div>';
+    }).join('')
+      + '<span class="img-preview-label">' + pendingFiles.length + ' file' + (pendingFiles.length === 1 ? '' : 's')
+      + ' ready \u2014 add a message or send now</span>';
+    bar.classList.add('active');
+    if (btn) btn.classList.add('has-image');
+  }
+  window.handleMultiUpload = function(event){
+    const list = Array.from(event.target.files || []);
+    event.target.value = '';
+    list.forEach(function(f){ handleImageUpload({ target: { files: [f], value: '' } }); });
+  };
 
   const TEXT_EXTS = ['csv','tsv','txt','md'];
   const MAX_TEXT_CHARS = 60000;
