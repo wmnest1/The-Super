@@ -1960,7 +1960,7 @@ app.post("/api/chat", async (req, res) => {
   req.setTimeout(120000);
   res.setTimeout(120000);
   try {
-    const { message, history, imageData, imageType, documentData, documentName } = req.body;
+    const { message, history, imageData, imageType, documentData, documentName, attachments } = req.body;
     let data = await loadData();
     const uploadedFile = documentData
       ? { data: documentData, mimeType: "application/pdf", name: documentName || "Uploaded PDF" }
