@@ -1138,11 +1138,7 @@
     return 'data:image/svg+xml;base64,' + btoa(svg);
   }
   function setFilePreview(iconLabel, iconColor, fileName, note){
-    document.getElementById('img-thumb').src = fileIconDataUri(iconLabel, iconColor);
-    const lbl = document.querySelector('.img-preview-label');
-    if (lbl) lbl.textContent = fileName + ' — ' + (note || 'ready, add a message or send now');
-    document.getElementById('img-preview-bar').classList.add('active');
-    document.getElementById('upload-btn').classList.add('has-image');
+    renderPreviewBar();
   }
   function stashTextFile(text, name, label, color){
     if (!text || !text.trim()) { addMessage('That file appears to be empty (no readable text found).', 'system'); return; }
