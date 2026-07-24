@@ -1427,10 +1427,9 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: kind === 'text'
-            ? '[Attached file: ' + imageToSend.name + ']\n```\n' + imageToSend.text + '\n```\n\n' + displayText
-            : displayText,
+          message: filesToSend.filter(f => f.kind === 'text').map(f => '[Attached file: ' + f.name + ']\n```\n' + f.text + '\n```\n').join('\n') + displayText,
           history,
+          attachments: filesToSend.filter(f => f.kind !== 'text').map(f => ({ kind: f.kind, data: f.data, type: f.type, name: f.name })),
           imageData: kind === 'image' ? imageToSend.data : null,
           imageType: kind === 'image' ? imageToSend.type : null,
           documentData: kind === 'pdf' ? imageToSend.data : null,
