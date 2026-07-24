@@ -1976,14 +1976,18 @@ app.post("/api/chat", async (req, res) => {
 
     let userContent;
     const contentBlocks = [];
-    if (imageData && imageType) {
-      contentBlocks.push({ type: "image", source: { type: "base64", media_type: imageType, data: imageData } });
-    }
-    if (documentData) {
-      contentBlocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: documentData } });
+    const _atts = (Array.isArray(attachments) && attachments.length)
+      ? attachments
+      : (documentData ? [{ kind: "pdf", data: documentData, type: "application/pdf", name: documentName }]
+        : (imageData ? [{ kind: "image", data: imageData, type: imageType, name: "Uploaded image" }] : []));
+    for (const a of _atts) {
+      if (!a || !a.data) continue;
+      if (a.kind === "pdf") contentBlocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data } });
+      else if (a.kind === "image") contentBlocks.push({ type: "image", source: { type: "base64", media_type: a.type || "image/jpeg", data: a.data } });
     }
     if (contentBlocks.length) {
-      const label = documentName ? `[Attached PDF: ${documentName}] ` : "";
+      const _names = _atts.filter(a => a && a.name).map(a => a.name);
+      const label = _names.length ? `[Attached: ${_names.join(", ")}] ` : "";
       contentBlocks.push({ type: "text", text: label + (message || "Please analyze this file.") });
       userContent = contentBlocks;
     } else {
