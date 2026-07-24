@@ -1993,8 +1993,9 @@
       ].filter(Boolean).join('<br>');
     }
     const _ft = { projects:'project', clients:'client', leads:'lead', crew:'crew', subs:'sub' }[tab];
-    const docsBtn = _ft
-      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${_ft}','${(r.name || '').replace(/'/g, "\\'")}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${_ft}','${(r.name || '').replace(/'/g, "\\'")}','photos')">\u{1F4F7} Photos</button>`
+    const _fk = ((tab === 'subs' ? (r.company || r.name) : r.name) || '').replace(/'/g, "\\'");
+    const docsBtn = (_ft && _fk)
+      ? `<button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${_ft}','${_fk}','docs')">\u{1F4C4} Docs</button><button class="edit-btn" style="background:#0f3460" onclick="event.stopPropagation();openRecordFiles('${_ft}','${_fk}','photos')">\u{1F4F7} Photos</button>`
       : '';
     const canDrag = ['clients','projects','crew','subs','unitPrices'].includes(tab);
     const dragAttrs = canDrag
