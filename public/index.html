@@ -1217,12 +1217,9 @@
   }
 
   function clearPendingImage() {
+    pendingFiles = [];
     pendingImage = null;
-    document.getElementById('img-thumb').src = '';
-    const lbl = document.querySelector('.img-preview-label');
-    if (lbl) lbl.textContent = 'Image ready — add a message or send now';
-    document.getElementById('img-preview-bar').classList.remove('active');
-    document.getElementById('upload-btn').classList.remove('has-image');
+    renderPreviewBar();
   }
 
   const textarea = document.getElementById('message-input');
