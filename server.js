@@ -595,6 +595,27 @@ const TOOLS = [
     }
   },
   {
+    name: "save_lead",
+    description: "Add a new lead or update an existing one by name. Use for prospects before they become clients.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Lead name — the unique key." },
+        phone: { type: "string" },
+        email: { type: "string" },
+        address: { type: "string" },
+        source: { type: "string", description: "Referral source." },
+        status: { type: "string", description: "One of: New, Contacted, Site Visit Scheduled, Ballpark Sent, Proposal Sent, Follow-Up, On Hold, Won, Lost. Defaults to New." },
+        value: { type: "string", description: "Estimated value." },
+        lastContact: { type: "string", description: "YYYY-MM-DD" },
+        followup: { type: "string", description: "YYYY-MM-DD" },
+        desc: { type: "string", description: "Project description." },
+        notes: { type: "string" }
+      },
+      required: ["name"]
+    }
+  },
+  {
     name: "save_crew_member",
     description: "Add a new crew member or update an existing one by name.",
     input_schema: {
