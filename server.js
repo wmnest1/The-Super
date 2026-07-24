@@ -1369,6 +1369,19 @@ async function executeTool(toolName, input, data, ctx) {
       data.subs.push(input);
       return { ok: true, action: "created", type: "sub", data: input };
     }
+    case "save_lead": {
+      if (!data.leads) data.leads = [];
+      const _leadKey = String(input.name || "").trim().toLowerCase();
+      const _leadIdx = data.leads.findIndex(l => String(l.name || "").trim().toLowerCase() === _leadKey);
+      if (_leadIdx >= 0) {
+        data.leads[_leadIdx] = { ...data.leads[_leadIdx], ...input };
+        return { ok: true, action: "updated", type: "lead", data: input };
+      }
+      const _newLead = { id: "lead_" + Date.now(), created: new Date().toISOString().slice(0, 10), activity: [], ...input };
+      if (!_newLead.status) _newLead.status = "New";
+      data.leads.push(_newLead);
+      return { ok: true, action: "created", type: "lead", data: _newLead };
+    }
     case "save_crew_member": {
       if (!data.crew) data.crew = [];
       const idx = data.crew.findIndex(c => c.name.toLowerCase() === input.name.toLowerCase());
