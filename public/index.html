@@ -3581,7 +3581,7 @@
 
   window.openRecordFiles = function(type, name, mode){
     mode = mode || 'docs';
-    if (window.isMobile() && window.openMobileWorkspace) return window.openMobileWorkspace({ type: type, name: name }, mode === 'photos' ? 'photos' : 'docs');
+    if (window.isMobile() && window.openMobileWorkspace && ['lead','client','project'].indexOf(type) !== -1) return window.openMobileWorkspace({ type: type, name: name }, mode === 'photos' ? 'photos' : 'docs');
     if (window.openFilesWindow && window.recordPanelScope) return window.openFilesWindow(window.recordPanelScope({ type: type, name: name }, mode), (mode === 'photos' ? '\u{1F4F7} Photos' : '\u{1F4C1} Files') + ' \u2014 ' + name);
   };
 
