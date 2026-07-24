@@ -135,6 +135,7 @@
       catch(e){ itemsEl.innerHTML = '<div class="fb-empty">Could not load files.</div>'; }
     }
     el._fbReload = load;
+    el._fbUpload = uploadFiles;
 
     function render(docs){
       lastDocs = docs;
