@@ -1383,9 +1383,10 @@
     isSending = true;
     const input = document.getElementById('message-input');
     const message = input.value.trim();
-    if (!message && !pendingImage) { isSending = false; return; }
+    if (!message && !pendingFiles.length) { isSending = false; return; }
 
-    const imageToSend = pendingImage;
+    const filesToSend = pendingFiles.slice();
+    const imageToSend = filesToSend[0] || null;
     const kind = imageToSend ? (imageToSend.kind || 'image') : null;
     const displayText = message || (kind === 'image' ? 'Analyze this image.' : kind ? 'Read this file and give me the key points.' : '');
     input.value = '';
