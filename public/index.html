@@ -1186,8 +1186,7 @@
       } else if (ext === 'pdf' || file.type === 'application/pdf') {
         if (file.size > 10 * 1024 * 1024) { addMessage('That PDF is over 10 MB — too large to send. Try uploading just the key pages.', 'system'); return; }
         const buf = await file.arrayBuffer();
-        pendingImage = { kind: 'pdf', data: arrayBufferToBase64(buf), type: 'application/pdf', name: file.name };
-        setFilePreview('PDF', '#b03030', file.name);
+        addPending({ kind: 'pdf', data: arrayBufferToBase64(buf), type: 'application/pdf', name: file.name }, fileIconDataUri('PDF', '#b03030'));
       } else if (ext === 'docx') {
         await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js');
         const buf = await file.arrayBuffer();
