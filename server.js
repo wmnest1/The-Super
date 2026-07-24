@@ -611,6 +611,29 @@ const TOOLS = [
     }
   },
   {
+    name: "save_sub",
+    description: "Add a new subcontractor or update an existing one by company name. Use for subs and vendors — trade, contact, license, and insurance info.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name — the sub's unique key." },
+        trade: { type: "string" },
+        contact: { type: "string" },
+        phone: { type: "string" },
+        email: { type: "string" },
+        address: { type: "string" },
+        cslbNumber: { type: "string" },
+        cslbExpiration: { type: "string", description: "YYYY-MM-DD" },
+        glCarrier: { type: "string" },
+        glExpiration: { type: "string", description: "YYYY-MM-DD" },
+        wcCarrier: { type: "string" },
+        wcExpiration: { type: "string", description: "YYYY-MM-DD" },
+        notes: { type: "string" }
+      },
+      required: ["company"]
+    }
+  },
+  {
     name: "save_unit_price",
     description: "Add or update a unit price / pricing item.",
     input_schema: {
